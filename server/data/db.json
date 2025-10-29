@@ -1,0 +1,294 @@
+{
+  "dashboard": {
+    "userName": "张同学",
+    "stats": [
+      {
+        "id": "studyTime",
+        "title": "本周学习时长",
+        "value": "28.5 小时",
+        "helperText": "比上周提升 14%",
+        "accent": "rgba(25, 118, 210, 0.2)"
+      },
+      {
+        "id": "questionDrill",
+        "title": "累计刷题",
+        "value": "940 题",
+        "helperText": "连续 15 天完成每日计划",
+        "accent": "rgba(255, 112, 67, 0.25)"
+      },
+      {
+        "id": "courseFocus",
+        "title": "重点突破课",
+        "value": "9 门",
+        "helperText": "新增 1 门英语冲刺班",
+        "accent": "rgba(102, 187, 106, 0.25)"
+      },
+      {
+        "id": "mockRank",
+        "title": "阶段模考排名",
+        "value": "TOP 9%",
+        "helperText": "模拟成绩稳步上升",
+        "accent": "rgba(255, 213, 79, 0.35)"
+      }
+    ],
+    "courses": [
+      {
+        "id": "english",
+        "title": "英语一真题精讲营",
+        "category": "公共课",
+        "teacher": "王老师",
+        "progress": 72,
+        "nextTask": "完成 2019 年阅读理解 B 讲义"
+      },
+      {
+        "id": "politics",
+        "title": "肖秀荣政治冲刺课",
+        "category": "公共课",
+        "teacher": "肖老师",
+        "progress": 48,
+        "nextTask": "背诵时政 50 题（第四章）"
+      },
+      {
+        "id": "major",
+        "title": "计算机 408 高频考点训练营",
+        "category": "专业课",
+        "teacher": "张老师",
+        "progress": 61,
+        "nextTask": "完成 图论与最短路径 章节刷题"
+      }
+    ],
+    "practiceSets": [
+      {
+        "id": "practice_001",
+        "name": "数学一选择题强化",
+        "questions": 60,
+        "accuracy": 0.78,
+        "lastAttempt": "2024-04-10T13:00:00.000Z",
+        "focus": "线性代数 · 特征值",
+        "difficulty": "进阶",
+        "duration": 40,
+        "source": "系统推荐"
+      },
+      {
+        "id": "practice_002",
+        "name": "政治主观题热点预测",
+        "questions": 24,
+        "accuracy": 0.64,
+        "lastAttempt": "2024-04-09T10:00:00.000Z",
+        "focus": "时政热点 · 共同富裕",
+        "difficulty": "冲刺",
+        "duration": 35,
+        "source": "系统推荐"
+      },
+      {
+        "id": "practice_003",
+        "name": "英语翻译与写作",
+        "questions": 12,
+        "accuracy": 0.83,
+        "lastAttempt": "2024-04-08T08:00:00.000Z",
+        "focus": "写作逻辑 · 段落衔接",
+        "difficulty": "基础",
+        "duration": 30,
+        "source": "系统推荐"
+      }
+    ],
+    "schedule": [
+      {
+        "id": "schedule_001",
+        "title": "数学一刷题营直播",
+        "type": "直播课",
+        "start": "2024-04-12T19:00:00.000Z",
+        "end": "2024-04-12T21:00:00.000Z",
+        "location": "腾讯会议 938-102-xxx",
+        "focus": "高频错题解析",
+        "tags": ["直播", "数学"]
+      },
+      {
+        "id": "schedule_002",
+        "title": "公共课晨读打卡",
+        "type": "自习",
+        "start": "2024-04-13T06:50:00.000Z",
+        "end": "2024-04-13T07:30:00.000Z",
+        "focus": "英语单词复盘",
+        "tags": ["晨读", "打卡"]
+      },
+      {
+        "id": "schedule_003",
+        "title": "英语一模拟考",
+        "type": "模拟考试",
+        "start": "2024-04-14T13:30:00.000Z",
+        "end": "2024-04-14T17:30:00.000Z",
+        "location": "线下教室 A301",
+        "focus": "全真模拟",
+        "tags": ["模考", "英语"]
+      },
+      {
+        "id": "schedule_004",
+        "title": "晚间错题精炼",
+        "type": "自习",
+        "start": "2024-04-12T21:30:00.000Z",
+        "end": "2024-04-12T22:30:00.000Z",
+        "focus": "整理数学错题",
+        "tags": ["错题", "整理"]
+      }
+    ],
+    "recommendation": "结合错题诊断，本周建议重点夯实线性代数与英语长难句，安排两次 30 分钟冲刺练习并保持晚间复盘。"
+  },
+  "schedule": [
+    {
+      "id": "schedule_001",
+      "title": "数学一刷题营直播",
+      "type": "直播课",
+      "start": "2024-04-12T19:00:00.000Z",
+      "end": "2024-04-12T21:00:00.000Z",
+      "location": "腾讯会议 938-102-xxx",
+      "focus": "高频错题解析",
+      "tags": ["直播", "数学"]
+    },
+    {
+      "id": "schedule_002",
+      "title": "公共课晨读打卡",
+      "type": "自习",
+      "start": "2024-04-13T06:50:00.000Z",
+      "end": "2024-04-13T07:30:00.000Z",
+      "focus": "英语单词复盘",
+      "tags": ["晨读", "打卡"]
+    },
+    {
+      "id": "schedule_003",
+      "title": "英语一模拟考",
+      "type": "模拟考试",
+      "start": "2024-04-14T13:30:00.000Z",
+      "end": "2024-04-14T17:30:00.000Z",
+      "location": "线下教室 A301",
+      "focus": "全真模拟",
+      "tags": ["模考", "英语"]
+    },
+    {
+      "id": "schedule_004",
+      "title": "晚间错题精炼",
+      "type": "自习",
+      "start": "2024-04-12T21:30:00.000Z",
+      "end": "2024-04-12T22:30:00.000Z",
+      "focus": "整理数学错题",
+      "tags": ["错题", "整理"]
+    }
+  ],
+  "practiceSets": [
+    {
+      "id": "practice_001",
+      "name": "数学一选择题强化",
+      "questions": 60,
+      "accuracy": 0.78,
+      "lastAttempt": "2024-04-10T13:00:00.000Z",
+      "focus": "线性代数 · 特征值",
+      "difficulty": "进阶",
+      "duration": 40,
+      "source": "系统推荐"
+    },
+    {
+      "id": "practice_002",
+      "name": "政治主观题热点预测",
+      "questions": 24,
+      "accuracy": 0.64,
+      "lastAttempt": "2024-04-09T10:00:00.000Z",
+      "focus": "时政热点 · 共同富裕",
+      "difficulty": "冲刺",
+      "duration": 35,
+      "source": "系统推荐"
+    },
+    {
+      "id": "practice_003",
+      "name": "英语翻译与写作",
+      "questions": 12,
+      "accuracy": 0.83,
+      "lastAttempt": "2024-04-08T08:00:00.000Z",
+      "focus": "写作逻辑 · 段落衔接",
+      "difficulty": "基础",
+      "duration": 30,
+      "source": "系统推荐"
+    }
+  ],
+  "admin": {
+    "lastSyncAt": "2024-04-10T13:30:00.000Z",
+    "stats": [
+      {
+        "label": "学员活跃度",
+        "value": "1,420",
+        "helper": "日活跃数",
+        "trend": "+8%"
+      },
+      {
+        "label": "题库通过率",
+        "value": "89%",
+        "helper": "AI 质检通过率",
+        "trend": "+3%"
+      },
+      {
+        "label": "课程上线",
+        "value": "18",
+        "helper": "本月发布课节",
+        "trend": "+5"
+      }
+    ],
+    "aiHighlights": [
+      {
+        "title": "AI 诊断提醒",
+        "detail": "政治刷题正确率低于 60%，建议推送错题巩固计划。"
+      },
+      {
+        "title": "知识图谱缺口",
+        "detail": "数据结构 · 图论模块缺少进阶题单，推荐排期。"
+      }
+    ],
+    "reviewQueue": [
+      {
+        "id": "queue_001",
+        "title": "数学冲刺题单 · 阶段反馈",
+        "description": "请复核 AI 推荐的难度梯度，确认是否符合冲刺阶段安排。",
+        "priority": "高"
+      },
+      {
+        "id": "queue_002",
+        "title": "英语写作模板更新",
+        "description": "确认示例作文点评是否符合最新评分标准。",
+        "priority": "中"
+      },
+      {
+        "id": "queue_003",
+        "title": "数据结构强化班新增章节",
+        "description": "补充实验题视频讲解与课后作业解析。",
+        "priority": "高"
+      }
+    ],
+    "courseDrafts": [
+      {
+        "id": "draft_101",
+        "name": "数学强化课 · 高频考点 50 讲",
+        "category": "数学",
+        "status": "待发布",
+        "teacher": "赵老师",
+        "updatedAt": "2024-04-09 19:30",
+        "releaseWindow": "4 月第 3 周"
+      },
+      {
+        "id": "draft_102",
+        "name": "政治主观题答题框架班",
+        "category": "政治",
+        "status": "待完善",
+        "teacher": "王老师",
+        "updatedAt": "2024-04-08 16:20",
+        "releaseWindow": "4 月第 4 周"
+      },
+      {
+        "id": "draft_103",
+        "name": "英语二冲刺模考密卷",
+        "category": "英语",
+        "status": "已发布",
+        "teacher": "刘老师",
+        "updatedAt": "2024-04-07 10:15",
+        "releaseWindow": "已上线"
+      }
+    ]
+  }
+}
