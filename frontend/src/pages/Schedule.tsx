@@ -31,6 +31,7 @@ import { useMemo, useState } from 'react';
 import useSchedule from '../hooks/useSchedule';
 import ScheduleTimeline from '../components/ScheduleTimeline';
 import type { ScheduleItem } from '../data/dashboard';
+import { useAuth } from '../context/AuthContext';
 
 dayjs.extend(duration);
 
@@ -57,6 +58,7 @@ const initialForm: ScheduleFormState = {
 };
 
 const Schedule = () => {
+  const { user } = useAuth();
   const {
     data: schedule = [],
     isFetching,
@@ -64,7 +66,7 @@ const Schedule = () => {
     refetch,
     createSchedule,
     isCreating,
-  } = useSchedule();
+  } = useSchedule(user);
   const [isDialogOpen, setDialogOpen] = useState(false);
   const [formState, setFormState] = useState(initialForm);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -80,8 +82,29 @@ const Schedule = () => {
 
   const timelineItems = useMemo(() => schedule.slice(0, 6), [schedule]);
 
+  const upcomingEvent = useMemo(() => {
+    const future = schedule
+      .filter((item) => dayjs(item.start).isAfter(dayjs()))
+      .sort((a, b) => dayjs(a.start).valueOf() - dayjs(b.start).valueOf());
+    return future[0] ?? null;
+  }, [schedule]);
+
+  const tagFrequency = useMemo(() => {
+    const counter = new Map<string, number>();
+    schedule.forEach((item) => {
+      (item.tags ?? []).forEach((tag) => {
+        const trimmed = tag.trim();
+        if (!trimmed) return;
+        counter.set(trimmed, (counter.get(trimmed) ?? 0) + 1);
+      });
+    });
+    return Array.from(counter.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 6);
+  }, [schedule]);
+
   const handleCreateSchedule = async () => {
-    if (!formState.title.trim() || !formState.date || !formState.startTime || !formState.endTime) {
+    if (!user || !formState.title.trim() || !formState.date || !formState.startTime || !formState.endTime) {
       return;
     }
     const start = dayjs(`${formState.date}T${formState.startTime}`);
@@ -182,6 +205,62 @@ const Schedule = () => {
               <Typography variant="body2" color="text.secondary">
                 建议课前 15 分钟预习大纲，确保课堂吸收度。
               </Typography>
+            </Stack>
+          </Paper>
+        </Grid>
+      </Grid>
+
+      <Grid container spacing={3}>
+        <Grid item xs={12} md={6}>
+          <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid', borderColor: 'divider' }}>
+            <Stack spacing={1.5}>
+              <Typography variant="h6" fontWeight={600}>
+                下一场安排
+              </Typography>
+              {upcomingEvent ? (
+                <>
+                  <Typography variant="subtitle1" fontWeight={600}>
+                    {upcomingEvent.title}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    {dayjs(upcomingEvent.start).format('MM月DD日 HH:mm')} · {upcomingEvent.type}
+                  </Typography>
+                  {upcomingEvent.focus && (
+                    <Typography variant="body2" color="text.secondary">
+                      重点：{upcomingEvent.focus}
+                    </Typography>
+                  )}
+                  <Stack direction="row" spacing={1} flexWrap="wrap">
+                    {(upcomingEvent.tags ?? []).map((tag) => (
+                      <Chip key={tag} label={tag} size="small" />
+                    ))}
+                  </Stack>
+                </>
+              ) : (
+                <Typography variant="body2" color="text.secondary">
+                  暂无未来 24 小时内的学习安排，可在右上角添加新的日程。
+                </Typography>
+              )}
+            </Stack>
+          </Paper>
+        </Grid>
+        <Grid item xs={12} md={6}>
+          <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid', borderColor: 'divider' }}>
+            <Stack spacing={1.5}>
+              <Typography variant="h6" fontWeight={600}>
+                高频标签与复习主题
+              </Typography>
+              {tagFrequency.length > 0 ? (
+                <Stack direction="row" spacing={1} flexWrap="wrap">
+                  {tagFrequency.map(([tag, count]) => (
+                    <Chip key={tag} label={`${tag} ×${count}`} color="primary" variant="outlined" />
+                  ))}
+                </Stack>
+              ) : (
+                <Typography variant="body2" color="text.secondary">
+                  还没有打标签的日程，添加标签可获得更精准的学习建议。
+                </Typography>
+              )}
             </Stack>
           </Paper>
         </Grid>

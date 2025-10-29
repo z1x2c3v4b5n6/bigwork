@@ -17,6 +17,8 @@ export interface PracticeSet {
   difficulty?: '基础' | '进阶' | '冲刺';
   duration?: number;
   source?: string;
+  latestScore?: number | null;
+  latestSummary?: string;
 }
 
 export interface ScheduleItem {
@@ -88,6 +90,8 @@ export const practiceSets: PracticeSet[] = [
     difficulty: '进阶',
     duration: 40,
     source: '系统推荐',
+    latestScore: 82,
+    latestSummary: '最近一次正确 49/60 题，错题集中在线性代数与概率统计。',
   },
   {
     id: 'practice_002',
@@ -99,6 +103,8 @@ export const practiceSets: PracticeSet[] = [
     difficulty: '冲刺',
     duration: 35,
     source: '系统推荐',
+    latestScore: 76,
+    latestSummary: '主观题结构良好，建议补充最新时政案例。',
   },
   {
     id: 'practice_003',
@@ -110,6 +116,8 @@ export const practiceSets: PracticeSet[] = [
     difficulty: '基础',
     duration: 30,
     source: '系统推荐',
+    latestScore: 88,
+    latestSummary: '写作逻辑连贯，关注细节词汇准确性。',
   },
 ];
 

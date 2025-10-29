@@ -28,6 +28,7 @@ import DarkModeIcon from '@mui/icons-material/DarkMode';
 import LightModeIcon from '@mui/icons-material/LightMode';
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
 import LogoutIcon from '@mui/icons-material/Logout';
+import ForumIcon from '@mui/icons-material/Forum';
 import { useMemo, useState } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -44,6 +45,7 @@ const baseNavItems = [
   { label: '课程体系', path: '/courses', icon: <AssignmentIcon /> },
   { label: '刷题训练', path: '/practice', icon: <QuizIcon /> },
   { label: '学习日程', path: '/schedule', icon: <EventIcon /> },
+  { label: '考研圈子', path: '/community', icon: <ForumIcon /> },
   { label: '学习分析', path: '/analytics', icon: <TimelineIcon /> },
   { label: '个人中心', path: '/profile', icon: <PersonIcon /> },
 ];

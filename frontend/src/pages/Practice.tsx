@@ -2,6 +2,7 @@ import {
   Alert,
   Box,
   Button,
+  Checkbox,
   Chip,
   Dialog,
   DialogActions,
@@ -9,11 +10,15 @@ import {
   DialogTitle,
   Drawer,
   FormControl,
+  FormControlLabel,
+  FormGroup,
   Grid,
   InputLabel,
   LinearProgress,
   MenuItem,
   Paper,
+  Radio,
+  RadioGroup,
   Select,
   SelectChangeEvent,
   Stack,
@@ -30,8 +35,16 @@ import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
 import TimelineIcon from '@mui/icons-material/Timeline';
 import AssessmentIcon from '@mui/icons-material/Assessment';
 import { useMemo, useState } from 'react';
+import dayjs from 'dayjs';
 import type { PracticeSet } from '../data/dashboard';
 import usePracticeSets from '../hooks/usePracticeSets';
+import { useAuth } from '../context/AuthContext';
+import {
+  fetchPracticeQuestions,
+  submitPracticeAttempt,
+  type PracticeAttemptResult,
+  type PracticeQuestion,
+} from '../services/practiceService';
 
 interface TrainingFormState {
   name: string;
@@ -48,6 +61,7 @@ const initialForm: TrainingFormState = {
 };
 
 const Practice = () => {
+  const { user } = useAuth();
   const {
     data: practiceSets = [],
     isFetching,
@@ -55,7 +69,7 @@ const Practice = () => {
     refetch,
     createPractice,
     isCreating,
-  } = usePracticeSets();
+  } = usePracticeSets(user);
   const [formState, setFormState] = useState(initialForm);
   const [isCreateDialogOpen, setCreateDialogOpen] = useState(false);
   const [isDiagnosisOpen, setDiagnosisOpen] = useState(false);
@@ -63,7 +77,14 @@ const Practice = () => {
   const [activePractice, setActivePractice] = useState<PracticeSet | null>(null);
   const [isSprintDrawerOpen, setSprintDrawerOpen] = useState(false);
   const [isFocusDialogOpen, setFocusDialogOpen] = useState(false);
-  const [retakeMessage, setRetakeMessage] = useState<string | null>(null);
+  const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
+  const [isAttemptDialogOpen, setAttemptDialogOpen] = useState(false);
+  const [questions, setQuestions] = useState<PracticeQuestion[]>([]);
+  const [questionAnswers, setQuestionAnswers] = useState<Record<string, number[]>>({});
+  const [attemptResult, setAttemptResult] = useState<PracticeAttemptResult | null>(null);
+  const [isLoadingQuestions, setLoadingQuestions] = useState(false);
+  const [questionError, setQuestionError] = useState<string | null>(null);
+  const [isSubmittingAttempt, setSubmittingAttempt] = useState(false);
 
   const diagnosisItems = useMemo(
     () => [
@@ -113,6 +134,10 @@ const Practice = () => {
       setCreationHint({ type: 'error', message: '请填写专项训练名称' });
       return;
     }
+    if (!user || user.role !== 'student') {
+      setCreationHint({ type: 'error', message: '仅学员可以创建专项训练' });
+      return;
+    }
     await createPractice({
       name: formState.name,
       duration: Number(formState.duration) || 45,
@@ -124,10 +149,10 @@ const Practice = () => {
     setFormState(initialForm);
   };
 
-  const handleOpenSprint = (practice: PracticeSet) => {
+  const handleOpenSprintPlan = (practice: PracticeSet) => {
     setActivePractice(practice);
     setSprintDrawerOpen(true);
-    setRetakeMessage(null);
+    setFeedbackMessage(null);
   };
 
   const handleOpenFocus = (practice: PracticeSet) => {
@@ -137,8 +162,97 @@ const Practice = () => {
 
   const handleRetake = (practice: PracticeSet) => {
     setActivePractice(practice);
-    setRetakeMessage(`已为你重置「${practice.name}」的错题训练，将根据最新诊断重新排列题序。`);
+    setFeedbackMessage(`已为你重置「${practice.name}」的错题训练，将根据最新诊断重新排列题序。`);
   };
+
+  const handleStartPractice = async (practice: PracticeSet) => {
+    if (!user) {
+      return;
+    }
+    setActivePractice(practice);
+    setAttemptDialogOpen(true);
+    setFeedbackMessage(null);
+    setQuestions([]);
+    setQuestionAnswers({});
+    setAttemptResult(null);
+    setQuestionError(null);
+    setLoadingQuestions(true);
+    try {
+      const loaded = await fetchPracticeQuestions(practice.id);
+      setQuestions(loaded);
+      setQuestionAnswers(
+        loaded.reduce<Record<string, number[]>>((acc, question) => {
+          acc[question.id] = [];
+          return acc;
+        }, {}),
+      );
+    } catch (error) {
+      setQuestionError('加载题目失败，请稍后重试。');
+    } finally {
+      setLoadingQuestions(false);
+    }
+  };
+
+  const handleCloseAttemptDialog = () => {
+    setAttemptDialogOpen(false);
+    setQuestions([]);
+    setQuestionAnswers({});
+    setAttemptResult(null);
+    setQuestionError(null);
+    setLoadingQuestions(false);
+    setSubmittingAttempt(false);
+  };
+
+  const handleSingleAnswerChange = (questionId: string, optionIndex: number) => {
+    setQuestionAnswers((prev) => ({ ...prev, [questionId]: [optionIndex] }));
+  };
+
+  const handleMultipleAnswerToggle = (questionId: string, optionIndex: number, checked: boolean) => {
+    setQuestionAnswers((prev) => {
+      const current = prev[questionId] ?? [];
+      const next = checked ? [...current, optionIndex] : current.filter((value) => value !== optionIndex);
+      return { ...prev, [questionId]: next.sort((a, b) => a - b) };
+    });
+  };
+
+  const handleSubmitAttempt = async () => {
+    if (!user || !activePractice || questions.length === 0) {
+      return;
+    }
+    setSubmittingAttempt(true);
+    setQuestionError(null);
+    try {
+      const result = await submitPracticeAttempt(activePractice.id, {
+        userId: user.id,
+        answers: questions.map((question) => ({
+          questionId: question.id,
+          selected: questionAnswers[question.id] ?? [],
+        })),
+      });
+      setAttemptResult(result);
+      setFeedbackMessage(
+        `本次练习正确率 ${(result.accuracy * 100).toFixed(0)}%，系统总结：${result.summary}`,
+      );
+      await refetch();
+    } catch (error) {
+      setQuestionError('提交练习失败，请稍后重试。');
+    } finally {
+      setSubmittingAttempt(false);
+    }
+  };
+
+  const canSubmitAttempt =
+    questions.length > 0 &&
+    questions.every((question) => (questionAnswers[question.id]?.length ?? 0) > 0);
+
+  const attemptDetailMap = useMemo(
+    () =>
+      attemptResult?.detail.reduce<Record<string, PracticeAttemptResult['detail'][number]>>((acc, item) => {
+        acc[item.questionId] = item;
+        return acc;
+      }, {}) ?? {},
+    [attemptResult],
+  );
 
   return (
     <Stack spacing={4}>
@@ -245,8 +359,14 @@ const Practice = () => {
                     题量 {practice.questions} · 正确率 {(practice.accuracy * 100).toFixed(0)}%
                   </Typography>
                   <Typography variant="caption" color="text.secondary">
-                    最近训练：{practice.lastAttempt}
+                    最近训练：
+                    {practice.lastAttempt ? dayjs(practice.lastAttempt).format('MM月DD日 HH:mm') : '待开始'}
                   </Typography>
+                  {practice.latestSummary && (
+                    <Typography variant="body2" color="text.secondary" mt={1}>
+                      {practice.latestSummary}
+                    </Typography>
+                  )}
                 </Box>
                 <Stack direction="row" spacing={1} flexWrap="wrap">
                   {practice.focus && <Chip label={practice.focus} color="primary" variant="outlined" />}
@@ -258,9 +378,9 @@ const Practice = () => {
                     variant="contained"
                     startIcon={<TimerIcon />}
                     fullWidth
-                    onClick={() => handleOpenSprint(practice)}
+                    onClick={() => handleStartPractice(practice)}
                   >
-                    30 分钟冲刺
+                    开始练习
                   </Button>
                   <Button
                     variant="outlined"
@@ -268,12 +388,17 @@ const Practice = () => {
                     fullWidth
                     onClick={() => handleOpenFocus(practice)}
                   >
-                    攻克考点
+                    考点拆解
                   </Button>
                 </Stack>
-                <Button startIcon={<RestartAltIcon />} color="inherit" onClick={() => handleRetake(practice)}>
-                  重新练习该套题
-                </Button>
+                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
+                  <Button startIcon={<RestartAltIcon />} color="inherit" onClick={() => handleRetake(practice)}>
+                    重新练习该套题
+                  </Button>
+                  <Button startIcon={<AssessmentIcon />} color="inherit" onClick={() => handleOpenSprintPlan(practice)}>
+                    查看冲刺节奏
+                  </Button>
+                </Stack>
               </Stack>
             </Paper>
           </Grid>
@@ -306,11 +431,116 @@ const Practice = () => {
         </Stack>
       </Paper>
 
-      {retakeMessage && (
-        <Alert severity="success" icon={<EmojiEventsIcon />} onClose={() => setRetakeMessage(null)}>
-          {retakeMessage}
+      {feedbackMessage && (
+        <Alert severity="success" icon={<EmojiEventsIcon />} onClose={() => setFeedbackMessage(null)}>
+          {feedbackMessage}
         </Alert>
       )}
+
+      <Dialog open={isAttemptDialogOpen} onClose={handleCloseAttemptDialog} fullWidth maxWidth="md">
+        <DialogTitle>专项训练 · {activePractice?.name ?? '加载中'}</DialogTitle>
+        <DialogContent dividers>
+          {isLoadingQuestions && <LinearProgress color="secondary" sx={{ mb: 2 }} />}
+          {questionError && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {questionError}
+            </Alert>
+          )}
+          {attemptResult && (
+            <Alert severity="success" icon={<EmojiEventsIcon />} sx={{ mb: 2 }}>
+              本次正确率 {(attemptResult.accuracy * 100).toFixed(0)}%，得分 {attemptResult.score} 分。{attemptResult.summary}
+            </Alert>
+          )}
+          <Stack spacing={3} mt={1}>
+            {questions.map((question, index) => {
+              const answer = questionAnswers[question.id] ?? [];
+              const detail = attemptDetailMap[question.id];
+              const correctLabels = detail
+                ? detail.correct.map((idx) => String.fromCharCode(65 + idx)).join('、')
+                : '';
+              const selectedLabels = detail
+                ? detail.selected.map((idx) => String.fromCharCode(65 + idx)).join('、')
+                : '';
+              const isCorrect = detail?.isCorrect ?? false;
+              return (
+                <Paper
+                  key={question.id}
+                  elevation={0}
+                  sx={{ p: 3, borderRadius: 3, border: '1px solid', borderColor: 'divider' }}
+                >
+                  <Stack spacing={2}>
+                    <Box>
+                      <Typography variant="subtitle1" fontWeight={600}>
+                        {index + 1}. {question.stem}
+                      </Typography>
+                      <Chip
+                        label={question.questionType === 'single' ? '单选题' : '多选题'}
+                        size="small"
+                        color="info"
+                        sx={{ mt: 1 }}
+                      />
+                    </Box>
+                    {question.questionType === 'single' ? (
+                      <RadioGroup
+                        value={answer[0] != null ? String(answer[0]) : ''}
+                        onChange={(event) => handleSingleAnswerChange(question.id, Number(event.target.value))}
+                      >
+                        {question.options.map((option, optionIndex) => (
+                          <FormControlLabel
+                            key={optionIndex}
+                            value={String(optionIndex)}
+                            control={<Radio />}
+                            label={`${String.fromCharCode(65 + optionIndex)}. ${option}`}
+                          />
+                        ))}
+                      </RadioGroup>
+                    ) : (
+                      <FormGroup>
+                        {question.options.map((option, optionIndex) => (
+                          <FormControlLabel
+                            key={optionIndex}
+                            control={
+                              <Checkbox
+                                checked={answer.includes(optionIndex)}
+                                onChange={(event) =>
+                                  handleMultipleAnswerToggle(question.id, optionIndex, event.target.checked)
+                                }
+                              />
+                            }
+                            label={`${String.fromCharCode(65 + optionIndex)}. ${option}`}
+                          />
+                        ))}
+                      </FormGroup>
+                    )}
+                    {detail && (
+                      <Alert severity={isCorrect ? 'success' : 'warning'}>
+                        {isCorrect ? '回答正确！' : '回答有待提高。'} 正确选项：{correctLabels || '—'}；你的选择：
+                        {selectedLabels || '未作答'}。
+                        <Box component="span" sx={{ display: 'block', mt: 1 }}>
+                          解析：{question.explanation}
+                        </Box>
+                      </Alert>
+                    )}
+                  </Stack>
+                </Paper>
+              );
+            })}
+            {!isLoadingQuestions && questions.length === 0 && !questionError && (
+              <Alert severity="info">暂时没有可用的练习题，稍后再试试吧。</Alert>
+            )}
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseAttemptDialog}>关闭</Button>
+          <Button
+            variant="contained"
+            onClick={handleSubmitAttempt}
+            disabled={!canSubmitAttempt || isSubmittingAttempt || isLoadingQuestions}
+          >
+            {isSubmittingAttempt ? '提交中…' : attemptResult ? '重新提交' : '提交答卷'}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       <Dialog open={isCreateDialogOpen} onClose={() => setCreateDialogOpen(false)} fullWidth maxWidth="sm">
         <DialogTitle>生成新的专项训练</DialogTitle>

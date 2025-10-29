@@ -12,6 +12,7 @@ import Profile from './pages/Profile';
 import NotFound from './pages/NotFound';
 import Login from './pages/Login';
 import AdminDashboard from './pages/AdminDashboard';
+import Community from './pages/Community';
 import { RequireAdmin, RequireAuth } from './components/auth/RequireAuth';
 
 const App = () => {
@@ -34,6 +35,7 @@ const App = () => {
           <Route path="courses" element={<Courses />} />
           <Route path="practice" element={<Practice />} />
           <Route path="schedule" element={<Schedule />} />
+          <Route path="community" element={<Community />} />
           <Route path="analytics" element={<Analytics />} />
           <Route path="profile" element={<Profile />} />
           <Route

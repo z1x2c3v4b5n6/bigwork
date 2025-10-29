@@ -1,45 +1,67 @@
 import httpClient from './httpClient';
 
-export interface AdminStat {
-  label: string;
-  value: string;
-  helper: string;
-  trend: string;
+export interface AdminTotals {
+  students: number;
+  majors: number;
+  courses: number;
+  materials: number;
+  forumTopics: number;
 }
 
-export interface AdminHighlight {
-  title: string;
-  detail: string;
-}
-
-export interface ReviewQueueItem {
+export interface AdminCourse {
   id: string;
   title: string;
-  description: string;
-  priority: '高' | '中' | '低';
-}
-
-export interface CourseDraft {
-  id: string;
-  name: string;
   category: string;
-  status: '待发布' | '已发布' | '待完善';
   teacher: string;
-  updatedAt: string;
+  progress: number;
+  status: string;
+  majorName?: string;
   releaseWindow?: string;
 }
 
+export interface AdminMaterial {
+  id: string;
+  title: string;
+  type: string;
+  url: string;
+  description: string;
+  courseId: string;
+  courseName: string;
+  createdAt?: string;
+}
+
+export interface AdminForumItem {
+  id: string;
+  title: string;
+  needsModeration: boolean;
+  commentCount: number;
+  createdAt?: string;
+}
+
+export interface AdminUserItem {
+  id: string;
+  name: string;
+  role: string;
+  email: string;
+  phone: string;
+  majorName: string;
+  createdAt?: string;
+}
+
 export interface AdminOverview {
-  lastSyncAt: string;
-  stats: AdminStat[];
-  aiHighlights: AdminHighlight[];
-  reviewQueue: ReviewQueueItem[];
-  courseDrafts: CourseDraft[];
+  totals: AdminTotals;
+  majors: { id: string; name: string }[];
+  courses: AdminCourse[];
+  courseDrafts: AdminCourse[];
+  materials: AdminMaterial[];
+  forum: AdminForumItem[];
+  users: AdminUserItem[];
 }
 
 const adminOverviewEndpoint = import.meta.env.VITE_ADMIN_OVERVIEW_ENDPOINT ?? '/api/admin/overview';
 const adminCoursesEndpoint = import.meta.env.VITE_ADMIN_COURSES_ENDPOINT ?? '/api/admin/courses';
-const adminSyncEndpoint = import.meta.env.VITE_ADMIN_SYNC_ENDPOINT ?? '/api/admin/sync';
+const majorsEndpoint = import.meta.env.VITE_MAJORS_ENDPOINT ?? '/api/majors';
+const materialsEndpoint = import.meta.env.VITE_MATERIALS_ENDPOINT ?? '/api/materials';
 
 export const fetchAdminOverview = async (): Promise<AdminOverview> => {
   const response = await httpClient.get<AdminOverview>(adminOverviewEndpoint);
@@ -50,20 +72,35 @@ export interface CreateCourseDraftPayload {
   name: string;
   category: string;
   teacher: string;
+  majorId?: string;
   releaseWindow?: string;
+  summary?: string;
 }
 
-export const createCourseDraft = async (payload: CreateCourseDraftPayload): Promise<CourseDraft> => {
-  const response = await httpClient.post<CourseDraft>(adminCoursesEndpoint, payload);
+export const createCourseDraft = async (payload: CreateCourseDraftPayload): Promise<AdminCourse> => {
+  const response = await httpClient.post<AdminCourse>(adminCoursesEndpoint, payload);
   return response.data;
 };
 
-export const publishCourseDraft = async (draftId: string): Promise<CourseDraft> => {
-  const response = await httpClient.post<CourseDraft>(`${adminCoursesEndpoint}/${draftId}/publish`);
+export const publishCourseDraft = async (draftId: string): Promise<AdminCourse> => {
+  const response = await httpClient.post<AdminCourse>(`${adminCoursesEndpoint}/${draftId}/publish`);
   return response.data;
 };
 
-export const triggerAdminSync = async (): Promise<{ lastSyncAt: string }> => {
-  const response = await httpClient.post<{ lastSyncAt: string }>(adminSyncEndpoint);
+export const createMajor = async (payload: { name: string; description?: string }) => {
+  const response = await httpClient.post<{ id: string; name: string; description?: string }>(majorsEndpoint, payload);
+  return response.data;
+};
+
+export interface CreateMaterialPayload {
+  courseId: string;
+  title: string;
+  type: string;
+  url?: string;
+  description?: string;
+}
+
+export const createMaterial = async (payload: CreateMaterialPayload): Promise<AdminMaterial> => {
+  const response = await httpClient.post<AdminMaterial>(materialsEndpoint, payload);
   return response.data;
 };

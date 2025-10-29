@@ -7,52 +7,66 @@ import {
   ScheduleItem,
   dashboardFallback,
 } from '../data/dashboard';
+import type { UserRole } from '../context/AuthContext';
+import type { AdminCourse } from './adminService';
+
+export interface AdminFocusSummary {
+  courseDrafts: AdminCourse[];
+  reviewQueue: { id: string; title: string; content: string; createdAt?: string }[];
+  recentRegistrations: { id: string; name: string; majorName: string; createdAt?: string }[];
+  dataQuality: { majors: number; practiceSets: number; forumTopics: number };
+}
 
 export interface DashboardOverview {
+  role: UserRole;
   userName: string;
   stats: DashboardStat[];
   courses: CourseProgress[];
   practiceSets: PracticeSet[];
   schedule: ScheduleItem[];
   recommendation: string;
+  adminFocus?: AdminFocusSummary;
 }
 
 const dashboardEndpoint = import.meta.env.VITE_DASHBOARD_ENDPOINT ?? '/api/dashboard';
 
-const mergeWithFallback = (payload: Partial<DashboardOverview> | undefined): DashboardOverview => {
+const mergeWithFallback = (payload: DashboardOverview | undefined): DashboardOverview => {
   const fallback = dashboardFallback;
+  if (!payload || payload.role === 'student') {
+    const stats = payload?.stats?.length
+      ? payload.stats.map((stat) => ({
+          ...stat,
+          accent:
+            stat.accent ??
+            fallback.stats.find((item) => item.id === stat.id)?.accent ??
+            fallback.stats[0].accent,
+        }))
+      : fallback.stats;
 
-  const mergeStats = (stats?: DashboardStat[]): DashboardStat[] => {
-    if (!stats || stats.length === 0) {
-      return fallback.stats;
-    }
+    return {
+      role: payload?.role ?? 'student',
+      userName: payload?.userName ?? fallback.userName,
+      stats,
+      courses: payload?.courses && payload.courses.length > 0 ? payload.courses : fallback.courses,
+      practiceSets:
+        payload?.practiceSets && payload.practiceSets.length > 0
+          ? payload.practiceSets
+          : fallback.practiceSets,
+      schedule: payload?.schedule && payload.schedule.length > 0 ? payload.schedule : fallback.schedule,
+      recommendation: payload?.recommendation ?? fallback.recommendation,
+    };
+  }
 
-    return stats.map((stat) => {
-      const fallbackStat = fallback.stats.find((item) => item.id === stat.id);
-      return {
-        ...fallbackStat,
-        ...stat,
-        accent: stat.accent ?? fallbackStat?.accent ?? fallback.stats[0].accent,
-      } as DashboardStat;
-    });
-  };
-
-  return {
-    userName: payload?.userName ?? fallback.userName,
-    stats: mergeStats(payload?.stats),
-    courses: payload?.courses && payload.courses.length > 0 ? payload.courses : fallback.courses,
-    practiceSets:
-      payload?.practiceSets && payload.practiceSets.length > 0
-        ? payload.practiceSets
-        : fallback.practiceSets,
-    schedule: payload?.schedule && payload.schedule.length > 0 ? payload.schedule : fallback.schedule,
-    recommendation: payload?.recommendation ?? fallback.recommendation,
-  };
+  return payload;
 };
 
-export const fetchDashboardOverview = async (): Promise<DashboardOverview> => {
-  const response = await httpClient.get<Partial<DashboardOverview>>(dashboardEndpoint);
+export const fetchDashboardOverview = async (
+  params: { userId: string; role: UserRole },
+): Promise<DashboardOverview> => {
+  const response = await httpClient.get<DashboardOverview>(dashboardEndpoint, {
+    params,
+  });
   return mergeWithFallback(response.data);
 };
 
-export const getDashboardFallback = (): DashboardFallbackData => dashboardFallback;
+export const getDashboardFallback = (): DashboardOverview => mergeWithFallback(undefined);

@@ -3,12 +3,15 @@ import type { ScheduleItem } from '../data/dashboard';
 
 const scheduleEndpoint = import.meta.env.VITE_SCHEDULE_ENDPOINT ?? '/api/schedule';
 
-export const fetchSchedule = async (): Promise<ScheduleItem[]> => {
-  const response = await httpClient.get<ScheduleItem[]>(scheduleEndpoint);
+export const fetchSchedule = async (userId: string): Promise<ScheduleItem[]> => {
+  const response = await httpClient.get<ScheduleItem[]>(scheduleEndpoint, {
+    params: { userId },
+  });
   return response.data;
 };
 
 export interface CreateSchedulePayload {
+  userId: string;
   title: string;
   type: ScheduleItem['type'];
   start: string;

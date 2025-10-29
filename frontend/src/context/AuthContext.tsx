@@ -1,4 +1,5 @@
 import { createContext, useContext, useMemo, useState, type ReactNode } from 'react';
+import httpClient from '../services/httpClient';
 
 export type UserRole = 'student' | 'admin';
 
@@ -7,44 +8,23 @@ export interface AuthUser {
   name: string;
   role: UserRole;
   email: string;
+  phone?: string;
   avatar: string;
   organization: string;
   goal?: string;
+  majorId?: string | null;
+  majorName?: string;
+  bio?: string;
 }
 
 interface AuthContextValue {
   user: AuthUser | null;
   login: (credentials: { username: string; password: string }) => Promise<AuthUser>;
   logout: () => void;
+  refreshUser: (nextUser: AuthUser) => void;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
-
-const ACCOUNT_BOOK: Record<string, { password: string; user: AuthUser }> = {
-  student: {
-    password: 'study2025',
-    user: {
-      id: 'u-student-001',
-      name: '张同学',
-      role: 'student',
-      email: 'student@example.com',
-      avatar: '张',
-      organization: '北京理工大学 · 计算机专硕',
-      goal: '冲刺 2025 统考 390+ 分',
-    },
-  },
-  admin: {
-    password: 'admin123',
-    user: {
-      id: 'u-admin-001',
-      name: '李老师',
-      role: 'admin',
-      email: 'admin@example.com',
-      avatar: '李',
-      organization: '研学进阶教研组',
-    },
-  },
-};
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const storage = typeof window !== 'undefined' ? window.localStorage : null;
@@ -61,21 +41,33 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   });
 
+  const persistUser = (nextUser: AuthUser | null) => {
+    setUser(nextUser);
+    if (nextUser) {
+      storage?.setItem('kaoyan-auth', JSON.stringify(nextUser));
+    } else {
+      storage?.removeItem('kaoyan-auth');
+    }
+  };
+
   const value = useMemo<AuthContextValue>(
     () => ({
       user,
       login: async ({ username, password }) => {
-        const account = ACCOUNT_BOOK[username as keyof typeof ACCOUNT_BOOK];
-        if (!account || account.password !== password) {
+        try {
+          const response = await httpClient.post<AuthUser>('/api/auth/login', { username, password });
+          const loggedInUser = response.data;
+          persistUser(loggedInUser);
+          return loggedInUser;
+        } catch (error) {
           throw new Error('账号或密码不正确');
         }
-        setUser(account.user);
-        storage?.setItem('kaoyan-auth', JSON.stringify(account.user));
-        return account.user;
       },
       logout: () => {
-        setUser(null);
-        storage?.removeItem('kaoyan-auth');
+        persistUser(null);
+      },
+      refreshUser: (nextUser) => {
+        persistUser(nextUser);
       },
     }),
     [storage, user],

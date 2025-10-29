@@ -7,9 +7,9 @@
 | 模块 | 目录 | 进入目录后运行的命令 | 默认端口 |
 | ---- | ---- | ------------------- | -------- |
 | 前端（Vite + React） | `frontend/` | `npm install` → `npm run dev` | `5173` |
-| 后端（Express API） | `server/` | `npm install` → `npm run dev`（或 `npm start`） | `3000` |
+| 后端（Express API + MySQL） | `server/` | `npm install` → `npm run dev`（或 `npm start`） | `3000` |
 
-> ⚠️ 请分别在两个独立的终端中运行前端和后端，确保后端先启动，这样前端在发起接口请求时能够成功返回数据。
+> ⚠️ 请分别在两个独立的终端中运行前端和后端，并在启动后端前确认本地 MySQL 已运行。首次启动会自动建库建表并写入示例数据。
 
 ### 前端对接后端接口
 
@@ -20,7 +20,12 @@
      VITE_DASHBOARD_ENDPOINT=/api/dashboard       # 返回看板总览的接口路径
      VITE_SCHEDULE_ENDPOINT=/api/schedule         # 日程相关接口
      VITE_PRACTICE_ENDPOINT=/api/practice         # 练习题单接口
-     VITE_ADMIN_ENDPOINT=/api/admin               # 管理员端入口
+     VITE_FORUM_ENDPOINT=/api/forum/topics        # 圈子交流接口
+     VITE_ADMIN_OVERVIEW_ENDPOINT=/api/admin/overview
+     VITE_ADMIN_COURSES_ENDPOINT=/api/admin/courses
+     VITE_ADMIN_SYNC_ENDPOINT=/api/admin/sync
+     VITE_MAJORS_ENDPOINT=/api/majors
+     VITE_MATERIALS_ENDPOINT=/api/materials
      VITE_API_WITH_CREDENTIALS=false              # 如果需要携带 Cookie/Session，改为 true
      ```
    - `.env.local` 会被 Vite 自动加载，`VITE_` 前缀会注入到浏览器端代码中。不要在仓库中提交真实的私有地址或密钥。
@@ -48,95 +53,73 @@
    - `stats` 数组中的 `id` 建议使用 `studyTime`、`questionDrill`、`courseFocus`、`mockRank` 之一，以便前端自动匹配相应图标和配色。
 
 3. **页面对应关系**
-   - `Home`、`Courses` 页面使用 `useDashboardData` 钩子获取总览数据。
-   - `Practice`、`Schedule`、`AdminDashboard` 页面分别使用 `usePracticeSets`、`useSchedule`、`useAdminOverview` 调用后端，可在 `frontend/src/services/*.ts` 中调整接口路径或字段映射。
+   - `Home`、`Courses` 页面使用 `useDashboardData` 钩子获取总览数据，并根据登录角色（学员或管理员）展示差异化的总览卡片和提醒。
+   - `Practice` 页面依赖 `/api/practice/*` 系列接口，支持获取题目、开始作答、提交测验以及查看“最新一次练习”摘要。
+   - `Schedule` 页面通过 `/api/schedule` 读写个人行程，新建的日程会同步到首页时间轴和统计区域。
+   - `Community` 页面连接 `/api/forum/topics`，用于发帖、评论、点赞；后端内置敏感词过滤并可标记待审核内容。
+   - `Profile` 页面调用 `/api/users/:id` 与 `/api/majors`，允许学员与管理员分别维护自己的资料、目标和负责方向。
+   - `AdminDashboard` 页面组合 `/api/admin/*`、`/api/materials` 等接口，提供课程发布、资料管理、圈子巡检与统计视图。
 
 4. **调试建议**
    - 保证后端允许跨域访问（CORS），特别是在前端使用 `npm run dev` 时端口为 `5173`。
    - 若后端需要 Cookie/Session，在 `.env.local` 中设置 `VITE_API_WITH_CREDENTIALS=true`，并在后端允许携带凭据。
    - 建议使用浏览器开发者工具的 Network 面板或 `npm run dev -- --host` 暴露给局域网设备调试。
 
-## 后端本地运行与数据库连接（Navicat 示例）
+## 后端本地运行与数据库说明
 
-`server/` 目录提供了一个使用本地 JSON 文件的 Express 示例服务，你可以先按照上面的命令直接运行，确认前后端打通。如果需要接入自己在 Navicat 中管理的数据库（例如 MySQL），可以按照以下步骤改造：
+`server/` 目录已经内置了基于 MySQL 的 Express 服务：
 
-1. **在 Navicat 中创建数据库与数据表**
-   - 新建连接 → 选择 MySQL → 填写主机、端口、用户名和密码（默认端口 3306）。
-   - 连接成功后创建一个新的数据库（例如 `kaoyan_platform`），并在其中建立如下数据表：
-     - `dashboard_stats`（字段：`id`、`title`、`value`、`helper_text`、`icon` 等）
-     - `courses`（字段：`id`、`title`、`category`、`teacher`、`progress`、`next_task` 等）
-     - `practice_sets`（字段：`id`、`name`、`questions`、`accuracy`、`duration`、`focus`、`last_attempt` 等）
-     - `schedule_events`（字段：`id`、`title`、`type`、`start_time`、`end_time`、`location`、`focus`、`tags` 等）
-     - `admin_course_drafts`、`admin_review_tasks` 等管理员专用表。
-   - 你可以使用 Navicat 的「设计表」界面建表，也可以导入 SQL 脚本（例如 `CREATE TABLE ...`）。
-
-2. **安装数据库驱动并配置环境变量**
-   - 在 `server/` 目录安装 MySQL 依赖：
-     ```bash
-     cd server
-     npm install mysql2
-     ```
-   - 新建 `server/.env`（或在部署环境设置变量）：
+1. **数据库配置**
+   - 仓库附带的 `server/.env` 默认内容如下，可在部署前按需修改：
      ```env
      DB_HOST=localhost
      DB_PORT=3306
      DB_USER=root
-     DB_PASSWORD=你的密码
+     DB_PASSWORD=123456
      DB_NAME=kaoyan_platform
      ```
+   - 启动后端前，请确保本地或远程 MySQL 服务已运行且账号密码正确。
 
-3. **在后端代码中启用数据库连接**
-   - 示例：在 `server/index.js` 中引入 `mysql2` 并初始化连接池，然后在各个路由中替换 `readDb()/writeDb()` 为 SQL 查询。
-     ```js
-     import mysql from 'mysql2/promise';
-     import dotenv from 'dotenv';
+2. **自动建库建表与种子数据**
+   - 首次运行 `npm run dev` / `npm start` 时会自动：
+     1. 创建 `kaoyan_platform` 数据库；
+     2. 建立所需的数据表；
+     3. 写入示例专业、账号、课程、资料、题库、圈子、分析等内容。
+   - 如果想重置数据，可在 Navicat 或命令行中清空这些表，或直接删除数据库后重新启动服务。
 
-     dotenv.config();
+3. **主要数据表**
+   | 表名 | 作用 | 关键字段 |
+   | --- | --- | --- |
+   | `majors` | 专业管理 | `name`、`description` |
+   | `users` | 用户与管理员账号 | `username`、`password`、`role`、`major_id` |
+   | `courses` | 课程与发布状态 | `name`、`category`、`teacher`、`status`、`release_window` |
+   | `materials` | 资料与题库附件 | `course_id`、`title`、`material_type`、`url` |
+   | `practice_sets` | 专项训练概览 | `name`、`focus`、`last_accuracy`、`last_summary` |
+   | `practice_questions` | 单选/多选题库 | `practice_set_id`、`question_type`、`stem`、`options_json` |
+   | `practice_attempts` | 练习历史 | `practice_set_id`、`user_id`、`accuracy`、`answers_json` |
+   | `schedule_events` | 学习日程 | `user_id`、`title`、`event_type`、`start_time`、`tags_json` |
+   | `forum_topics` | 圈子话题 | `title`、`content`、`tags_json`、`needs_moderation` |
+   | `forum_comments` | 圈子评论 | `topic_id`、`content`、`author_id` |
+   | `forum_likes` | 点赞记录 | `topic_id`、`user_id` |
+   | `analytics_overview` | 学习分析摘要 | `mock_trend`、`time_distribution`、`behavior_insight` |
+   | `subject_mastery` | 学科掌握度 | `subject`、`mastery`、`trend`、`focus` |
+   | `weak_topics` | 薄弱知识点 | `topic`、`error_rate`、`suggestion` |
 
-     const pool = mysql.createPool({
-       host: process.env.DB_HOST,
-       port: process.env.DB_PORT,
-       user: process.env.DB_USER,
-       password: process.env.DB_PASSWORD,
-       database: process.env.DB_NAME,
-     });
+4. **接口与功能覆盖**
+   - `/api/auth/login`：根据数据库账号完成登录，返回角色信息、联系方式、目标院校等。
+   - `/api/dashboard`：根据角色返回学习总览、课程进度、题单、日程以及管理员关注项。
+   - `/api/practice` + `/api/practice/:id/questions` + `/api/practice/:id/attempt`：创建题单、获取题目、提交答卷并记录最新成绩摘要。
+   - `/api/schedule`：读取与创建学习日程，自动与首页同步。
+   - `/api/forum/topics`：圈子发帖、评论、点赞；系统会使用内置敏感词表替换辱骂词并标记待审核话题。
+   - `/api/users/:id`：个人中心信息查询与更新。
+   - `/api/majors`、`/api/materials`、`/api/admin/*`：管理员端的专业、资料、课程草稿、统计与同步控制。
 
-     app.get('/api/dashboard', async (_req, res) => {
-       const [stats] = await pool.query('SELECT id, title, value, helper_text FROM dashboard_stats ORDER BY sort_order');
-       const [courses] = await pool.query('SELECT * FROM courses ORDER BY updated_at DESC LIMIT 8');
-       // ...按需组装返回对象
-       res.json({ stats, courses /* ... */ });
-     });
-     ```
-   - 如果你希望继续使用 `db.json` 作为兜底数据，可以在查询失败时捕获异常并回退到文件读取逻辑。
+5. **Navicat 维护建议**
+   - 使用 Navicat 连接 `kaoyan_platform` 后，可直接通过可视化界面新增课程、题目、论坛帖子或用户信息。
+   - 导入外部 SQL/CSV 题库时，请确保字段名称与上表一致，必要时可在 `server/seedData.js` 参考示例数据结构。
 
-4. **使用 Navicat 进行数据维护**
-   - Navicat 支持可视化新增、编辑、导入导出数据，所有操作都会直接更新数据库表。
-   - Express 服务使用 SQL 查询实时读取最新数据，因此你在 Navicat 中的修改会立即反映到前端页面。
+6. **预置账号**
+   - 学员账号：`student / study2025`
+   - 管理员账号：`admin / admin123`
 
-5. **常见调试问题**
-   - 如果前端出现 404/500，请检查后端终端的报错信息，确认 SQL 是否正确、连接是否成功。
-   - 若需要远程访问数据库，请在 Navicat 中确认数据库服务端已经开放外网访问，并在 Express 服务器中使用对应的 IP 和端口。
-   - 推荐在 `server` 项目中运行 `npm run dev`，它使用 `nodemon` 监听文件变更，修改后端代码会自动重启服务。
-
-## 示例 JSON 数据服务（快速演示）
-
-在接入真实数据库前，也可以使用默认的 JSON 数据快速预览整体功能：
-
-```bash
-cd server
-npm install
-npm run dev   # 使用 nodemon 热更新
-# 或 npm start # 以纯 Node.js 方式启动
-```
-
-默认会在 `http://localhost:3000` 暴露以下端点：
-
-| 方法 | 路径 | 说明 |
-| ---- | ---- | ---- |
-| GET  | `/api/dashboard`        | 返回学生端看板数据，含课程、题单、日程等 |
-| GET/POST | `/api/practice`     | 获取或创建专项训练题单，支持前端自定义生成 |
-| GET/POST | `/api/schedule`     | 获取或创建学习日程，自动同步到首页时间轴 |
-| GET/POST | `/api/admin/*`      | 管理员端驾驶舱所需的统计、课程草稿与同步动作 |
-
-后端会将新增的日程、题单写回 `server/data/db.json`，刷新页面即可看到更新。
+> 如果需要重新执行种子脚本，可删除数据库或清空各表后重启后端服务。
