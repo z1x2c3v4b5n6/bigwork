@@ -1,7 +1,7 @@
 import { Box, Button, Paper, Stack, Typography } from '@mui/material';
-import { Link as RouterLink } from 'react-router-dom';
 import RocketLaunchIcon from '@mui/icons-material/RocketLaunch';
 import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
+import { Link as RouterLink } from 'react-router-dom';
 
 interface HeroBannerProps {
   greeting: string;
@@ -35,22 +35,22 @@ const HeroBanner = ({ greeting, userName }: HeroBannerProps) => {
           </Typography>
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} mt={4}>
             <Button
-              component={RouterLink}
-              to="/practice"
               variant="contained"
               color="secondary"
               startIcon={<RocketLaunchIcon />}
               size="large"
+              component={RouterLink}
+              to="/practice"
             >
               开始今日计划
             </Button>
             <Button
-              component={RouterLink}
-              to="/schedule"
               variant="outlined"
               color="inherit"
               startIcon={<CalendarMonthIcon />}
               size="large"
+              component={RouterLink}
+              to="/schedule"
             >
               查看一周安排
             </Button>

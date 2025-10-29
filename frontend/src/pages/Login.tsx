@@ -1,73 +1,47 @@
 import {
   Alert,
+  Avatar,
   Box,
   Button,
+  Card,
+  CardContent,
+  Divider,
+  FormControl,
+  InputLabel,
   MenuItem,
-  Paper,
+  Select,
+  Stack,
   TextField,
   Typography,
 } from '@mui/material';
-import { FormEvent, useEffect, useMemo, useState } from 'react';
+import LockIcon from '@mui/icons-material/Lock';
+import { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
-const credentialPresets = [
-  { label: 'Admin', username: 'admin', password: 'admin123' },
-  { label: 'Student', username: 'student', password: 'student123' },
-];
-
 const Login = () => {
-  const { user, login } = useAuth();
+  const { login } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [selectedPreset, setSelectedPreset] = useState('');
-  const [error, setError] = useState('');
+  const [username, setUsername] = useState('student');
+  const [password, setPassword] = useState('study2025');
+  const [error, setError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const redirectPath = useMemo(() => {
-    const state = location.state as { from?: { pathname: string } } | undefined;
+  const from = (location.state as { from?: { pathname: string } } | null)?.from?.pathname ?? '/';
 
-    if (state?.from?.pathname) {
-      return state.from.pathname;
-    }
-
-    if (user?.role === 'admin') {
-      return '/analytics';
-    }
-
-    return '/';
-  }, [location.state, user?.role]);
-
-  useEffect(() => {
-    if (user) {
-      navigate(redirectPath, { replace: true });
-    }
-  }, [navigate, redirectPath, user]);
-
-  const handlePresetChange = (value: string) => {
-    setSelectedPreset(value);
-    const preset = credentialPresets.find((option) => option.username === value);
-
-    if (preset) {
-      setUsername(preset.username);
-      setPassword(preset.password);
-    } else {
-      setUsername('');
-      setPassword('');
-    }
-  };
-
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    setError('');
+    setError(null);
+    setIsSubmitting(true);
 
     try {
-      const authenticatedUser = login(username, password);
-      const fallbackPath = authenticatedUser.role === 'admin' ? '/analytics' : '/';
-      navigate(redirectPath || fallbackPath, { replace: true });
-    } catch (loginError) {
-      setError(loginError instanceof Error ? loginError.message : 'Unable to login');
+      await login({ username, password });
+      navigate(from, { replace: true });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '登录失败，请稍后再试');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -75,69 +49,76 @@ const Login = () => {
     <Box
       sx={{
         minHeight: '100vh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        bgcolor: 'background.default',
+        display: 'grid',
+        placeItems: 'center',
+        bgcolor: 'linear-gradient(120deg, #e3f2fd, #f1f8e9)',
         px: 2,
       }}
     >
-      <Paper component="form" onSubmit={handleSubmit} elevation={6} sx={{ maxWidth: 420, width: '100%', p: 4 }}>
-        <Typography variant="h4" component="h1" fontWeight={700} gutterBottom>
-          登录账户
-        </Typography>
-        <Typography variant="body2" color="text.secondary" gutterBottom>
-          选择预设账号或输入用户名与密码以访问平台。
-        </Typography>
+      <Card sx={{ maxWidth: 420, width: '100%', borderRadius: 4, boxShadow: 8 }}>
+        <CardContent sx={{ p: 5 }}>
+          <Stack spacing={3} component="form" onSubmit={handleSubmit}>
+            <Stack spacing={2} alignItems="center">
+              <Avatar sx={{ bgcolor: 'primary.main', width: 72, height: 72 }}>
+                <LockIcon fontSize="large" />
+              </Avatar>
+              <Box textAlign="center">
+                <Typography variant="h5" fontWeight={700} gutterBottom>
+                  研学进阶登录中心
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  选择对应身份登录即可体验普通学员与管理员的不同功能模块。
+                </Typography>
+              </Box>
+            </Stack>
 
-        <TextField
-          select
-          label="快速选择账号"
-          value={selectedPreset}
-          onChange={(event) => handlePresetChange(event.target.value)}
-          fullWidth
-          margin="normal"
-        >
-          <MenuItem value="">
-            <em>手动输入</em>
-          </MenuItem>
-          {credentialPresets.map((preset) => (
-            <MenuItem key={preset.username} value={preset.username}>
-              {preset.label}（{preset.username}）
-            </MenuItem>
-          ))}
-        </TextField>
+            <Divider textAlign="left">快速体验账号</Divider>
+            <FormControl fullWidth>
+              <InputLabel id="login-role">账号类型</InputLabel>
+              <Select
+                labelId="login-role"
+                label="账号类型"
+                value={username}
+                onChange={(event) => {
+                  const value = event.target.value as 'student' | 'admin';
+                  setUsername(value);
+                  setPassword(value === 'student' ? 'study2025' : 'admin123');
+                }}
+              >
+                <MenuItem value="student">普通学员：student / study2025</MenuItem>
+                <MenuItem value="admin">教学管理员：admin / admin123</MenuItem>
+              </Select>
+            </FormControl>
 
-        <TextField
-          label="用户名"
-          value={username}
-          onChange={(event) => setUsername(event.target.value)}
-          autoComplete="username"
-          required
-          fullWidth
-          margin="normal"
-        />
-        <TextField
-          label="密码"
-          type="password"
-          value={password}
-          onChange={(event) => setPassword(event.target.value)}
-          autoComplete="current-password"
-          required
-          fullWidth
-          margin="normal"
-        />
+            <TextField
+              label="账号"
+              placeholder="student 或 admin"
+              value={username}
+              onChange={(event) => setUsername(event.target.value)}
+              fullWidth
+              required
+            />
+            <TextField
+              label="密码"
+              type="password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              fullWidth
+              required
+            />
 
-        {error && (
-          <Alert severity="error" sx={{ mt: 2 }}>
-            {error}
-          </Alert>
-        )}
+            {error && <Alert severity="error">{error}</Alert>}
 
-        <Button type="submit" variant="contained" size="large" fullWidth sx={{ mt: 3 }}>
-          登录
-        </Button>
-      </Paper>
+            <Button type="submit" variant="contained" size="large" disabled={isSubmitting}>
+              {isSubmitting ? '登录中…' : '立即登录'}
+            </Button>
+
+            <Typography variant="caption" color="text.secondary" textAlign="center">
+              登录即表示你同意平台的《用户协议》与《隐私政策》。
+            </Typography>
+          </Stack>
+        </CardContent>
+      </Card>
     </Box>
   );
 };
