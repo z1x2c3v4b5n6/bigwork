@@ -10,6 +10,8 @@ import Schedule from './pages/Schedule';
 import Analytics from './pages/Analytics';
 import Profile from './pages/Profile';
 import NotFound from './pages/NotFound';
+import AdminDashboard from './pages/AdminDashboard';
+import RequireAdmin from './components/RequireAdmin';
 
 const App = () => {
   const [mode, setMode] = useState<'light' | 'dark'>('light');
@@ -26,6 +28,14 @@ const App = () => {
           <Route path="/schedule" element={<Schedule />} />
           <Route path="/analytics" element={<Analytics />} />
           <Route path="/profile" element={<Profile />} />
+          <Route
+            path="/admin"
+            element={(
+              <RequireAdmin>
+                <AdminDashboard />
+              </RequireAdmin>
+            )}
+          />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </AppLayout>
