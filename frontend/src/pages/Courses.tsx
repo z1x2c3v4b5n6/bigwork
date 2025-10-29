@@ -18,9 +18,11 @@ import PlayCircleIcon from '@mui/icons-material/PlayCircle';
 import AutoStoriesIcon from '@mui/icons-material/AutoStories';
 import SchoolIcon from '@mui/icons-material/School';
 import useDashboardData from '../hooks/useDashboardData';
+import { useAuth } from '../context/AuthContext';
 
 const Courses = () => {
-  const { data, isFetching, isError, refetch } = useDashboardData();
+  const { user } = useAuth();
+  const { data, isFetching, isError, refetch } = useDashboardData(user);
   const courseProgressData = data?.courses ?? [];
 
   return (
