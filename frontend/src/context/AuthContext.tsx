@@ -34,6 +34,21 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL?.replace(/\/?$/, '') ?? '
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
+const parseResponseBody = async (response: Response): Promise<Record<string, unknown>> => {
+  const text = await response.text();
+
+  if (!text) {
+    return {};
+  }
+
+  try {
+    return JSON.parse(text) as Record<string, unknown>;
+  } catch (error) {
+    console.warn('响应体不是 JSON，返回原始文本', error);
+    return { message: text };
+  }
+};
+
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
@@ -45,12 +60,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       });
 
       if (response.ok) {
-        const data = await response.json();
-        setUser(data?.user ?? null);
+        const data = await parseResponseBody(response);
+        setUser((data as { user?: AuthUser }).user ?? null);
       } else if (response.status === 401) {
         setUser(null);
       } else {
-        console.error('无法获取登录状态', response.statusText);
+        const data = await parseResponseBody(response);
+        const message = (data as { message?: string }).message ?? response.statusText;
+        console.error('无法获取登录状态', message);
         setUser(null);
       }
     } catch (error) {
@@ -79,12 +96,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       });
 
       if (!response.ok) {
-        const message = (await response.text()) || '登录失败，请检查账号或密码';
+        const data = await parseResponseBody(response);
+        const message = (data as { message?: string }).message ?? '登录失败，请检查账号或密码';
         throw new Error(message);
       }
 
-      const data = await response.json();
-      setUser(data?.user ?? null);
+      const data = await parseResponseBody(response);
+      setUser((data as { user?: AuthUser }).user ?? null);
     } finally {
       setLoading(false);
     }
@@ -100,7 +118,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       });
 
       if (!response.ok) {
-        const message = (await response.text()) || '退出登录失败';
+        const data = await parseResponseBody(response);
+        const message = (data as { message?: string }).message ?? '退出登录失败';
         throw new Error(message);
       }
     } finally {
