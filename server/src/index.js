@@ -4,13 +4,18 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 
 import authRouter from './routes/auth.js';
+import adminRouter from './routes/admin.js';
+import practiceRouter from './routes/practice.js';
+import forumRouter from './routes/forum.js';
 import { getPool } from './config/database.js';
 
 dotenv.config();
 
 const app = express();
 
-const allowedOrigins = (process.env.ALLOWED_ORIGINS ?? 'http://localhost:5173')
+const defaultOrigins = ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:5175'];
+
+const allowedOrigins = (process.env.ALLOWED_ORIGINS ?? defaultOrigins.join(','))
   .split(',')
   .map((origin) => origin.trim())
   .filter(Boolean);
@@ -28,7 +33,9 @@ app.use(
         return callback(null, true);
       }
 
-      return callback(new Error(`Origin ${origin} is not allowed by CORS`));
+      const error = new Error(`Origin ${origin} is not allowed by CORS`);
+      console.warn(error.message);
+      return callback(error);
     },
     credentials: true,
   }),
@@ -62,6 +69,13 @@ app.get('/health', async (req, res, next) => {
 });
 
 app.use('/api/auth', authRouter);
+app.use('/api/admin', adminRouter);
+app.use('/api/practice', practiceRouter);
+app.use('/api/forum', forumRouter);
+
+app.use('/api/*', (req, res) => {
+  res.status(404).json({ message: '接口未找到' });
+});
 
 app.use((err, req, res, next) => {
   console.error('请求处理失败:', err);

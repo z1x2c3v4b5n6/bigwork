@@ -28,8 +28,9 @@ import PersonIcon from '@mui/icons-material/Person';
 import DarkModeIcon from '@mui/icons-material/DarkMode';
 import LightModeIcon from '@mui/icons-material/LightMode';
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
-import { MouseEvent, ReactNode, useMemo, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import ForumIcon from '@mui/icons-material/Forum';
+import { MouseEvent, useMemo, useState } from 'react';
+import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 const baseNavItems = [
@@ -39,6 +40,7 @@ const baseNavItems = [
   { label: '学习日程', path: '/schedule', icon: <EventIcon /> },
   { label: '考研圈子', path: '/community', icon: <ForumIcon /> },
   { label: '学习分析', path: '/analytics', icon: <TimelineIcon /> },
+  { label: '考研论坛', path: '/forum', icon: <ForumIcon /> },
   { label: '个人中心', path: '/profile', icon: <PersonIcon /> },
 ];
 
@@ -47,12 +49,11 @@ const adminNavItem = { label: '后台管理', path: '/admin', icon: <AdminPanelS
 interface AppLayoutProps {
   mode: 'light' | 'dark';
   onToggleMode: () => void;
-  children: ReactNode;
 }
 
 const drawerWidth = 240;
 
-const AppLayout = ({ mode, onToggleMode, children }: AppLayoutProps) => {
+const AppLayout = ({ mode, onToggleMode }: AppLayoutProps) => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [accountMenuAnchor, setAccountMenuAnchor] = useState<null | HTMLElement>(null);
   const isDesktop = useMediaQuery('(min-width:1024px)');
@@ -82,9 +83,7 @@ const AppLayout = ({ mode, onToggleMode, children }: AppLayoutProps) => {
       console.error('退出登录失败', error);
     } finally {
       handleCloseAccountMenu();
-      if (location.pathname.startsWith('/admin')) {
-        navigate('/');
-      }
+      navigate('/login', { replace: true });
     }
   };
 

@@ -1,6 +1,15 @@
 # bigwork
 
-毕业设计 - 考研学习平台前后端项目。本次提交新增了基于 React + Vite + Material UI 的前端原型，并配套了一个 Node.js Express 示例后端，涵盖学习概览、课程体系、刷题训练、日程规划、数据分析以及个人中心等核心页面，便于与现有后端或数据库对接。
+毕业设计 - 考研学习平台前后端项目。当前代码在原型界面基础上扩展了完整的账号体系、后台管理、刷题题库、论坛交流等功能模块，所有数
+据均通过接口写入 MySQL，由人工维护的数据库结构提供支撑。
+
+## 新增功能概览
+
+- **账号体系**：登录、注册直接对接数据库中的 `users` 表，AuthContext 会在路由层拦截未登录访问；退出登录后自动失去管理员权限。
+- **后台管理**：`/admin` 页面提供基础信息、用户、专业、课程、资料、论坛、统计查询等面板，所有操作均调用 `/api/admin/*` 接口写入数据库。
+- **刷题训练**：`/practice` 页面支持创建题单、录入题目、实时查看题库内容，全部存储于 `practice_sets`、`practice_questions` 表。
+- **考研论坛**：`/forum` 页面提供话题与帖子增删，管理员可在后台进行话题、帖子审核与删除。
+- **接口约束**：服务端不会自动建表或填充种子数据，所有结构需按下方 SQL 手动执行。跨域默认允许 `5173/5174/5175` 端口，便于多实例调试。
 
 ## 前后端目录与启动方式
 
@@ -60,66 +69,176 @@
    - `Profile` 页面调用 `/api/users/:id` 与 `/api/majors`，允许学员与管理员分别维护自己的资料、目标和负责方向。
    - `AdminDashboard` 页面组合 `/api/admin/*`、`/api/materials` 等接口，提供课程发布、资料管理、圈子巡检与统计视图。
 
-4. **调试建议**
-   - 保证后端允许跨域访问（CORS），特别是在前端使用 `npm run dev` 时端口为 `5173`。
-   - 若后端需要 Cookie/Session，在 `.env.local` 中设置 `VITE_API_WITH_CREDENTIALS=true`，并在后端允许携带凭据。
-   - 建议使用浏览器开发者工具的 Network 面板或 `npm run dev -- --host` 暴露给局域网设备调试。
+## 服务端接口与数据库表结构
 
-## 后端本地运行与数据库说明
+> **重要说明**：以下所有数据表均需由你手动在 MySQL 中创建，项目不会自动建表。字段类型统一采用 `BIGINT UNSIGNED` 作为主键，时间字段建议使用 `DATETIME` 并结合 `toMySQLDateTime` 工具统一写入格式。
 
-`server/` 目录已经内置了基于 MySQL 的 Express 服务：
+### 认证与基础设置
 
-1. **数据库配置**
-   - 仓库附带的 `server/.env` 默认内容如下，可在部署前按需修改：
-     ```env
-     DB_HOST=localhost
-     DB_PORT=3306
-     DB_USER=root
-     DB_PASSWORD=123456
-     DB_NAME=kaoyan_platform
-     ```
-   - 启动后端前，请确保本地或远程 MySQL 服务已运行且账号密码正确。
+```sql
+CREATE TABLE `users` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `username` VARCHAR(64) NOT NULL UNIQUE,
+  `password` VARCHAR(255) NOT NULL,
+  `display_name` VARCHAR(100) NOT NULL,
+  `email` VARCHAR(120) DEFAULT NULL,
+  `role` ENUM('student','admin') NOT NULL DEFAULT 'student',
+  `created_at` DATETIME NOT NULL,
+  `updated_at` DATETIME NOT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-2. **自动建库建表与种子数据**
-   - 首次运行 `npm run dev` / `npm start` 时会自动：
-     1. 创建 `kaoyan_platform` 数据库；
-     2. 建立所需的数据表；
-     3. 写入示例专业、账号、课程、资料、题库、圈子、分析等内容。
-   - 如果想重置数据，可在 Navicat 或命令行中清空这些表，或直接删除数据库后重新启动服务。
+CREATE TABLE `site_settings` (
+  `key` VARCHAR(64) NOT NULL,
+  `value` TEXT,
+  `updated_at` DATETIME NOT NULL,
+  PRIMARY KEY (`key`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-3. **主要数据表**
-   | 表名 | 作用 | 关键字段 |
-   | --- | --- | --- |
-   | `majors` | 专业管理 | `name`、`description` |
-   | `users` | 用户与管理员账号 | `username`、`password`、`role`、`major_id` |
-   | `courses` | 课程与发布状态 | `name`、`category`、`teacher`、`status`、`release_window` |
-   | `materials` | 资料与题库附件 | `course_id`、`title`、`material_type`、`url` |
-   | `practice_sets` | 专项训练概览 | `name`、`focus`、`last_accuracy`、`last_summary` |
-   | `practice_questions` | 单选/多选题库 | `practice_set_id`、`question_type`、`stem`、`options_json` |
-   | `practice_attempts` | 练习历史 | `practice_set_id`、`user_id`、`accuracy`、`answers_json` |
-   | `schedule_events` | 学习日程 | `user_id`、`title`、`event_type`、`start_time`、`tags_json` |
-   | `forum_topics` | 圈子话题 | `title`、`content`、`tags_json`、`needs_moderation` |
-   | `forum_comments` | 圈子评论 | `topic_id`、`content`、`author_id` |
-   | `forum_likes` | 点赞记录 | `topic_id`、`user_id` |
-   | `analytics_overview` | 学习分析摘要 | `mock_trend`、`time_distribution`、`behavior_insight` |
-   | `subject_mastery` | 学科掌握度 | `subject`、`mastery`、`trend`、`focus` |
-   | `weak_topics` | 薄弱知识点 | `topic`、`error_rate`、`suggestion` |
+CREATE TABLE `admin_audit_logs` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `action` VARCHAR(120) NOT NULL,
+  `detail` TEXT,
+  `actor_name` VARCHAR(100),
+  `created_at` DATETIME NOT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+```
 
-4. **接口与功能覆盖**
-   - `/api/auth/login`：根据数据库账号完成登录，返回角色信息、联系方式、目标院校等。
-   - `/api/dashboard`：根据角色返回学习总览、课程进度、题单、日程以及管理员关注项。
-   - `/api/practice` + `/api/practice/:id/questions` + `/api/practice/:id/attempt`：创建题单、获取题目、提交答卷并记录最新成绩摘要。
-   - `/api/schedule`：读取与创建学习日程，自动与首页同步。
-   - `/api/forum/topics`：圈子发帖、评论、点赞；系统会使用内置敏感词表替换辱骂词并标记待审核话题。
-   - `/api/users/:id`：个人中心信息查询与更新。
-   - `/api/majors`、`/api/materials`、`/api/admin/*`：管理员端的专业、资料、课程草稿、统计与同步控制。
+### 学习与运营数据
 
-5. **Navicat 维护建议**
-   - 使用 Navicat 连接 `kaoyan_platform` 后，可直接通过可视化界面新增课程、题目、论坛帖子或用户信息。
-   - 导入外部 SQL/CSV 题库时，请确保字段名称与上表一致，必要时可在 `server/seedData.js` 参考示例数据结构。
+```sql
+CREATE TABLE `student_progress` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `user_id` BIGINT UNSIGNED NOT NULL,
+  `target_university` VARCHAR(120) DEFAULT NULL,
+  `weekly_study_hours` INT DEFAULT 0,
+  `completion_rate` DECIMAL(5,2) DEFAULT 0,
+  `updated_at` DATETIME NOT NULL,
+  PRIMARY KEY (`id`),
+  FOREIGN KEY (`user_id`) REFERENCES `users`(`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-6. **预置账号**
-   - 学员账号：`student / study2025`
-   - 管理员账号：`admin / admin123`
+CREATE TABLE `study_tasks` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `user_id` BIGINT UNSIGNED NOT NULL,
+  `title` VARCHAR(120) NOT NULL,
+  `completed` TINYINT(1) DEFAULT 0,
+  `completed_at` DATETIME DEFAULT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-> 如果需要重新执行种子脚本，可删除数据库或清空各表后重启后端服务。
+CREATE TABLE `follow_up_tasks` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `title` VARCHAR(120) NOT NULL,
+  `status` ENUM('pending','done') NOT NULL DEFAULT 'pending',
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE `system_alerts` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `message` VARCHAR(255) NOT NULL,
+  `resolved` TINYINT(1) NOT NULL DEFAULT 0,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+```
+
+### 教务信息管理
+
+```sql
+CREATE TABLE `majors` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `name` VARCHAR(120) NOT NULL,
+  `description` TEXT,
+  `created_at` DATETIME NOT NULL,
+  `updated_at` DATETIME NOT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE `courses` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `title` VARCHAR(150) NOT NULL,
+  `description` TEXT,
+  `teacher` VARCHAR(100),
+  `credit` DECIMAL(4,1) DEFAULT NULL,
+  `major_id` BIGINT UNSIGNED DEFAULT NULL,
+  `created_at` DATETIME NOT NULL,
+  `updated_at` DATETIME NOT NULL,
+  PRIMARY KEY (`id`),
+  FOREIGN KEY (`major_id`) REFERENCES `majors`(`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE `course_materials` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `course_id` BIGINT UNSIGNED DEFAULT NULL,
+  `title` VARCHAR(150) NOT NULL,
+  `description` TEXT,
+  `file_url` VARCHAR(255),
+  `created_at` DATETIME NOT NULL,
+  `updated_at` DATETIME NOT NULL,
+  PRIMARY KEY (`id`),
+  FOREIGN KEY (`course_id`) REFERENCES `courses`(`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+```
+
+### 刷题题库
+
+```sql
+CREATE TABLE `practice_sets` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `title` VARCHAR(150) NOT NULL,
+  `description` TEXT,
+  `difficulty` VARCHAR(20) DEFAULT 'medium',
+  `tags` VARCHAR(255) DEFAULT NULL,
+  `created_by` BIGINT UNSIGNED DEFAULT NULL,
+  `created_at` DATETIME NOT NULL,
+  `updated_at` DATETIME NOT NULL,
+  PRIMARY KEY (`id`),
+  FOREIGN KEY (`created_by`) REFERENCES `users`(`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE `practice_questions` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `practice_set_id` BIGINT UNSIGNED NOT NULL,
+  `question_text` TEXT NOT NULL,
+  `answer_text` TEXT,
+  `explanation` TEXT,
+  `tags` VARCHAR(255),
+  `difficulty` VARCHAR(20) DEFAULT 'medium',
+  `created_by` BIGINT UNSIGNED DEFAULT NULL,
+  `created_at` DATETIME NOT NULL,
+  `updated_at` DATETIME NOT NULL,
+  PRIMARY KEY (`id`),
+  FOREIGN KEY (`practice_set_id`) REFERENCES `practice_sets`(`id`),
+  FOREIGN KEY (`created_by`) REFERENCES `users`(`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+```
+
+### 论坛交流
+
+```sql
+CREATE TABLE `forum_topics` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `title` VARCHAR(150) NOT NULL,
+  `description` TEXT,
+  `created_by` BIGINT UNSIGNED DEFAULT NULL,
+  `created_at` DATETIME NOT NULL,
+  `updated_at` DATETIME NOT NULL,
+  PRIMARY KEY (`id`),
+  FOREIGN KEY (`created_by`) REFERENCES `users`(`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE `forum_posts` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `topic_id` BIGINT UNSIGNED NOT NULL,
+  `user_id` BIGINT UNSIGNED DEFAULT NULL,
+  `content` TEXT NOT NULL,
+  `created_at` DATETIME NOT NULL,
+  `updated_at` DATETIME NOT NULL,
+  PRIMARY KEY (`id`),
+  FOREIGN KEY (`topic_id`) REFERENCES `forum_topics`(`id`),
+  FOREIGN KEY (`user_id`) REFERENCES `users`(`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+```
+
+准备好以上表结构后即可直接运行 `node server/src/index.js` 启动后端，并通过前端界面完成增删改查操作。

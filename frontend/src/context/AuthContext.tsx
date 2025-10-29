@@ -22,10 +22,18 @@ export interface LoginPayload {
   password: string;
 }
 
+export interface RegisterPayload {
+  username: string;
+  password: string;
+  displayName: string;
+  email?: string;
+}
+
 interface AuthContextValue {
   user: AuthUser | null;
   loading: boolean;
   login: (credentials: LoginPayload) => Promise<void>;
+  register: (payload: RegisterPayload) => Promise<void>;
   logout: () => Promise<void>;
   refresh: () => Promise<void>;
 }
@@ -108,6 +116,32 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [API_BASE_URL]);
 
+  const register = useCallback(async (payload: RegisterPayload) => {
+    setLoading(true);
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/auth/register`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const data = await parseResponseBody(response);
+        const message = (data as { message?: string }).message ?? '注册失败，请稍后重试';
+        throw new Error(message);
+      }
+
+      const data = await parseResponseBody(response);
+      setUser((data as { user?: AuthUser }).user ?? null);
+    } finally {
+      setLoading(false);
+    }
+  }, [API_BASE_URL]);
+
   const logout = useCallback(async () => {
     setLoading(true);
 
@@ -138,10 +172,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       user,
       loading,
       login,
+      register,
       logout,
       refresh,
     }),
-    [user, loading, login, logout, refresh],
+    [user, loading, login, register, logout, refresh],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

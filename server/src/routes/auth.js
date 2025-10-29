@@ -5,7 +5,7 @@ const router = Router();
 
 const sanitizeUser = (row) => ({
   id: String(row.id),
-  name: row.name ?? row.username ?? '未知用户',
+  name: row.display_name ?? row.username ?? '未知用户',
   username: row.username ?? '',
   role: row.role ?? 'student',
   email: row.email ?? undefined,
@@ -30,7 +30,7 @@ router.post('/login', async (req, res, next) => {
     }
 
     const users = await query(
-      `SELECT id, username, name, role, email, password FROM users WHERE username = ? LIMIT 1`,
+      'SELECT id, username, display_name, role, email, password FROM users WHERE username = ? LIMIT 1',
       [username],
     );
 
@@ -80,6 +80,46 @@ router.post('/logout', (req, res, next) => {
     res.clearCookie(sessionCookieName, cookieOptions);
     return res.json({ success: true });
   });
+});
+
+router.post('/register', async (req, res, next) => {
+  try {
+    const { username, password, displayName, email } = req.body ?? {};
+
+    if (!username || !password || !displayName) {
+      return res.status(400).json({ message: '用户名、姓名和密码均为必填项' });
+    }
+
+    const existing = await query('SELECT id FROM users WHERE username = ? LIMIT 1', [username]);
+
+    if (existing.length > 0) {
+      return res.status(409).json({ message: '用户名已存在' });
+    }
+
+    const result = await query(
+      'INSERT INTO users (username, password, display_name, email, role, created_at, updated_at) VALUES (?, ?, ?, ?, ?, NOW(), NOW())',
+      [username, password, displayName, email ?? null, 'student'],
+    );
+
+    const user = sanitizeUser({
+      id: result.insertId,
+      username,
+      display_name: displayName,
+      email,
+      role: 'student',
+    });
+
+    return req.session.regenerate((error) => {
+      if (error) {
+        return next(error);
+      }
+
+      req.session.user = user;
+      return res.status(201).json({ success: true, user });
+    });
+  } catch (error) {
+    return next(error);
+  }
 });
 
 export default router;
