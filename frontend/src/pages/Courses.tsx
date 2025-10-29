@@ -1,8 +1,11 @@
 import {
+  Alert,
   Box,
+  Button,
   Chip,
   Divider,
   Grid,
+  LinearProgress,
   List,
   ListItem,
   ListItemAvatar,
@@ -14,11 +17,28 @@ import {
 import PlayCircleIcon from '@mui/icons-material/PlayCircle';
 import AutoStoriesIcon from '@mui/icons-material/AutoStories';
 import SchoolIcon from '@mui/icons-material/School';
-import { courseProgressData } from '../data/dashboard';
+import useDashboardData from '../hooks/useDashboardData';
 
 const Courses = () => {
+  const { data, isFetching, isError, refetch } = useDashboardData();
+  const courseProgressData = data?.courses ?? [];
+
   return (
     <Stack spacing={4}>
+      {isFetching && <LinearProgress />}
+      {isError && (
+        <Alert
+          severity="error"
+          action={
+            <Button color="inherit" size="small" onClick={() => refetch()}>
+              重试
+            </Button>
+          }
+        >
+          课程信息暂时无法从后端获取，当前展示示例数据。
+        </Alert>
+      )}
+
       <Box>
         <Typography variant="h4" fontWeight={700} gutterBottom>
           课程体系

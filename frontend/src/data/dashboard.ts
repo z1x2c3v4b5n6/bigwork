@@ -24,6 +24,25 @@ export interface ScheduleItem {
   location?: string;
 }
 
+export type DashboardStatId = 'studyTime' | 'questionDrill' | 'courseFocus' | 'mockRank';
+
+export interface DashboardStat {
+  id: DashboardStatId;
+  title: string;
+  value: string;
+  helperText: string;
+  accent: string;
+}
+
+export interface DashboardFallbackData {
+  userName: string;
+  stats: DashboardStat[];
+  courses: CourseProgress[];
+  practiceSets: PracticeSet[];
+  schedule: ScheduleItem[];
+  recommendation: string;
+}
+
 export const courseProgressData: CourseProgress[] = [
   {
     id: 'english',
@@ -99,3 +118,44 @@ export const schedule: ScheduleItem[] = [
     end: '2024-03-16T17:30:00',
   },
 ];
+
+export const dashboardStats: DashboardStat[] = [
+  {
+    id: 'studyTime',
+    title: '本周学习时长',
+    value: '26.5 小时',
+    helperText: '比上周提升 12%',
+    accent: 'rgba(25, 118, 210, 0.2)',
+  },
+  {
+    id: 'questionDrill',
+    title: '累计刷题',
+    value: '860 题',
+    helperText: '连续 12 天完成每日计划',
+    accent: 'rgba(255, 112, 67, 0.25)',
+  },
+  {
+    id: 'courseFocus',
+    title: '重点突破课',
+    value: '8 门',
+    helperText: '新上线 2 门冲刺小班',
+    accent: 'rgba(102, 187, 106, 0.25)',
+  },
+  {
+    id: 'mockRank',
+    title: '阶段模考排名',
+    value: 'TOP 12%',
+    helperText: '保持冲刺节奏，继续巩固弱项',
+    accent: 'rgba(255, 213, 79, 0.35)',
+  },
+];
+
+export const dashboardFallback: DashboardFallbackData = {
+  userName: '张同学',
+  stats: dashboardStats,
+  courses: courseProgressData,
+  practiceSets,
+  schedule,
+  recommendation:
+    '结合你的练习记录，建议本周重点回顾线性代数特征值章节，并安排一次政治时事热点速记。周末尝试进行一次 3 小时完整模拟，提前适应考试节奏。',
+};

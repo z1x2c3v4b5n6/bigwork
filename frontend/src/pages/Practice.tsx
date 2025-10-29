@@ -1,12 +1,29 @@
-import { Box, Button, Chip, Grid, LinearProgress, Paper, Stack, Typography } from '@mui/material';
+import { Alert, Box, Button, Chip, Grid, LinearProgress, Paper, Stack, Typography } from '@mui/material';
 import TimerIcon from '@mui/icons-material/Timer';
 import FlagIcon from '@mui/icons-material/Flag';
 import RestartAltIcon from '@mui/icons-material/RestartAlt';
-import { practiceSets } from '../data/dashboard';
+import useDashboardData from '../hooks/useDashboardData';
 
 const Practice = () => {
+  const { data, isFetching, isError, refetch } = useDashboardData();
+  const practiceSets = data?.practiceSets ?? [];
+
   return (
     <Stack spacing={4}>
+      {isFetching && <LinearProgress color="secondary" />}
+      {isError && (
+        <Alert
+          severity="error"
+          action={
+            <Button color="inherit" size="small" onClick={() => refetch()}>
+              重试
+            </Button>
+          }
+        >
+          刷题数据暂时不可用，当前为示例内容。
+        </Alert>
+      )}
+
       <Box>
         <Typography variant="h4" fontWeight={700} gutterBottom>
           刷题训练营

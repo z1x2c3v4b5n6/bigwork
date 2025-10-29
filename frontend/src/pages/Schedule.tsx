@@ -1,8 +1,11 @@
 import {
+  Alert,
   Box,
+  Button,
   Chip,
   Divider,
   Grid,
+  LinearProgress,
   List,
   ListItem,
   ListItemIcon,
@@ -15,11 +18,28 @@ import AccessTimeFilledIcon from '@mui/icons-material/AccessTimeFilled';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import AlarmOnIcon from '@mui/icons-material/AlarmOn';
 import dayjs from 'dayjs';
-import { schedule } from '../data/dashboard';
+import useDashboardData from '../hooks/useDashboardData';
 
 const Schedule = () => {
+  const { data, isFetching, isError, refetch } = useDashboardData();
+  const schedule = data?.schedule ?? [];
+
   return (
     <Stack spacing={4}>
+      {isFetching && <LinearProgress color="secondary" />}
+      {isError && (
+        <Alert
+          severity="error"
+          action={
+            <Button color="inherit" size="small" onClick={() => refetch()}>
+              重试
+            </Button>
+          }
+        >
+          暂时无法同步后端日程，以下为示例计划。
+        </Alert>
+      )}
+
       <Box>
         <Typography variant="h4" fontWeight={700} gutterBottom>
           学习日程
