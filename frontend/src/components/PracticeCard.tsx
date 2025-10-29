@@ -1,6 +1,7 @@
 import { Box, Chip, Paper, Stack, Typography } from '@mui/material';
 import QuizIcon from '@mui/icons-material/Quiz';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import SchoolIcon from '@mui/icons-material/School';
 import type { PracticeSet } from '../data/dashboard';
 import dayjs from 'dayjs';
 
@@ -40,9 +41,17 @@ const PracticeCard = ({ practice }: PracticeCardProps) => {
           sx={{ ml: 'auto' }}
         />
       </Stack>
-      <Typography variant="body2" color="text.secondary">
-        建议：针对错题进行归类整理，强化薄弱环节。
-      </Typography>
+      <Stack direction="row" spacing={1} alignItems="center">
+        <SchoolIcon color="primary" fontSize="small" />
+        <Typography variant="body2" color="text.secondary">
+          {practice.focus ?? '建议针对错题进行归类整理，强化薄弱环节。'}
+        </Typography>
+      </Stack>
+      <Stack direction="row" spacing={1}>
+        {practice.difficulty && <Chip label={practice.difficulty} size="small" color="primary" variant="outlined" />}
+        {practice.source && <Chip label={practice.source} size="small" variant="outlined" />}
+        {practice.duration && <Chip label={`${practice.duration} 分钟`} size="small" variant="outlined" />}
+      </Stack>
     </Paper>
   );
 };

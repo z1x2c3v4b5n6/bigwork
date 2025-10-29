@@ -13,15 +13,22 @@ export interface PracticeSet {
   questions: number;
   accuracy: number;
   lastAttempt: string;
+  focus?: string;
+  difficulty?: '基础' | '进阶' | '冲刺';
+  duration?: number;
+  source?: string;
 }
 
 export interface ScheduleItem {
   id: string;
   title: string;
-  type: '直播课' | '自习' | '模拟考试';
+  type: '直播课' | '自习' | '模拟考试' | '教练辅导';
   start: string;
   end: string;
   location?: string;
+  focus?: string;
+  tags?: string[];
+  createdAt?: string;
 }
 
 export type DashboardStatId = 'studyTime' | 'questionDrill' | 'courseFocus' | 'mockRank';
@@ -72,50 +79,78 @@ export const courseProgressData: CourseProgress[] = [
 
 export const practiceSets: PracticeSet[] = [
   {
-    id: 'ps1',
+    id: 'practice_001',
     name: '数学一选择题强化',
     questions: 60,
-    accuracy: 0.74,
-    lastAttempt: '2024-03-08',
+    accuracy: 0.78,
+    lastAttempt: '2024-04-10T13:00:00.000Z',
+    focus: '线性代数 · 特征值',
+    difficulty: '进阶',
+    duration: 40,
+    source: '系统推荐',
   },
   {
-    id: 'ps2',
+    id: 'practice_002',
     name: '政治主观题热点预测',
-    questions: 20,
-    accuracy: 0.6,
-    lastAttempt: '2024-03-07',
+    questions: 24,
+    accuracy: 0.64,
+    lastAttempt: '2024-04-09T10:00:00.000Z',
+    focus: '时政热点 · 共同富裕',
+    difficulty: '冲刺',
+    duration: 35,
+    source: '系统推荐',
   },
   {
-    id: 'ps3',
+    id: 'practice_003',
     name: '英语翻译与写作',
-    questions: 10,
-    accuracy: 0.82,
-    lastAttempt: '2024-03-05',
+    questions: 12,
+    accuracy: 0.83,
+    lastAttempt: '2024-04-08T08:00:00.000Z',
+    focus: '写作逻辑 · 段落衔接',
+    difficulty: '基础',
+    duration: 30,
+    source: '系统推荐',
   },
 ];
 
 export const schedule: ScheduleItem[] = [
   {
-    id: 'sc1',
+    id: 'schedule_001',
     title: '数学一刷题营直播',
     type: '直播课',
-    start: '2024-03-10T19:00:00',
-    end: '2024-03-10T21:00:00',
+    start: '2024-04-12T19:00:00.000Z',
+    end: '2024-04-12T21:00:00.000Z',
     location: '腾讯会议 938-102-xxx',
+    focus: '高频错题解析',
+    tags: ['直播', '数学'],
   },
   {
-    id: 'sc2',
+    id: 'schedule_002',
     title: '公共课晨读打卡',
     type: '自习',
-    start: '2024-03-11T06:50:00',
-    end: '2024-03-11T07:30:00',
+    start: '2024-04-13T06:50:00.000Z',
+    end: '2024-04-13T07:30:00.000Z',
+    focus: '英语单词复盘',
+    tags: ['晨读', '打卡'],
   },
   {
-    id: 'sc3',
+    id: 'schedule_003',
     title: '英语一模拟考',
     type: '模拟考试',
-    start: '2024-03-16T13:30:00',
-    end: '2024-03-16T17:30:00',
+    start: '2024-04-14T13:30:00.000Z',
+    end: '2024-04-14T17:30:00.000Z',
+    location: '线下教室 A301',
+    focus: '全真模拟',
+    tags: ['模考', '英语'],
+  },
+  {
+    id: 'schedule_004',
+    title: '晚间错题精炼',
+    type: '自习',
+    start: '2024-04-12T21:30:00.000Z',
+    end: '2024-04-12T22:30:00.000Z',
+    focus: '整理数学错题',
+    tags: ['错题', '整理'],
   },
 ];
 

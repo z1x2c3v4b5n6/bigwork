@@ -1,6 +1,6 @@
 # bigwork
 
-毕业设计 - 考研学习平台前后端项目。本次提交新增了基于 React + Vite + Material UI 的前端原型，涵盖学习概览、课程体系、刷题训练、日程规划、数据分析以及个人中心等核心页面，便于与现有后端接口对接。
+毕业设计 - 考研学习平台前后端项目。本次提交新增了基于 React + Vite + Material UI 的前端原型，并配套了一个 Node.js Express 示例后端，涵盖学习概览、课程体系、刷题训练、日程规划、数据分析以及个人中心等核心页面，便于与现有后端或数据库对接。
 
 ## 前端如何连接现有后端
 
@@ -8,7 +8,9 @@
    - 将 `frontend/.env.example` 复制为 `frontend/.env.local`（或 `.env`），并根据后端部署情况修改：
      ```bash
      VITE_API_BASE_URL=http://localhost:3000      # 你的后端基础地址
-     VITE_DASHBOARD_ENDPOINT=/dashboard-overview  # 返回看板总览的接口路径
+     VITE_DASHBOARD_ENDPOINT=/api/dashboard       # 返回看板总览的接口路径
+     VITE_SCHEDULE_ENDPOINT=/api/schedule         # 日程相关接口
+     VITE_PRACTICE_ENDPOINT=/api/practice         # 练习题单接口
      VITE_API_WITH_CREDENTIALS=false              # 如果需要携带 Cookie/Session，改为 true
      ```
    - `.env.local` 会被 Vite 自动加载，`VITE_` 前缀会注入到浏览器端代码中。不要在仓库中提交真实的私有地址或密钥。
@@ -36,13 +38,34 @@
    - `stats` 数组中的 `id` 建议使用 `studyTime`、`questionDrill`、`courseFocus`、`mockRank` 之一，以便前端自动匹配相应图标和配色。
 
 3. **在前端页面中查看接口数据**
-   - `Home`、`Courses`、`Practice`、`Schedule` 页面通过 `useDashboardData` 钩子调用后端，当接口可用时会展示实时数据；如果请求失败，则会显示错误提示并保留示例数据。
-   - 你可以在 `frontend/src/services/dashboardService.ts` 中自定义字段映射逻辑，例如追加新的统计项、练习类型或使用不同的接口路径。
+   - `Home` 和 `Courses` 页面通过 `useDashboardData` 钩子获取概览数据；`Practice`、`Schedule`、`AdminDashboard` 页面分别使用 `usePracticeSets`、`useSchedule`、`useAdminOverview` 钩子调用后端，可以创建题单、安排日程以及维护管理员端课程草稿。
+   - 你可以在 `frontend/src/services/*.ts` 中自定义字段映射逻辑，例如追加新的统计项、练习类型或使用不同的接口路径。
 
 4. **联调建议**
    - 保证后端允许跨域访问（CORS），特别是在前端使用 `npm run dev` 时端口通常为 `5173`。
    - 若后端需要 Cookie 或 Session，可以在 `.env.local` 中把 `VITE_API_WITH_CREDENTIALS` 设置为 `true`，并在后端设置允许携带凭据。
    - 推荐使用 `npm run dev` 启动前端后，通过浏览器开发者工具或 `Network` 面板确认请求是否成功、数据结构是否匹配。
+
+## 示例后端（可选）
+
+仓库新增了 `server/` 目录，提供一个基于 Express 的轻量 API，数据存放在 `server/data/db.json` 中，便于本地调试：
+
+```bash
+cd server
+npm install
+npm run dev   # 或 npm start
+```
+
+默认会在 `http://localhost:3000` 暴露以下端点：
+
+| 方法 | 路径 | 说明 |
+| ---- | ---- | ---- |
+| GET  | `/api/dashboard`        | 返回学生端看板数据，含课程、题单、日程等 |
+| GET/POST | `/api/practice`     | 获取或创建专项训练题单，支持前端自定义生成 |
+| GET/POST | `/api/schedule`     | 获取或创建学习日程，自动同步到首页时间轴 |
+| GET/POST | `/api/admin/*`      | 管理员端驾驶舱所需的统计、课程草稿与同步动作 |
+
+后端会将新增的日程、题单写回 `db.json`，刷新页面即可看到更新；若你已有数据库，可以把这些路由替换成真实查询逻辑。
 
 ## 如何上传到 GitHub
 

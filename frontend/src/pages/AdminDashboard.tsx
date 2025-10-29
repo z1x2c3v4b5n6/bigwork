@@ -6,9 +6,6 @@ import {
   Divider,
   Grid,
   LinearProgress,
-  List,
-  ListItem,
-  ListItemText,
   MenuItem,
   Paper,
   Stack,
@@ -18,173 +15,224 @@ import {
   TableHead,
   TableRow,
   TextField,
+  Tooltip,
   Typography,
 } from '@mui/material';
-import AnalyticsIcon from '@mui/icons-material/Analytics';
-import PendingActionsIcon from '@mui/icons-material/PendingActions';
-import LibraryBooksIcon from '@mui/icons-material/LibraryBooks';
+import InsightsIcon from '@mui/icons-material/Insights';
 import UploadIcon from '@mui/icons-material/Upload';
-import AddTaskIcon from '@mui/icons-material/AddTask';
-import { useState } from 'react';
-
-interface CourseDraft {
-  id: string;
-  name: string;
-  category: string;
-  status: '待发布' | '已发布' | '待完善';
-  teacher: string;
-  updatedAt: string;
-}
-
-const initialDrafts: CourseDraft[] = [
-  {
-    id: 'draft-001',
-    name: '数学强化课 · 高频考点 50 讲',
-    category: '数学',
-    status: '待发布',
-    teacher: '赵老师',
-    updatedAt: '2024-04-10',
-  },
-  {
-    id: 'draft-002',
-    name: '政治主观题答题框架班',
-    category: '政治',
-    status: '待完善',
-    teacher: '王老师',
-    updatedAt: '2024-04-08',
-  },
-  {
-    id: 'draft-003',
-    name: '英语二冲刺模考密卷',
-    category: '英语',
-    status: '已发布',
-    teacher: '刘老师',
-    updatedAt: '2024-04-05',
-  },
-];
+import GroupsIcon from '@mui/icons-material/Groups';
+import TaskIcon from '@mui/icons-material/Task';
+import PlaylistAddCheckIcon from '@mui/icons-material/PlaylistAddCheck';
+import RocketLaunchIcon from '@mui/icons-material/RocketLaunch';
+import PriorityHighIcon from '@mui/icons-material/PriorityHigh';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import { useMemo, useState } from 'react';
+import useAdminOverview from '../hooks/useAdminOverview';
 
 const AdminDashboard = () => {
-  const [drafts, setDrafts] = useState(initialDrafts);
-  const [newCourse, setNewCourse] = useState({ name: '', category: '', teacher: '' });
-  const [syncing, setSyncing] = useState(false);
+  const {
+    overviewQuery: { data, isLoading, isError, refetch },
+    syncMutation,
+    createCourseMutation,
+    publishCourseMutation,
+  } = useAdminOverview();
 
-  const handlePublish = (draftId: string) => {
-    setDrafts((prev) =>
-      prev.map((draft) => (draft.id === draftId ? { ...draft, status: '已发布', updatedAt: '刚刚' } : draft)),
-    );
+  const [newCourse, setNewCourse] = useState({ name: '', category: '数学', teacher: '', releaseWindow: '' });
+
+  const isSyncing = syncMutation.isPending;
+  const isCreating = createCourseMutation.isPending;
+
+  const highlightChips = useMemo(
+    () =>
+      (data?.stats ?? []).map((stat) => ({
+        ...stat,
+        color: stat.trend.startsWith('+') ? 'success' : stat.trend.startsWith('-') ? 'error' : 'default',
+      })),
+    [data?.stats],
+  );
+
+  const handleSync = async () => {
+    await syncMutation.mutateAsync();
   };
 
-  const handleCreateCourse = () => {
+  const handleCreateCourse = async () => {
     if (!newCourse.name || !newCourse.category || !newCourse.teacher) {
       return;
     }
-    const draft: CourseDraft = {
-      id: `draft-${Date.now()}`,
-      name: newCourse.name,
-      category: newCourse.category,
-      status: '待发布',
-      teacher: newCourse.teacher,
-      updatedAt: '刚刚',
-    };
-    setDrafts((prev) => [draft, ...prev]);
-    setNewCourse({ name: '', category: '', teacher: '' });
+    await createCourseMutation.mutateAsync(newCourse);
+    setNewCourse({ name: '', category: '数学', teacher: '', releaseWindow: '' });
   };
 
-  const handleSync = async () => {
-    setSyncing(true);
-    await new Promise((resolve) => setTimeout(resolve, 1200));
-    setSyncing(false);
+  const handlePublish = async (draftId: string) => {
+    await publishCourseMutation.mutateAsync(draftId);
   };
 
   return (
     <Stack spacing={4}>
-      {syncing && <LinearProgress color="secondary" />}
+      {(isLoading || isSyncing) && <LinearProgress color="secondary" />}
 
       <Stack spacing={1}>
         <Typography variant="h4" fontWeight={700}>
           教学管理驾驶舱
         </Typography>
         <Typography variant="body1" color="text.secondary">
-          快速掌握课程发布、题库运营与学员学情的核心指标，构建以数据驱动的教学决策流程。
+          与学生端完全不同的管理视角，聚焦在学情监控、课程上新与题库质检，让你一站式掌控教学节奏。
         </Typography>
       </Stack>
+
+      {isError && (
+        <Alert severity="error" action={<Button color="inherit" onClick={() => refetch()}>重试</Button>}>
+          后端管理数据暂时不可用，稍后再试或检查服务是否启动。
+        </Alert>
+      )}
 
       <Grid container spacing={3}>
         <Grid item xs={12} md={4}>
           <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid', borderColor: 'divider' }}>
             <Stack spacing={2}>
               <Stack direction="row" spacing={2} alignItems="center">
-                <AnalyticsIcon color="primary" />
+                <UploadIcon color="primary" />
                 <Box>
                   <Typography variant="subtitle1" fontWeight={600}>
                     学情数据同步
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
-                    最近一次同步：2024-04-10 21:30
+                    最近一次同步：{data ? new Date(data.lastSyncAt).toLocaleString() : '—'}
                   </Typography>
                 </Box>
               </Stack>
-              <Button variant="contained" onClick={handleSync} startIcon={<UploadIcon />} disabled={syncing}>
-                {syncing ? '同步中…' : '同步后端数据仓'}
+              <Button variant="contained" onClick={handleSync} startIcon={<RocketLaunchIcon />} disabled={isSyncing}>
+                {isSyncing ? '同步中…' : '刷新学情大盘'}
               </Button>
               <Alert severity="info" sx={{ bgcolor: 'primary.50' }}>
-                已接入 5 个学院的智能学情上报接口，支持实时监控薄弱知识点分布。
+                已接入学院学情 API，支持实时下发预警；同步后学生端即可看到最新学习建议。
               </Alert>
             </Stack>
           </Paper>
         </Grid>
 
-        <Grid item xs={12} md={4}>
-          <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid', borderColor: 'divider' }}>
+        <Grid item xs={12} md={8}>
+          <Paper
+            elevation={0}
+            sx={{
+              p: 3,
+              borderRadius: 3,
+              border: '1px solid',
+              borderColor: 'divider',
+              height: '100%',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 2,
+            }}
+          >
+            <Stack direction="row" spacing={2} alignItems="center">
+              <InsightsIcon color="secondary" />
+              <Typography variant="subtitle1" fontWeight={600}>
+                中台实时指标
+              </Typography>
+            </Stack>
+            <Grid container spacing={2}>
+              {highlightChips.map((stat) => (
+                <Grid item xs={12} sm={4} key={stat.label}>
+                  <Paper elevation={0} sx={{ p: 2, borderRadius: 2, bgcolor: 'grey.50' }}>
+                    <Typography variant="body2" color="text.secondary">
+                      {stat.label}
+                    </Typography>
+                    <Typography variant="h5" fontWeight={700} sx={{ mt: 1 }}>
+                      {stat.value}
+                    </Typography>
+                    <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 1 }}>
+                      <Chip size="small" label={stat.trend} color={stat.color as 'success' | 'error' | 'default'} />
+                      <Typography variant="caption" color="text.secondary">
+                        {stat.helper}
+                      </Typography>
+                    </Stack>
+                  </Paper>
+                </Grid>
+              ))}
+            </Grid>
+            <Stack spacing={1}>
+              <Typography variant="subtitle2" color="text.secondary">
+                AI 风险提示
+              </Typography>
+              <Grid container spacing={2}>
+                {(data?.aiHighlights ?? []).map((item) => (
+                  <Grid item xs={12} md={6} key={item.title}>
+                    <Paper elevation={0} sx={{ p: 2, borderRadius: 2, border: '1px solid', borderColor: 'divider' }}>
+                      <Stack direction="row" spacing={1.5} alignItems="flex-start">
+                        <PriorityHighIcon color="warning" fontSize="small" />
+                        <Box>
+                          <Typography variant="subtitle2">{item.title}</Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            {item.detail}
+                          </Typography>
+                        </Box>
+                      </Stack>
+                    </Paper>
+                  </Grid>
+                ))}
+              </Grid>
+            </Stack>
+          </Paper>
+        </Grid>
+      </Grid>
+
+      <Grid container spacing={3}>
+        <Grid item xs={12} md={5}>
+          <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid', borderColor: 'divider', height: '100%' }}>
             <Stack spacing={2}>
               <Stack direction="row" spacing={2} alignItems="center">
-                <PendingActionsIcon color="secondary" />
-                <Box>
-                  <Typography variant="subtitle1" fontWeight={600}>
-                    待处理事项
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    今日需审核 12 套题单与 4 项课程变更。
-                  </Typography>
-                </Box>
+                <GroupsIcon color="primary" />
+                <Typography variant="subtitle1" fontWeight={600}>
+                  审核待办清单
+                </Typography>
               </Stack>
-              <List dense>
-                <ListItem>
-                  <ListItemText primary="数学冲刺题单 · 阶段性反馈" secondary="需复核 AI 评分准则" />
-                </ListItem>
-                <ListItem>
-                  <ListItemText primary="英语写作模板更新" secondary="待确认示例作文是否合规" />
-                </ListItem>
-                <ListItem>
-                  <ListItemText primary="数据结构强化班新增章节" secondary="确认新增实验题答案" />
-                </ListItem>
-              </List>
+              <Stack spacing={2}>
+                {(data?.reviewQueue ?? []).map((item) => (
+                  <Paper key={item.id} elevation={0} sx={{ p: 2, borderRadius: 2, bgcolor: 'grey.50' }}>
+                    <Stack spacing={1}>
+                      <Stack direction="row" alignItems="center" spacing={1}>
+                        <Chip
+                          size="small"
+                          color={item.priority === '高' ? 'error' : item.priority === '中' ? 'warning' : 'default'}
+                          label={`优先级 ${item.priority}`}
+                        />
+                        <Typography variant="subtitle2">{item.title}</Typography>
+                      </Stack>
+                      <Typography variant="body2" color="text.secondary">
+                        {item.description}
+                      </Typography>
+                    </Stack>
+                  </Paper>
+                ))}
+              </Stack>
             </Stack>
           </Paper>
         </Grid>
 
-        <Grid item xs={12} md={4}>
+        <Grid item xs={12} md={7}>
           <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid', borderColor: 'divider' }}>
             <Stack spacing={2}>
               <Stack direction="row" spacing={2} alignItems="center">
-                <LibraryBooksIcon color="success" />
-                <Box>
-                  <Typography variant="subtitle1" fontWeight={600}>
-                    资源规划
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    下周重点：上线《408 算法拔高营》与政治主观题密训。
-                  </Typography>
-                </Box>
+                <TaskIcon color="secondary" />
+                <Typography variant="subtitle1" fontWeight={600}>
+                  运营流程概览
+                </Typography>
               </Stack>
-              <Stack direction="row" spacing={1} flexWrap="wrap">
-                <Chip label="题库升级" color="primary" variant="outlined" />
-                <Chip label="课件排期" color="secondary" variant="outlined" />
-                <Chip label="督学运营" color="success" variant="outlined" />
+              <Stack spacing={1}>
+                <Typography variant="body2" color="text.secondary">
+                  · AI 自动整理错题诊断，管理员审核后推送至学员端“AI 训练营”。
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  · 课程草稿通过后自动进入排期表，并生成督学提醒。
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  · 已发布课程会同步到直播排班与题库更新日程，学生端导航随即更新。
+                </Typography>
               </Stack>
-              <Typography variant="body2" color="text.secondary">
-                可通过下方“课程产出”快速录入新课并安排教学团队上线节奏。
-              </Typography>
+              <Alert severity="success" icon={<CheckCircleIcon />}>
+                最新一轮迭代已让管理员专注任务缩短 36%，请持续维护 AI 规则以保持效果。
+              </Alert>
             </Stack>
           </Paper>
         </Grid>
@@ -225,8 +273,20 @@ const AdminDashboard = () => {
                 onChange={(event) => setNewCourse((prev) => ({ ...prev, teacher: event.target.value }))}
                 sx={{ minWidth: 160 }}
               />
-              <Button variant="contained" startIcon={<AddTaskIcon />} onClick={handleCreateCourse}>
-                新建课程草稿
+              <TextField
+                label="上线窗口"
+                value={newCourse.releaseWindow}
+                placeholder="如：5 月第 2 周"
+                onChange={(event) => setNewCourse((prev) => ({ ...prev, releaseWindow: event.target.value }))}
+                sx={{ minWidth: 160 }}
+              />
+              <Button
+                variant="contained"
+                startIcon={<PlaylistAddCheckIcon />}
+                onClick={handleCreateCourse}
+                disabled={isCreating}
+              >
+                {isCreating ? '生成中…' : '新建课程草稿'}
               </Button>
             </Stack>
           </Stack>
@@ -239,17 +299,19 @@ const AdminDashboard = () => {
                 <TableCell>课程名称</TableCell>
                 <TableCell>科目</TableCell>
                 <TableCell>主讲老师</TableCell>
+                <TableCell>上线窗口</TableCell>
                 <TableCell>状态</TableCell>
                 <TableCell>更新时间</TableCell>
                 <TableCell align="right">操作</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
-              {drafts.map((draft) => (
+              {(data?.courseDrafts ?? []).map((draft) => (
                 <TableRow key={draft.id} hover>
                   <TableCell>{draft.name}</TableCell>
                   <TableCell>{draft.category}</TableCell>
                   <TableCell>{draft.teacher}</TableCell>
+                  <TableCell>{draft.releaseWindow ?? '待排期'}</TableCell>
                   <TableCell>
                     <Chip
                       size="small"
@@ -260,10 +322,17 @@ const AdminDashboard = () => {
                   <TableCell>{draft.updatedAt}</TableCell>
                   <TableCell align="right">
                     <Stack direction="row" spacing={1} justifyContent="flex-end">
-                      <Button variant="outlined" size="small">
-                        校对
-                      </Button>
-                      <Button variant="contained" size="small" onClick={() => handlePublish(draft.id)}>
+                      <Tooltip title="导出校审清单">
+                        <Button variant="outlined" size="small">
+                          导出
+                        </Button>
+                      </Tooltip>
+                      <Button
+                        variant="contained"
+                        size="small"
+                        onClick={() => handlePublish(draft.id)}
+                        disabled={draft.status === '已发布' || publishCourseMutation.isPending}
+                      >
                         一键发布
                       </Button>
                     </Stack>
