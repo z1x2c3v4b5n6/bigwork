@@ -2,7 +2,16 @@
 
 毕业设计 - 考研学习平台前后端项目。本次提交新增了基于 React + Vite + Material UI 的前端原型，并配套了一个 Node.js Express 示例后端，涵盖学习概览、课程体系、刷题训练、日程规划、数据分析以及个人中心等核心页面，便于与现有后端或数据库对接。
 
-## 前端如何连接现有后端
+## 前后端目录与启动方式
+
+| 模块 | 目录 | 进入目录后运行的命令 | 默认端口 |
+| ---- | ---- | ------------------- | -------- |
+| 前端（Vite + React） | `frontend/` | `npm install` → `npm run dev` | `5173` |
+| 后端（Express API） | `server/` | `npm install` → `npm run dev`（或 `npm start`） | `3000` |
+
+> ⚠️ 请分别在两个独立的终端中运行前端和后端，确保后端先启动，这样前端在发起接口请求时能够成功返回数据。
+
+### 前端对接后端接口
 
 1. **配置接口地址**
    - 将 `frontend/.env.example` 复制为 `frontend/.env.local`（或 `.env`），并根据后端部署情况修改：
@@ -11,11 +20,12 @@
      VITE_DASHBOARD_ENDPOINT=/api/dashboard       # 返回看板总览的接口路径
      VITE_SCHEDULE_ENDPOINT=/api/schedule         # 日程相关接口
      VITE_PRACTICE_ENDPOINT=/api/practice         # 练习题单接口
+     VITE_ADMIN_ENDPOINT=/api/admin               # 管理员端入口
      VITE_API_WITH_CREDENTIALS=false              # 如果需要携带 Cookie/Session，改为 true
      ```
    - `.env.local` 会被 Vite 自动加载，`VITE_` 前缀会注入到浏览器端代码中。不要在仓库中提交真实的私有地址或密钥。
 
-2. **返回统一的数据结构**
+2. **数据结构参考**
    - 前端默认会请求 `GET {VITE_API_BASE_URL}{VITE_DASHBOARD_ENDPOINT}` 并期望返回如下字段（可以按需增减，缺失时会自动使用内置示例数据兜底）：
      ```jsonc
      {
@@ -37,23 +47,87 @@
      ```
    - `stats` 数组中的 `id` 建议使用 `studyTime`、`questionDrill`、`courseFocus`、`mockRank` 之一，以便前端自动匹配相应图标和配色。
 
-3. **在前端页面中查看接口数据**
-   - `Home` 和 `Courses` 页面通过 `useDashboardData` 钩子获取概览数据；`Practice`、`Schedule`、`AdminDashboard` 页面分别使用 `usePracticeSets`、`useSchedule`、`useAdminOverview` 钩子调用后端，可以创建题单、安排日程以及维护管理员端课程草稿。
-   - 你可以在 `frontend/src/services/*.ts` 中自定义字段映射逻辑，例如追加新的统计项、练习类型或使用不同的接口路径。
+3. **页面对应关系**
+   - `Home`、`Courses` 页面使用 `useDashboardData` 钩子获取总览数据。
+   - `Practice`、`Schedule`、`AdminDashboard` 页面分别使用 `usePracticeSets`、`useSchedule`、`useAdminOverview` 调用后端，可在 `frontend/src/services/*.ts` 中调整接口路径或字段映射。
 
-4. **联调建议**
-   - 保证后端允许跨域访问（CORS），特别是在前端使用 `npm run dev` 时端口通常为 `5173`。
-   - 若后端需要 Cookie 或 Session，可以在 `.env.local` 中把 `VITE_API_WITH_CREDENTIALS` 设置为 `true`，并在后端设置允许携带凭据。
-   - 推荐使用 `npm run dev` 启动前端后，通过浏览器开发者工具或 `Network` 面板确认请求是否成功、数据结构是否匹配。
+4. **调试建议**
+   - 保证后端允许跨域访问（CORS），特别是在前端使用 `npm run dev` 时端口为 `5173`。
+   - 若后端需要 Cookie/Session，在 `.env.local` 中设置 `VITE_API_WITH_CREDENTIALS=true`，并在后端允许携带凭据。
+   - 建议使用浏览器开发者工具的 Network 面板或 `npm run dev -- --host` 暴露给局域网设备调试。
 
-## 示例后端（可选）
+## 后端本地运行与数据库连接（Navicat 示例）
 
-仓库新增了 `server/` 目录，提供一个基于 Express 的轻量 API，数据存放在 `server/data/db.json` 中，便于本地调试：
+`server/` 目录提供了一个使用本地 JSON 文件的 Express 示例服务，你可以先按照上面的命令直接运行，确认前后端打通。如果需要接入自己在 Navicat 中管理的数据库（例如 MySQL），可以按照以下步骤改造：
+
+1. **在 Navicat 中创建数据库与数据表**
+   - 新建连接 → 选择 MySQL → 填写主机、端口、用户名和密码（默认端口 3306）。
+   - 连接成功后创建一个新的数据库（例如 `kaoyan_platform`），并在其中建立如下数据表：
+     - `dashboard_stats`（字段：`id`、`title`、`value`、`helper_text`、`icon` 等）
+     - `courses`（字段：`id`、`title`、`category`、`teacher`、`progress`、`next_task` 等）
+     - `practice_sets`（字段：`id`、`name`、`questions`、`accuracy`、`duration`、`focus`、`last_attempt` 等）
+     - `schedule_events`（字段：`id`、`title`、`type`、`start_time`、`end_time`、`location`、`focus`、`tags` 等）
+     - `admin_course_drafts`、`admin_review_tasks` 等管理员专用表。
+   - 你可以使用 Navicat 的「设计表」界面建表，也可以导入 SQL 脚本（例如 `CREATE TABLE ...`）。
+
+2. **安装数据库驱动并配置环境变量**
+   - 在 `server/` 目录安装 MySQL 依赖：
+     ```bash
+     cd server
+     npm install mysql2
+     ```
+   - 新建 `server/.env`（或在部署环境设置变量）：
+     ```env
+     DB_HOST=localhost
+     DB_PORT=3306
+     DB_USER=root
+     DB_PASSWORD=你的密码
+     DB_NAME=kaoyan_platform
+     ```
+
+3. **在后端代码中启用数据库连接**
+   - 示例：在 `server/index.js` 中引入 `mysql2` 并初始化连接池，然后在各个路由中替换 `readDb()/writeDb()` 为 SQL 查询。
+     ```js
+     import mysql from 'mysql2/promise';
+     import dotenv from 'dotenv';
+
+     dotenv.config();
+
+     const pool = mysql.createPool({
+       host: process.env.DB_HOST,
+       port: process.env.DB_PORT,
+       user: process.env.DB_USER,
+       password: process.env.DB_PASSWORD,
+       database: process.env.DB_NAME,
+     });
+
+     app.get('/api/dashboard', async (_req, res) => {
+       const [stats] = await pool.query('SELECT id, title, value, helper_text FROM dashboard_stats ORDER BY sort_order');
+       const [courses] = await pool.query('SELECT * FROM courses ORDER BY updated_at DESC LIMIT 8');
+       // ...按需组装返回对象
+       res.json({ stats, courses /* ... */ });
+     });
+     ```
+   - 如果你希望继续使用 `db.json` 作为兜底数据，可以在查询失败时捕获异常并回退到文件读取逻辑。
+
+4. **使用 Navicat 进行数据维护**
+   - Navicat 支持可视化新增、编辑、导入导出数据，所有操作都会直接更新数据库表。
+   - Express 服务使用 SQL 查询实时读取最新数据，因此你在 Navicat 中的修改会立即反映到前端页面。
+
+5. **常见调试问题**
+   - 如果前端出现 404/500，请检查后端终端的报错信息，确认 SQL 是否正确、连接是否成功。
+   - 若需要远程访问数据库，请在 Navicat 中确认数据库服务端已经开放外网访问，并在 Express 服务器中使用对应的 IP 和端口。
+   - 推荐在 `server` 项目中运行 `npm run dev`，它使用 `nodemon` 监听文件变更，修改后端代码会自动重启服务。
+
+## 示例 JSON 数据服务（快速演示）
+
+在接入真实数据库前，也可以使用默认的 JSON 数据快速预览整体功能：
 
 ```bash
 cd server
 npm install
-npm run dev   # 或 npm start
+npm run dev   # 使用 nodemon 热更新
+# 或 npm start # 以纯 Node.js 方式启动
 ```
 
 默认会在 `http://localhost:3000` 暴露以下端点：
@@ -65,51 +139,4 @@ npm run dev   # 或 npm start
 | GET/POST | `/api/schedule`     | 获取或创建学习日程，自动同步到首页时间轴 |
 | GET/POST | `/api/admin/*`      | 管理员端驾驶舱所需的统计、课程草稿与同步动作 |
 
-后端会将新增的日程、题单写回 `db.json`，刷新页面即可看到更新；若你已有数据库，可以把这些路由替换成真实查询逻辑。
-
-## 如何上传到 GitHub
-
-如果你希望把本仓库的前端代码直接发布到自己的 GitHub 仓库，可以在任意可以运行 Git 的环境（例如 Codespaces、云服务器或本地电脑）按照下面的步骤操作：
-
-1. **初始化远程仓库**
-   - 在 GitHub 上创建一个空仓库（不要勾选初始化 README 等选项）。
-   - 复制该仓库的 HTTPS 或 SSH 地址。
-
-2. **克隆当前代码**
-   - 在可以运行 Git 的环境中执行：
-     ```bash
-     git clone <当前项目的下载地址或在此环境中将项目打包下载>
-     cd bigwork
-     ```
-   - 如果你正在使用本环境，可以执行（确保当前位于 `bigwork/` 目录中）：
-     ```bash
-     tar czf bigwork.tar.gz -C .. bigwork
-     ```
-     这样 `tar` 会先切换到当前目录的上一级，再将整个 `bigwork/` 文件夹打包。然后下载 `bigwork.tar.gz`，在本地或其他服务器解压：
-     ```bash
-     tar xzf bigwork.tar.gz
-     cd bigwork
-     ```
-   - 如果你在 **Windows PowerShell** 或 **CMD** 中操作，并且 `tar` 命令无法正常使用（常见错误如 `Program Files` 路径提示无法访问），可以改用内置的压缩命令：
-     ```powershell
-     Compress-Archive -Path bigwork -DestinationPath bigwork.zip
-     ```
-     解压时同样使用 PowerShell：
-     ```powershell
-     Expand-Archive -Path bigwork.zip -DestinationPath .
-     ```
-     如果你安装了 Git Bash 或 WSL，也可以在这些环境中运行上面的 `tar` 命令以避免 Windows 路径空格导致的问题。
-
-3. **关联 GitHub 仓库**
-   ```bash
-   git remote remove origin 2>/dev/null || true
-   git remote add origin <你的 GitHub 仓库地址>
-   ```
-
-4. **推送代码**
-   ```bash
-   git branch -M main
-   git push -u origin main
-   ```
-
-完成后，你的 GitHub 仓库就会包含本项目的所有文件，其他人可以直接从 GitHub 上克隆或下载。
+后端会将新增的日程、题单写回 `server/data/db.json`，刷新页面即可看到更新。
