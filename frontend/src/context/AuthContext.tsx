@@ -1,51 +1,81 @@
-import { createContext, ReactNode, useContext, useMemo, useState } from 'react';
+import { createContext, ReactNode, useCallback, useContext, useMemo, useState } from 'react';
 
-export type UserRole = 'student' | 'admin';
+type UserRole = 'admin' | 'student';
+
+interface AuthAccount {
+  username: string;
+  password: string;
+  name: string;
+  role: UserRole;
+}
 
 export interface AuthUser {
-  id: string;
+  username: string;
   name: string;
   role: UserRole;
 }
 
 interface AuthContextValue {
   user: AuthUser | null;
-  login: (user: AuthUser) => void;
+  login: (username: string, password: string) => AuthUser;
   logout: () => void;
-  updateRole: (role: UserRole) => void;
 }
 
-const defaultUser: AuthUser = {
-  id: 'u-001',
-  name: '张同学',
-  role: 'student',
-};
+const accounts: AuthAccount[] = [
+  {
+    username: 'admin',
+    password: 'admin123',
+    name: 'Admin User',
+    role: 'admin',
+  },
+  {
+    username: 'student',
+    password: 'student123',
+    name: 'Student User',
+    role: 'student',
+  },
+];
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
-export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [user, setUser] = useState<AuthUser | null>(defaultUser);
+interface AuthProviderProps {
+  children: ReactNode;
+}
 
-  const login = (nextUser: AuthUser) => {
-    setUser(nextUser);
-  };
+export const AuthProvider = ({ children }: AuthProviderProps) => {
+  const [user, setUser] = useState<AuthUser | null>(null);
 
-  const logout = () => {
+  const login = useCallback((username: string, password: string) => {
+    const normalizedUsername = username.trim();
+    const account = accounts.find(
+      (candidate) => candidate.username === normalizedUsername && candidate.password === password,
+    );
+
+    if (!account) {
+      throw new Error('Invalid username or password');
+    }
+
+    const authenticatedUser: AuthUser = {
+      username: account.username,
+      name: account.name,
+      role: account.role,
+    };
+
+    setUser(authenticatedUser);
+    return authenticatedUser;
+  }, []);
+
+  const logout = useCallback(() => {
     setUser(null);
-  };
-
-  const updateRole = (role: UserRole) => {
-    setUser((prev) => (prev ? { ...prev, role } : prev));
-  };
+  }, []);
 
   const value = useMemo(
     () => ({
       user,
       login,
       logout,
-      updateRole,
     }),
-    [user],
+    [user, login, logout],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
