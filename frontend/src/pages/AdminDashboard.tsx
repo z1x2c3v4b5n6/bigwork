@@ -1,492 +1,366 @@
+import RefreshIcon from '@mui/icons-material/Refresh';
+import SecurityIcon from '@mui/icons-material/Security';
+import GroupIcon from '@mui/icons-material/Group';
+import AssessmentIcon from '@mui/icons-material/Assessment';
+import InsightsIcon from '@mui/icons-material/Insights';
 import {
   Alert,
+  Avatar,
   Box,
   Button,
   Chip,
   Divider,
-  FormControl,
   Grid,
-  InputLabel,
   LinearProgress,
-  MenuItem,
+  List,
+  ListItem,
+  ListItemAvatar,
+  ListItemText,
   Paper,
-  Select,
   Stack,
   Table,
   TableBody,
   TableCell,
   TableHead,
   TableRow,
-  TextField,
   Typography,
 } from '@mui/material';
-import InsightsIcon from '@mui/icons-material/Insights';
-import LibraryBooksIcon from '@mui/icons-material/LibraryBooks';
-import GroupsIcon from '@mui/icons-material/Groups';
-import InventoryIcon from '@mui/icons-material/Inventory';
-import ForumIcon from '@mui/icons-material/Forum';
-import PlaylistAddCheckIcon from '@mui/icons-material/PlaylistAddCheck';
-import AddCircleIcon from '@mui/icons-material/AddCircle';
-import PublishIcon from '@mui/icons-material/Publish';
-import { useMemo, useState } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import useAdminOverview from '../hooks/useAdminOverview';
-import {
-  createMajor,
-  createMaterial,
-  type CreateMaterialPayload,
-  type AdminCourse,
-} from '../services/adminService';
-import { ADMIN_OVERVIEW_QUERY_KEY } from '../hooks/useAdminOverview';
+import dayjs from 'dayjs';
+import { useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { useAuth } from '../context/AuthContext';
+
+interface DashboardMetrics {
+  activeStudents: number;
+  tasksCompletedToday: number;
+  followUpsPending: number;
+  systemAlerts: number;
+}
+
+interface StudentProgress {
+  id?: string;
+  name: string;
+  university: string;
+  studyHours: number;
+  completion: number;
+}
+
+interface AuditLogEntry {
+  id?: string;
+  title: string;
+  description?: string;
+  createdAt: string;
+  actor?: string;
+}
+
+interface AdminDashboardResponse {
+  metrics: DashboardMetrics;
+  studentProgress: StudentProgress[];
+  auditLogs: AuditLogEntry[];
+  administrators: string[];
+  securityNote?: string;
+}
+
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL?.replace(/\/?$/, '') ?? '';
+
+const fetchAdminDashboard = async (): Promise<AdminDashboardResponse> => {
+  const response = await fetch(`${API_BASE_URL}/api/admin/dashboard`, {
+    credentials: 'include',
+  });
+
+  if (!response.ok) {
+    const message = (await response.text()) || '无法加载后台数据';
+    throw new Error(message);
+  }
+
+  return (await response.json()) as AdminDashboardResponse;
+};
+
+const numberFormatter = new Intl.NumberFormat('zh-CN');
 
 const AdminDashboard = () => {
-  const queryClient = useQueryClient();
+  const { user, loading: authLoading } = useAuth();
+
   const {
-    overviewQuery: { data, isLoading, isError, refetch },
-    createCourseMutation,
-    publishCourseMutation,
-  } = useAdminOverview();
-
-  const [majorForm, setMajorForm] = useState({ name: '', description: '' });
-  const [courseForm, setCourseForm] = useState({ name: '', category: '公共课', teacher: '', majorId: '', releaseWindow: '', summary: '' });
-  const [materialForm, setMaterialForm] = useState<CreateMaterialPayload>({ courseId: '', title: '', type: '资料', url: '', description: '' });
-
-  const createMajorMutation = useMutation({
-    mutationFn: createMajor,
-    onSuccess: () => {
-      setMajorForm({ name: '', description: '' });
-      queryClient.invalidateQueries({ queryKey: ADMIN_OVERVIEW_QUERY_KEY });
-    },
+    data,
+    isLoading,
+    isError,
+    error,
+    refetch,
+    isFetching,
+  } = useQuery<AdminDashboardResponse>({
+    queryKey: ['admin-dashboard'],
+    queryFn: fetchAdminDashboard,
+    enabled: !authLoading && user?.role === 'admin',
+    staleTime: 60 * 1000,
   });
 
-  const createMaterialMutation = useMutation({
-    mutationFn: createMaterial,
-    onSuccess: () => {
-      setMaterialForm({ courseId: '', title: '', type: '资料', url: '', description: '' });
-      queryClient.invalidateQueries({ queryKey: ADMIN_OVERVIEW_QUERY_KEY });
-    },
-  });
-
-  const summaryCards = useMemo(
+  const metricsCards = useMemo(
     () => [
       {
+        key: 'activeStudents',
         label: '活跃学员',
-        value: data?.totals.students ?? 0,
-        icon: <GroupsIcon color="primary" />,
+        value: data?.metrics?.activeStudents ?? 0,
+        icon: <GroupIcon />,
+        color: 'primary.main',
       },
       {
-        label: '开设专业',
-        value: data?.totals.majors ?? 0,
-        icon: <InsightsIcon color="secondary" />,
+        key: 'tasksCompletedToday',
+        label: '今日完成任务',
+        value: data?.metrics?.tasksCompletedToday ?? 0,
+        icon: <AssessmentIcon />,
+        color: 'success.main',
       },
       {
-        label: '课程数量',
-        value: data?.totals.courses ?? 0,
-        icon: <LibraryBooksIcon color="success" />,
+        key: 'followUpsPending',
+        label: '跟进提醒',
+        value: data?.metrics?.followUpsPending ?? 0,
+        icon: <InsightsIcon />,
+        color: 'warning.main',
       },
       {
-        label: '资料资源',
-        value: data?.totals.materials ?? 0,
-        icon: <InventoryIcon color="warning" />,
-      },
-      {
-        label: '论坛话题',
-        value: data?.totals.forumTopics ?? 0,
-        icon: <ForumIcon color="info" />,
+        key: 'systemAlerts',
+        label: '系统告警',
+        value: data?.metrics?.systemAlerts ?? 0,
+        icon: <SecurityIcon />,
+        color: 'secondary.main',
       },
     ],
-    [data?.totals],
+    [data?.metrics?.activeStudents, data?.metrics?.followUpsPending, data?.metrics?.systemAlerts, data?.metrics?.tasksCompletedToday],
   );
 
-  const handleCreateCourse = async () => {
-    if (!courseForm.name || !courseForm.teacher) {
-      return;
-    }
-    await createCourseMutation.mutateAsync({
-      name: courseForm.name,
-      category: courseForm.category,
-      teacher: courseForm.teacher,
-      majorId: courseForm.majorId || undefined,
-      releaseWindow: courseForm.releaseWindow || undefined,
-      summary: courseForm.summary || undefined,
-    });
-    setCourseForm({ name: '', category: '公共课', teacher: '', majorId: '', releaseWindow: '', summary: '' });
-  };
+  if (authLoading || isLoading) {
+    return (
+      <Box sx={{ py: 8, display: 'flex', justifyContent: 'center' }}>
+        <Stack spacing={2} alignItems="center">
+          <LinearProgress sx={{ width: 160 }} />
+          <Typography variant="body2" color="text.secondary">
+            正在加载后台数据…
+          </Typography>
+        </Stack>
+      </Box>
+    );
+  }
 
-  const handleCreateMajor = async () => {
-    if (!majorForm.name.trim()) {
-      return;
-    }
-    await createMajorMutation.mutateAsync(majorForm);
-  };
+  if (isError) {
+    const message = error instanceof Error ? error.message : '无法加载后台数据';
+    return (
+      <Alert
+        severity="error"
+        action={
+          <Button color="inherit" size="small" onClick={() => { void refetch(); }} startIcon={<RefreshIcon />}>
+            重试
+          </Button>
+        }
+      >
+        {message}
+      </Alert>
+    );
+  }
 
-  const handleCreateMaterial = async () => {
-    if (!materialForm.courseId || !materialForm.title) {
-      return;
-    }
-    await createMaterialMutation.mutateAsync(materialForm);
-  };
+  if (!data) {
+    return (
+      <Alert severity="info">暂未获取到后台数据，请确认服务端接口已连接数据库并返回数据。</Alert>
+    );
+  }
 
-  const handlePublishCourse = async (course: AdminCourse) => {
-    await publishCourseMutation.mutateAsync(course.id);
-  };
+  const students = data.studentProgress ?? [];
+  const auditLogs = data.auditLogs ?? [];
+  const administrators = data.administrators ?? [];
+  const securityNote = data.securityNote ?? '建议启用双因素认证，并定期复审管理员账户权限，确保敏感数据安全。';
 
   return (
     <Stack spacing={4}>
-      {isLoading && <LinearProgress color="secondary" />}
-
-      <Box>
-        <Typography variant="h4" fontWeight={700} gutterBottom>
-          教研管理驾驶舱
-        </Typography>
-        <Typography variant="body1" color="text.secondary">
-          统筹专业、课程、资料与圈子，随时掌握学员动态并快速处理待办。
-        </Typography>
-      </Box>
-
-      {isError && (
-        <Alert severity="error" action={<Button color="inherit" onClick={() => refetch()}>重试</Button>}>
-          管理数据暂时不可用，请确认后端服务是否启动。
-        </Alert>
-      )}
+      <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={2}>
+        <Box>
+          <Typography variant="h4" fontWeight={700} gutterBottom>
+            管理员控制台
+          </Typography>
+          <Typography variant="body1" color="text.secondary">
+            审视平台整体运营情况、管理学员账号及监控关键指标。
+          </Typography>
+        </Box>
+        <Button
+          variant="outlined"
+          startIcon={<RefreshIcon />}
+          onClick={() => {
+            void refetch();
+          }}
+          disabled={isFetching}
+        >
+          {isFetching ? '刷新中…' : '刷新数据'}
+        </Button>
+      </Stack>
 
       <Grid container spacing={3}>
-        {summaryCards.map((card) => (
-          <Grid item xs={12} md={4} lg={2} key={card.label}>
-            <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid', borderColor: 'divider' }}>
-              <Stack spacing={2}>
-                <Stack direction="row" spacing={2} alignItems="center">
-                  {card.icon}
-                  <Box>
-                    <Typography variant="subtitle2" color="text.secondary">
-                      {card.label}
-                    </Typography>
-                    <Typography variant="h5" fontWeight={700}>
-                      {card.value}
-                    </Typography>
-                  </Box>
-                </Stack>
+        {metricsCards.map((item) => (
+          <Grid item xs={12} md={3} key={item.key}>
+            <Paper
+              elevation={0}
+              sx={{ p: 3, borderRadius: 3, border: '1px solid', borderColor: 'divider', height: '100%' }}
+            >
+              <Stack direction="row" spacing={2} alignItems="center">
+                <Avatar sx={{ bgcolor: item.color }}>{item.icon}</Avatar>
+                <Box>
+                  <Typography variant="subtitle2" color="text.secondary">
+                    {item.label}
+                  </Typography>
+                  <Typography variant="h5" fontWeight={700}>
+                    {numberFormatter.format(item.value)}
+                  </Typography>
+                </Box>
               </Stack>
             </Paper>
           </Grid>
         ))}
       </Grid>
 
-      <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid', borderColor: 'divider' }}>
-        <Stack spacing={3}>
-          <Typography variant="h6" fontWeight={600}>
-            专业管理
-          </Typography>
-          <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
-            <TextField
-              label="新增专业名称"
-              value={majorForm.name}
-              onChange={(event) => setMajorForm((prev) => ({ ...prev, name: event.target.value }))}
-              sx={{ flex: 1 }}
-            />
-            <TextField
-              label="专业描述"
-              value={majorForm.description}
-              onChange={(event) => setMajorForm((prev) => ({ ...prev, description: event.target.value }))}
-              sx={{ flex: 2 }}
-            />
-            <Button
-              variant="contained"
-              startIcon={<AddCircleIcon />}
-              onClick={handleCreateMajor}
-              disabled={createMajorMutation.isPending}
-            >
-              新增专业
-            </Button>
-          </Stack>
-          <Divider />
-          <Table size="small">
-            <TableHead>
-              <TableRow>
-                <TableCell>专业名称</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {(data?.majors ?? []).map((major) => (
-                <TableRow key={major.id}>
-                  <TableCell>{major.name}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </Stack>
-      </Paper>
-
-      <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid', borderColor: 'divider' }}>
-        <Stack spacing={3}>
-          <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems={{ md: 'center' }}>
-            <Typography variant="h6" fontWeight={600}>
-              课程管理
-            </Typography>
-            <Chip
-              icon={<PlaylistAddCheckIcon />}
-              label={`待发布 ${data?.courseDrafts.length ?? 0} 门`}
-              color="warning"
-              variant="outlined"
-            />
-          </Stack>
-
-          <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
-            <TextField
-              label="课程名称"
-              value={courseForm.name}
-              onChange={(event) => setCourseForm((prev) => ({ ...prev, name: event.target.value }))}
-              sx={{ flex: 2 }}
-            />
-            <FormControl sx={{ flex: 1 }}>
-              <InputLabel id="course-category-label">课程类型</InputLabel>
-              <Select
-                labelId="course-category-label"
-                label="课程类型"
-                value={courseForm.category}
-                onChange={(event) => setCourseForm((prev) => ({ ...prev, category: event.target.value }))}
-              >
-                <MenuItem value="公共课">公共课</MenuItem>
-                <MenuItem value="专业课">专业课</MenuItem>
-                <MenuItem value="选修课">选修课</MenuItem>
-              </Select>
-            </FormControl>
-            <TextField
-              label="授课老师"
-              value={courseForm.teacher}
-              onChange={(event) => setCourseForm((prev) => ({ ...prev, teacher: event.target.value }))}
-              sx={{ flex: 1 }}
-            />
-          </Stack>
-          <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
-            <FormControl sx={{ flex: 1 }}>
-              <InputLabel id="course-major-label">所属专业</InputLabel>
-              <Select
-                labelId="course-major-label"
-                label="所属专业"
-                value={courseForm.majorId}
-                onChange={(event) => setCourseForm((prev) => ({ ...prev, majorId: event.target.value }))}
-              >
-                <MenuItem value="">全部</MenuItem>
-                {(data?.majors ?? []).map((major) => (
-                  <MenuItem key={major.id} value={major.id}>
-                    {major.name}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-            <TextField
-              label="上线时间窗口"
-              value={courseForm.releaseWindow}
-              onChange={(event) => setCourseForm((prev) => ({ ...prev, releaseWindow: event.target.value }))}
-              sx={{ flex: 1 }}
-            />
-            <TextField
-              label="课程简介"
-              value={courseForm.summary}
-              onChange={(event) => setCourseForm((prev) => ({ ...prev, summary: event.target.value }))}
-              sx={{ flex: 2 }}
-            />
-            <Button
-              variant="contained"
-              startIcon={<AddCircleIcon />}
-              onClick={handleCreateCourse}
-              disabled={createCourseMutation.isPending}
-            >
-              新建课程
-            </Button>
-          </Stack>
-
-          <Divider />
-          <Table size="small">
-            <TableHead>
-              <TableRow>
-                <TableCell>课程名称</TableCell>
-                <TableCell>类型</TableCell>
-                <TableCell>讲师</TableCell>
-                <TableCell>进度</TableCell>
-                <TableCell>状态</TableCell>
-                <TableCell align="right">操作</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {(data?.courses ?? []).map((course) => (
-                <TableRow key={course.id}>
-                  <TableCell>{course.title}</TableCell>
-                  <TableCell>{course.category}</TableCell>
-                  <TableCell>{course.teacher}</TableCell>
-                  <TableCell>{course.progress}%</TableCell>
-                  <TableCell>
-                    <Chip
-                      label={course.status === 'published' ? '已发布' : '待发布'}
-                      color={course.status === 'published' ? 'success' : 'warning'}
-                      size="small"
-                    />
-                  </TableCell>
-                  <TableCell align="right">
-                    {course.status !== 'published' && (
-                      <Button
-                        size="small"
-                        variant="outlined"
-                        startIcon={<PublishIcon />}
-                        onClick={() => handlePublishCourse(course)}
-                        disabled={publishCourseMutation.isPending}
-                      >
-                        发布
-                      </Button>
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </Stack>
-      </Paper>
-
-      <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid', borderColor: 'divider' }}>
-        <Stack spacing={3}>
-          <Typography variant="h6" fontWeight={600}>
-            资料管理
-          </Typography>
-          <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
-            <FormControl sx={{ flex: 1 }}>
-              <InputLabel id="material-course-label">所属课程</InputLabel>
-              <Select
-                labelId="material-course-label"
-                label="所属课程"
-                value={materialForm.courseId}
-                onChange={(event) => setMaterialForm((prev) => ({ ...prev, courseId: event.target.value }))}
-              >
-                {(data?.courses ?? []).map((course) => (
-                  <MenuItem key={course.id} value={course.id}>
-                    {course.title}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-            <TextField
-              label="资料标题"
-              value={materialForm.title}
-              onChange={(event) => setMaterialForm((prev) => ({ ...prev, title: event.target.value }))}
-              sx={{ flex: 1 }}
-            />
-            <TextField
-              label="类型"
-              value={materialForm.type}
-              onChange={(event) => setMaterialForm((prev) => ({ ...prev, type: event.target.value }))}
-              sx={{ flex: 1 }}
-            />
-          </Stack>
-          <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
-            <TextField
-              label="资源地址"
-              value={materialForm.url}
-              onChange={(event) => setMaterialForm((prev) => ({ ...prev, url: event.target.value }))}
-              sx={{ flex: 1 }}
-            />
-            <TextField
-              label="资料描述"
-              value={materialForm.description}
-              onChange={(event) => setMaterialForm((prev) => ({ ...prev, description: event.target.value }))}
-              sx={{ flex: 2 }}
-            />
-            <Button
-              variant="contained"
-              startIcon={<AddCircleIcon />}
-              onClick={handleCreateMaterial}
-              disabled={createMaterialMutation.isPending}
-            >
-              上传资料
-            </Button>
-          </Stack>
-          <Divider />
-          <Table size="small">
-            <TableHead>
-              <TableRow>
-                <TableCell>资料名称</TableCell>
-                <TableCell>类型</TableCell>
-                <TableCell>所属课程</TableCell>
-                <TableCell>地址</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {(data?.materials ?? []).map((material) => (
-                <TableRow key={material.id}>
-                  <TableCell>{material.title}</TableCell>
-                  <TableCell>{material.type}</TableCell>
-                  <TableCell>{material.courseName}</TableCell>
-                  <TableCell>
-                    <Typography variant="body2" color="primary">
-                      {material.url || '—'}
-                    </Typography>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </Stack>
-      </Paper>
-
       <Grid container spacing={3}>
-        <Grid item xs={12} md={6}>
-          <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid', borderColor: 'divider' }}>
-            <Typography variant="h6" fontWeight={600} mb={2}>
-              用户管理
-            </Typography>
-            <Table size="small">
-              <TableHead>
-                <TableRow>
-                  <TableCell>姓名</TableCell>
-                  <TableCell>角色</TableCell>
-                  <TableCell>专业</TableCell>
-                  <TableCell>联系方式</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {(data?.users ?? []).map((user) => (
-                  <TableRow key={user.id}>
-                    <TableCell>{user.name}</TableCell>
-                    <TableCell>{user.role === 'admin' ? '管理员' : '学员'}</TableCell>
-                    <TableCell>{user.majorName || '—'}</TableCell>
-                    <TableCell>{user.phone || user.email}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+        <Grid item xs={12} lg={8}>
+          <Paper
+            elevation={0}
+            sx={{ p: 3, borderRadius: 3, border: '1px solid', borderColor: 'divider', height: '100%' }}
+          >
+            <Stack spacing={2} sx={{ height: '100%' }}>
+              <Box display="flex" alignItems="center" justifyContent="space-between">
+                <Typography variant="h6" fontWeight={600}>
+                  学员学习进度
+                </Typography>
+                <Chip label="本周" color="primary" variant="outlined" />
+              </Box>
+              {students.length === 0 ? (
+                <Box sx={{ py: 8, textAlign: 'center' }}>
+                  <Typography variant="body2" color="text.secondary">
+                    暂无学员进度数据，请在数据库中新增相关记录。
+                  </Typography>
+                </Box>
+              ) : (
+                <Table size="small" sx={{ flexGrow: 1 }}>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>学员</TableCell>
+                      <TableCell>目标院校</TableCell>
+                      <TableCell>本周学习时长（h）</TableCell>
+                      <TableCell align="right">完成率</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {students.map((student) => (
+                      <TableRow key={student.id ?? student.name} hover>
+                        <TableCell>
+                          <Stack direction="row" spacing={2} alignItems="center">
+                            <Avatar>{student.name?.charAt(0) ?? '学'}</Avatar>
+                            <Typography variant="subtitle2">{student.name}</Typography>
+                          </Stack>
+                        </TableCell>
+                        <TableCell>{student.university}</TableCell>
+                        <TableCell>{student.studyHours}</TableCell>
+                        <TableCell align="right" sx={{ minWidth: 160 }}>
+                          <Stack spacing={1}>
+                            <Typography variant="body2" fontWeight={600}>
+                              {Math.round((student.completion ?? 0) * 100)}%
+                            </Typography>
+                            <LinearProgress
+                              variant="determinate"
+                              value={Math.max(0, Math.min(100, (student.completion ?? 0) * 100))}
+                              sx={{ height: 6, borderRadius: 999 }}
+                            />
+                          </Stack>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </Stack>
           </Paper>
         </Grid>
-        <Grid item xs={12} md={6}>
-          <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid', borderColor: 'divider' }}>
-            <Typography variant="h6" fontWeight={600} mb={2}>
-              论坛管理
-            </Typography>
-            <Table size="small">
-              <TableHead>
-                <TableRow>
-                  <TableCell>话题</TableCell>
-                  <TableCell>评论数</TableCell>
-                  <TableCell>状态</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {(data?.forum ?? []).map((topic) => (
-                  <TableRow key={topic.id}>
-                    <TableCell>{topic.title}</TableCell>
-                    <TableCell>{topic.commentCount}</TableCell>
-                    <TableCell>
-                      <Chip
-                        label={topic.needsModeration ? '待审核' : '正常'}
-                        size="small"
-                        color={topic.needsModeration ? 'warning' : 'success'}
+        <Grid item xs={12} lg={4}>
+          <Paper
+            elevation={0}
+            sx={{ p: 3, borderRadius: 3, border: '1px solid', borderColor: 'divider', height: '100%' }}
+          >
+            <Stack spacing={2} sx={{ height: '100%' }}>
+              <Typography variant="h6" fontWeight={600}>
+                最新操作日志
+              </Typography>
+              {auditLogs.length === 0 ? (
+                <Box sx={{ py: 8, textAlign: 'center' }}>
+                  <Typography variant="body2" color="text.secondary">
+                    暂无日志记录，执行操作后日志将展示在此处。
+                  </Typography>
+                </Box>
+              ) : (
+                <List disablePadding sx={{ flexGrow: 1 }}>
+                  {auditLogs.map((item) => (
+                    <ListItem key={item.id ?? item.title} disableGutters sx={{ alignItems: 'flex-start', py: 1.5 }}>
+                      <ListItemAvatar>
+                        <Avatar variant="rounded" sx={{ bgcolor: 'grey.100', color: 'text.primary' }}>
+                          <SecurityIcon fontSize="small" />
+                        </Avatar>
+                      </ListItemAvatar>
+                      <ListItemText
+                        primary={
+                          <Typography variant="subtitle2" fontWeight={600}>
+                            {item.title}
+                          </Typography>
+                        }
+                        secondary={
+                          <Stack spacing={0.5}>
+                            {item.description ? (
+                              <Typography variant="body2" color="text.secondary">
+                                {item.description}
+                              </Typography>
+                            ) : null}
+                            <Typography variant="caption" color="text.secondary">
+                              {`${item.actor ? `${item.actor} · ` : ''}${dayjs(item.createdAt).format('YYYY-MM-DD HH:mm')}`}
+                            </Typography>
+                          </Stack>
+                        }
                       />
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                    </ListItem>
+                  ))}
+                </List>
+              )}
+            </Stack>
           </Paper>
         </Grid>
       </Grid>
+
+      <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid', borderColor: 'divider' }}>
+        <Stack spacing={2}>
+          <Typography variant="h6" fontWeight={600}>
+            权限审计
+          </Typography>
+          <Divider />
+          <Stack direction={{ xs: 'column', md: 'row' }} spacing={3} justifyContent="space-between">
+            <Stack spacing={1}>
+              <Typography variant="subtitle2" color="text.secondary">
+                当前管理员
+              </Typography>
+              {administrators.length === 0 ? (
+                <Typography variant="body2" color="text.secondary">
+                  暂未设置管理员账号，请在数据库或后台服务中添加具有管理员角色的用户。
+                </Typography>
+              ) : (
+                <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                  {administrators.map((name) => (
+                    <Chip key={name} label={name} color="primary" variant="outlined" />
+                  ))}
+                </Stack>
+              )}
+            </Stack>
+            <Stack spacing={1} maxWidth={420}>
+              <Typography variant="subtitle2" color="text.secondary">
+                安全提示
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                {securityNote}
+              </Typography>
+            </Stack>
+          </Stack>
+        </Stack>
+      </Paper>
     </Stack>
   );
 };

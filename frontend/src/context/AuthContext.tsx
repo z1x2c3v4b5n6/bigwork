@@ -1,5 +1,12 @@
-import { createContext, useContext, useMemo, useState, type ReactNode } from 'react';
-import httpClient from '../services/httpClient';
+import {
+  createContext,
+  ReactNode,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
 
 export type UserRole = 'student' | 'admin';
 
@@ -7,70 +14,115 @@ export interface AuthUser {
   id: string;
   name: string;
   role: UserRole;
-  email: string;
-  phone?: string;
-  avatar: string;
-  organization: string;
-  goal?: string;
-  majorId?: string | null;
-  majorName?: string;
-  bio?: string;
+  email?: string;
+}
+
+export interface LoginPayload {
+  username: string;
+  password: string;
 }
 
 interface AuthContextValue {
   user: AuthUser | null;
-  login: (credentials: { username: string; password: string }) => Promise<AuthUser>;
-  logout: () => void;
-  refreshUser: (nextUser: AuthUser) => void;
+  loading: boolean;
+  login: (credentials: LoginPayload) => Promise<void>;
+  logout: () => Promise<void>;
+  refresh: () => Promise<void>;
 }
+
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL?.replace(/\/?$/, '') ?? '';
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const storage = typeof window !== 'undefined' ? window.localStorage : null;
-  const [user, setUser] = useState<AuthUser | null>(() => {
-    if (!storage) return null;
-    const raw = storage.getItem('kaoyan-auth');
-    if (!raw) return null;
+  const [user, setUser] = useState<AuthUser | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const fetchSession = useCallback(async () => {
     try {
-      const parsed = JSON.parse(raw) as AuthUser;
-      return parsed ?? null;
+      const response = await fetch(`${API_BASE_URL}/api/auth/session`, {
+        credentials: 'include',
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setUser(data?.user ?? null);
+      } else if (response.status === 401) {
+        setUser(null);
+      } else {
+        console.error('无法获取登录状态', response.statusText);
+        setUser(null);
+      }
     } catch (error) {
-      console.warn('Failed to parse persisted auth user', error);
-      return null;
+      console.error('获取登录状态时出现异常', error);
+      setUser(null);
+    } finally {
+      setLoading(false);
     }
-  });
+  }, [API_BASE_URL]);
 
-  const persistUser = (nextUser: AuthUser | null) => {
-    setUser(nextUser);
-    if (nextUser) {
-      storage?.setItem('kaoyan-auth', JSON.stringify(nextUser));
-    } else {
-      storage?.removeItem('kaoyan-auth');
+  useEffect(() => {
+    fetchSession();
+  }, [fetchSession]);
+
+  const login = useCallback(async (credentials: LoginPayload) => {
+    setLoading(true);
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify(credentials),
+      });
+
+      if (!response.ok) {
+        const message = (await response.text()) || '登录失败，请检查账号或密码';
+        throw new Error(message);
+      }
+
+      const data = await response.json();
+      setUser(data?.user ?? null);
+    } finally {
+      setLoading(false);
     }
-  };
+  }, [API_BASE_URL]);
 
-  const value = useMemo<AuthContextValue>(
+  const logout = useCallback(async () => {
+    setLoading(true);
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/auth/logout`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        const message = (await response.text()) || '退出登录失败';
+        throw new Error(message);
+      }
+    } finally {
+      setUser(null);
+      setLoading(false);
+    }
+  }, [API_BASE_URL]);
+
+  const refresh = useCallback(async () => {
+    setLoading(true);
+    await fetchSession();
+  }, [fetchSession]);
+
+  const value = useMemo(
     () => ({
       user,
-      login: async ({ username, password }) => {
-        try {
-          const response = await httpClient.post<AuthUser>('/api/auth/login', { username, password });
-          const loggedInUser = response.data;
-          persistUser(loggedInUser);
-          return loggedInUser;
-        } catch (error) {
-          throw new Error('账号或密码不正确');
-        }
-      },
-      logout: () => {
-        persistUser(null);
-      },
-      refreshUser: (nextUser) => {
-        persistUser(nextUser);
-      },
+      loading,
+      login,
+      logout,
+      refresh,
     }),
-    [storage, user],
+    [user, loading, login, logout, refresh],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
@@ -78,8 +130,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
+
   if (!context) {
-    throw new Error('useAuth 必须在 AuthProvider 中使用');
+    throw new Error('useAuth must be used within an AuthProvider');
   }
+
   return context;
 };

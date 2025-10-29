@@ -10,10 +10,9 @@ import Schedule from './pages/Schedule';
 import Analytics from './pages/Analytics';
 import Profile from './pages/Profile';
 import NotFound from './pages/NotFound';
-import Login from './pages/Login';
 import AdminDashboard from './pages/AdminDashboard';
-import Community from './pages/Community';
-import { RequireAdmin, RequireAuth } from './components/auth/RequireAuth';
+import RequireAdmin from './components/RequireAdmin';
+import Login from './pages/Login';
 
 const App = () => {
   const [mode, setMode] = useState<'light' | 'dark'>('light');
@@ -22,29 +21,22 @@ const App = () => {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <Routes>
-        <Route path="/login" element={<Login />} />
-        <Route
-          element={
-            <RequireAuth>
-              <AppLayout mode={mode} onToggleMode={() => setMode(mode === 'light' ? 'dark' : 'light')} />
-            </RequireAuth>
-          }
-        >
-          <Route index element={<Home />} />
-          <Route path="courses" element={<Courses />} />
-          <Route path="practice" element={<Practice />} />
-          <Route path="schedule" element={<Schedule />} />
-          <Route path="community" element={<Community />} />
-          <Route path="analytics" element={<Analytics />} />
-          <Route path="profile" element={<Profile />} />
+      <AppLayout mode={mode} onToggleMode={() => setMode(mode === 'light' ? 'dark' : 'light')}>
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/courses" element={<Courses />} />
+          <Route path="/practice" element={<Practice />} />
+          <Route path="/schedule" element={<Schedule />} />
+          <Route path="/analytics" element={<Analytics />} />
+          <Route path="/profile" element={<Profile />} />
+          <Route path="/login" element={<Login />} />
           <Route
-            path="admin"
-            element={
+            path="/admin"
+            element={(
               <RequireAdmin>
                 <AdminDashboard />
               </RequireAdmin>
-            }
+            )}
           />
           <Route path="*" element={<NotFound />} />
         </Route>

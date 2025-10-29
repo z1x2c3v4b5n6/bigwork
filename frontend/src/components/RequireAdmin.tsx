@@ -1,3 +1,4 @@
+import { Box, CircularProgress } from '@mui/material';
 import { ReactNode } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -7,11 +8,19 @@ interface RequireAdminProps {
 }
 
 const RequireAdmin = ({ children }: RequireAdminProps) => {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
   const location = useLocation();
 
+  if (loading) {
+    return (
+      <Box sx={{ py: 8, display: 'flex', justifyContent: 'center' }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
+
   if (!user || user.role !== 'admin') {
-    return <Navigate to="/" state={{ from: location }} replace />;
+    return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
   return <>{children}</>;

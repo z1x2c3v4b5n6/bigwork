@@ -1,10 +1,8 @@
 node_modules/
-frontend/node_modules/
-frontend/dist/
-server/node_modules/
-server/data/*.log
-.DS_Store
+dist/
 .env
-!server/.env
-frontend/.env.local
-frontend/.env
+.env.local
+.DS_Store
+pnpm-lock.yaml
+yarn.lock
+package-lock.json
