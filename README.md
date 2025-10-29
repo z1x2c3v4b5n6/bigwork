@@ -1,19 +1,36 @@
 # bigwork
 
-毕业设计 - 考研学习平台前后端项目。本次提交新增了基于 React + Vite + Material UI 的前端原型，涵盖学习概览、课程体系、刷题训练、日程规划、数据分析以及个人中心等核心页面，便于与现有后端接口对接。
+毕业设计 - 考研学习平台前后端项目。本次提交新增了基于 React + Vite + Material UI 的前端原型，并配套了一个 Node.js Express 示例后端，涵盖学习概览、课程体系、刷题训练、日程规划、数据分析以及个人中心等核心页面，便于与现有后端或数据库对接。
 
-## 前端如何连接现有后端
+## 前后端目录与启动方式
+
+| 模块 | 目录 | 进入目录后运行的命令 | 默认端口 |
+| ---- | ---- | ------------------- | -------- |
+| 前端（Vite + React） | `frontend/` | `npm install` → `npm run dev` | `5173` |
+| 后端（Express API + MySQL） | `server/` | `npm install` → `npm run dev`（或 `npm start`） | `3000` |
+
+> ⚠️ 请分别在两个独立的终端中运行前端和后端，并在启动后端前确认本地 MySQL 已运行。首次启动会自动建库建表并写入示例数据。
+
+### 前端对接后端接口
 
 1. **配置接口地址**
    - 将 `frontend/.env.example` 复制为 `frontend/.env.local`（或 `.env`），并根据后端部署情况修改：
      ```bash
      VITE_API_BASE_URL=http://localhost:3000      # 你的后端基础地址
-     VITE_DASHBOARD_ENDPOINT=/dashboard-overview  # 返回看板总览的接口路径
+     VITE_DASHBOARD_ENDPOINT=/api/dashboard       # 返回看板总览的接口路径
+     VITE_SCHEDULE_ENDPOINT=/api/schedule         # 日程相关接口
+     VITE_PRACTICE_ENDPOINT=/api/practice         # 练习题单接口
+     VITE_FORUM_ENDPOINT=/api/forum/topics        # 圈子交流接口
+     VITE_ADMIN_OVERVIEW_ENDPOINT=/api/admin/overview
+     VITE_ADMIN_COURSES_ENDPOINT=/api/admin/courses
+     VITE_ADMIN_SYNC_ENDPOINT=/api/admin/sync
+     VITE_MAJORS_ENDPOINT=/api/majors
+     VITE_MATERIALS_ENDPOINT=/api/materials
      VITE_API_WITH_CREDENTIALS=false              # 如果需要携带 Cookie/Session，改为 true
      ```
    - `.env.local` 会被 Vite 自动加载，`VITE_` 前缀会注入到浏览器端代码中。不要在仓库中提交真实的私有地址或密钥。
 
-2. **返回统一的数据结构**
+2. **数据结构参考**
    - 前端默认会请求 `GET {VITE_API_BASE_URL}{VITE_DASHBOARD_ENDPOINT}` 并期望返回如下字段（可以按需增减，缺失时会自动使用内置示例数据兜底）：
      ```jsonc
      {
@@ -35,58 +52,74 @@
      ```
    - `stats` 数组中的 `id` 建议使用 `studyTime`、`questionDrill`、`courseFocus`、`mockRank` 之一，以便前端自动匹配相应图标和配色。
 
-3. **在前端页面中查看接口数据**
-   - `Home`、`Courses`、`Practice`、`Schedule` 页面通过 `useDashboardData` 钩子调用后端，当接口可用时会展示实时数据；如果请求失败，则会显示错误提示并保留示例数据。
-   - 你可以在 `frontend/src/services/dashboardService.ts` 中自定义字段映射逻辑，例如追加新的统计项、练习类型或使用不同的接口路径。
+3. **页面对应关系**
+   - `Home`、`Courses` 页面使用 `useDashboardData` 钩子获取总览数据，并根据登录角色（学员或管理员）展示差异化的总览卡片和提醒。
+   - `Practice` 页面依赖 `/api/practice/*` 系列接口，支持获取题目、开始作答、提交测验以及查看“最新一次练习”摘要。
+   - `Schedule` 页面通过 `/api/schedule` 读写个人行程，新建的日程会同步到首页时间轴和统计区域。
+   - `Community` 页面连接 `/api/forum/topics`，用于发帖、评论、点赞；后端内置敏感词过滤并可标记待审核内容。
+   - `Profile` 页面调用 `/api/users/:id` 与 `/api/majors`，允许学员与管理员分别维护自己的资料、目标和负责方向。
+   - `AdminDashboard` 页面组合 `/api/admin/*`、`/api/materials` 等接口，提供课程发布、资料管理、圈子巡检与统计视图。
 
-4. **联调建议**
-   - 保证后端允许跨域访问（CORS），特别是在前端使用 `npm run dev` 时端口通常为 `5173`。
-   - 若后端需要 Cookie 或 Session，可以在 `.env.local` 中把 `VITE_API_WITH_CREDENTIALS` 设置为 `true`，并在后端设置允许携带凭据。
-   - 推荐使用 `npm run dev` 启动前端后，通过浏览器开发者工具或 `Network` 面板确认请求是否成功、数据结构是否匹配。
+4. **调试建议**
+   - 保证后端允许跨域访问（CORS），特别是在前端使用 `npm run dev` 时端口为 `5173`。
+   - 若后端需要 Cookie/Session，在 `.env.local` 中设置 `VITE_API_WITH_CREDENTIALS=true`，并在后端允许携带凭据。
+   - 建议使用浏览器开发者工具的 Network 面板或 `npm run dev -- --host` 暴露给局域网设备调试。
 
-## 如何上传到 GitHub
+## 后端本地运行与数据库说明
 
-如果你希望把本仓库的前端代码直接发布到自己的 GitHub 仓库，可以在任意可以运行 Git 的环境（例如 Codespaces、云服务器或本地电脑）按照下面的步骤操作：
+`server/` 目录已经内置了基于 MySQL 的 Express 服务：
 
-1. **初始化远程仓库**
-   - 在 GitHub 上创建一个空仓库（不要勾选初始化 README 等选项）。
-   - 复制该仓库的 HTTPS 或 SSH 地址。
-
-2. **克隆当前代码**
-   - 在可以运行 Git 的环境中执行：
-     ```bash
-     git clone <当前项目的下载地址或在此环境中将项目打包下载>
-     cd bigwork
+1. **数据库配置**
+   - 仓库附带的 `server/.env` 默认内容如下，可在部署前按需修改：
+     ```env
+     DB_HOST=localhost
+     DB_PORT=3306
+     DB_USER=root
+     DB_PASSWORD=123456
+     DB_NAME=kaoyan_platform
      ```
-   - 如果你正在使用本环境，可以执行（确保当前位于 `bigwork/` 目录中）：
-     ```bash
-     tar czf bigwork.tar.gz -C .. bigwork
-     ```
-     这样 `tar` 会先切换到当前目录的上一级，再将整个 `bigwork/` 文件夹打包。然后下载 `bigwork.tar.gz`，在本地或其他服务器解压：
-     ```bash
-     tar xzf bigwork.tar.gz
-     cd bigwork
-     ```
-   - 如果你在 **Windows PowerShell** 或 **CMD** 中操作，并且 `tar` 命令无法正常使用（常见错误如 `Program Files` 路径提示无法访问），可以改用内置的压缩命令：
-     ```powershell
-     Compress-Archive -Path bigwork -DestinationPath bigwork.zip
-     ```
-     解压时同样使用 PowerShell：
-     ```powershell
-     Expand-Archive -Path bigwork.zip -DestinationPath .
-     ```
-     如果你安装了 Git Bash 或 WSL，也可以在这些环境中运行上面的 `tar` 命令以避免 Windows 路径空格导致的问题。
+   - 启动后端前，请确保本地或远程 MySQL 服务已运行且账号密码正确。
 
-3. **关联 GitHub 仓库**
-   ```bash
-   git remote remove origin 2>/dev/null || true
-   git remote add origin <你的 GitHub 仓库地址>
-   ```
+2. **自动建库建表与种子数据**
+   - 首次运行 `npm run dev` / `npm start` 时会自动：
+     1. 创建 `kaoyan_platform` 数据库；
+     2. 建立所需的数据表；
+     3. 写入示例专业、账号、课程、资料、题库、圈子、分析等内容。
+   - 如果想重置数据，可在 Navicat 或命令行中清空这些表，或直接删除数据库后重新启动服务。
 
-4. **推送代码**
-   ```bash
-   git branch -M main
-   git push -u origin main
-   ```
+3. **主要数据表**
+   | 表名 | 作用 | 关键字段 |
+   | --- | --- | --- |
+   | `majors` | 专业管理 | `name`、`description` |
+   | `users` | 用户与管理员账号 | `username`、`password`、`role`、`major_id` |
+   | `courses` | 课程与发布状态 | `name`、`category`、`teacher`、`status`、`release_window` |
+   | `materials` | 资料与题库附件 | `course_id`、`title`、`material_type`、`url` |
+   | `practice_sets` | 专项训练概览 | `name`、`focus`、`last_accuracy`、`last_summary` |
+   | `practice_questions` | 单选/多选题库 | `practice_set_id`、`question_type`、`stem`、`options_json` |
+   | `practice_attempts` | 练习历史 | `practice_set_id`、`user_id`、`accuracy`、`answers_json` |
+   | `schedule_events` | 学习日程 | `user_id`、`title`、`event_type`、`start_time`、`tags_json` |
+   | `forum_topics` | 圈子话题 | `title`、`content`、`tags_json`、`needs_moderation` |
+   | `forum_comments` | 圈子评论 | `topic_id`、`content`、`author_id` |
+   | `forum_likes` | 点赞记录 | `topic_id`、`user_id` |
+   | `analytics_overview` | 学习分析摘要 | `mock_trend`、`time_distribution`、`behavior_insight` |
+   | `subject_mastery` | 学科掌握度 | `subject`、`mastery`、`trend`、`focus` |
+   | `weak_topics` | 薄弱知识点 | `topic`、`error_rate`、`suggestion` |
 
-完成后，你的 GitHub 仓库就会包含本项目的所有文件，其他人可以直接从 GitHub 上克隆或下载。
+4. **接口与功能覆盖**
+   - `/api/auth/login`：根据数据库账号完成登录，返回角色信息、联系方式、目标院校等。
+   - `/api/dashboard`：根据角色返回学习总览、课程进度、题单、日程以及管理员关注项。
+   - `/api/practice` + `/api/practice/:id/questions` + `/api/practice/:id/attempt`：创建题单、获取题目、提交答卷并记录最新成绩摘要。
+   - `/api/schedule`：读取与创建学习日程，自动与首页同步。
+   - `/api/forum/topics`：圈子发帖、评论、点赞；系统会使用内置敏感词表替换辱骂词并标记待审核话题。
+   - `/api/users/:id`：个人中心信息查询与更新。
+   - `/api/majors`、`/api/materials`、`/api/admin/*`：管理员端的专业、资料、课程草稿、统计与同步控制。
+
+5. **Navicat 维护建议**
+   - 使用 Navicat 连接 `kaoyan_platform` 后，可直接通过可视化界面新增课程、题目、论坛帖子或用户信息。
+   - 导入外部 SQL/CSV 题库时，请确保字段名称与上表一致，必要时可在 `server/seedData.js` 参考示例数据结构。
+
+6. **预置账号**
+   - 学员账号：`student / study2025`
+   - 管理员账号：`admin / admin123`
+
+> 如果需要重新执行种子脚本，可删除数据库或清空各表后重启后端服务。

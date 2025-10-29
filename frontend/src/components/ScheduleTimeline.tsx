@@ -11,16 +11,18 @@ import {
 import EventIcon from '@mui/icons-material/Event';
 import SelfImprovementIcon from '@mui/icons-material/SelfImprovement';
 import QuizIcon from '@mui/icons-material/Quiz';
+import SupportAgentIcon from '@mui/icons-material/SupportAgent';
 import dayjs from 'dayjs';
 import 'dayjs/locale/zh-cn';
 import type { ScheduleItem } from '../data/dashboard';
 
 dayjs.locale('zh-cn');
 
-const timelineIconMap: Record<ScheduleItem['type'], JSX.Element> = {
+const timelineIconMap: Partial<Record<ScheduleItem['type'], JSX.Element>> = {
   直播课: <EventIcon />,
   自习: <SelfImprovementIcon />,
   模拟考试: <QuizIcon />,
+  教练辅导: <SupportAgentIcon />,
 };
 
 interface ScheduleTimelineProps {
@@ -40,7 +42,7 @@ const ScheduleTimeline = ({ items }: ScheduleTimelineProps) => {
               {dayjs(item.start).format('MM月DD日 ddd')}
             </TimelineOppositeContent>
             <TimelineSeparator>
-              <TimelineDot color="primary">{timelineIconMap[item.type]}</TimelineDot>
+              <TimelineDot color="primary">{timelineIconMap[item.type] ?? <EventIcon />}</TimelineDot>
               <TimelineConnector />
             </TimelineSeparator>
             <TimelineContent>
@@ -54,10 +56,22 @@ const ScheduleTimeline = ({ items }: ScheduleTimelineProps) => {
                     {dayjs(item.start).format('HH:mm')} - {dayjs(item.end).format('HH:mm')}
                   </Typography>
                 </Stack>
+                {item.focus && (
+                  <Typography variant="body2" color="text.secondary">
+                    重点：{item.focus}
+                  </Typography>
+                )}
                 {item.location && (
                   <Typography variant="body2" color="text.secondary">
                     地点：{item.location}
                   </Typography>
+                )}
+                {item.tags && item.tags.length > 0 && (
+                  <Stack direction="row" spacing={1}>
+                    {item.tags.map((tag) => (
+                      <Chip key={tag} label={tag} size="small" variant="outlined" />
+                    ))}
+                  </Stack>
                 )}
               </Stack>
             </TimelineContent>
