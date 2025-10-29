@@ -1,6 +1,15 @@
 # bigwork
 
-毕业设计 - 考研学习平台前后端项目。本次提交新增了基于 React + Vite + Material UI 的前端原型，涵盖学习概览、课程体系、刷题训练、日程规划、数据分析以及个人中心等核心页面，便于与现有后端接口对接。
+毕业设计 - 考研学习平台前后端项目。当前代码在原型界面基础上扩展了完整的账号体系、后台管理、刷题题库、论坛交流等功能模块，所有数
+据均通过接口写入 MySQL，由人工维护的数据库结构提供支撑。
+
+## 新增功能概览
+
+- **账号体系**：登录、注册直接对接数据库中的 `users` 表，AuthContext 会在路由层拦截未登录访问；退出登录后自动失去管理员权限。
+- **后台管理**：`/admin` 页面提供基础信息、用户、专业、课程、资料、论坛、统计查询等面板，所有操作均调用 `/api/admin/*` 接口写入数据库。
+- **刷题训练**：`/practice` 页面支持创建题单、录入题目、实时查看题库内容，全部存储于 `practice_sets`、`practice_questions` 表。
+- **考研论坛**：`/forum` 页面提供话题与帖子增删，管理员可在后台进行话题、帖子审核与删除。
+- **接口约束**：服务端不会自动建表或填充种子数据，所有结构需按下方 SQL 手动执行。跨域默认允许 `5173/5174/5175` 端口，便于多实例调试。
 
 ## 前端如何连接现有后端
 
@@ -44,49 +53,176 @@
    - 若后端需要 Cookie 或 Session，可以在 `.env.local` 中把 `VITE_API_WITH_CREDENTIALS` 设置为 `true`，并在后端设置允许携带凭据。
    - 推荐使用 `npm run dev` 启动前端后，通过浏览器开发者工具或 `Network` 面板确认请求是否成功、数据结构是否匹配。
 
-## 如何上传到 GitHub
+## 服务端接口与数据库表结构
 
-如果你希望把本仓库的前端代码直接发布到自己的 GitHub 仓库，可以在任意可以运行 Git 的环境（例如 Codespaces、云服务器或本地电脑）按照下面的步骤操作：
+> **重要说明**：以下所有数据表均需由你手动在 MySQL 中创建，项目不会自动建表。字段类型统一采用 `BIGINT UNSIGNED` 作为主键，时间字段建议使用 `DATETIME` 并结合 `toMySQLDateTime` 工具统一写入格式。
 
-1. **初始化远程仓库**
-   - 在 GitHub 上创建一个空仓库（不要勾选初始化 README 等选项）。
-   - 复制该仓库的 HTTPS 或 SSH 地址。
+### 认证与基础设置
 
-2. **克隆当前代码**
-   - 在可以运行 Git 的环境中执行：
-     ```bash
-     git clone <当前项目的下载地址或在此环境中将项目打包下载>
-     cd bigwork
-     ```
-   - 如果你正在使用本环境，可以执行（确保当前位于 `bigwork/` 目录中）：
-     ```bash
-     tar czf bigwork.tar.gz -C .. bigwork
-     ```
-     这样 `tar` 会先切换到当前目录的上一级，再将整个 `bigwork/` 文件夹打包。然后下载 `bigwork.tar.gz`，在本地或其他服务器解压：
-     ```bash
-     tar xzf bigwork.tar.gz
-     cd bigwork
-     ```
-   - 如果你在 **Windows PowerShell** 或 **CMD** 中操作，并且 `tar` 命令无法正常使用（常见错误如 `Program Files` 路径提示无法访问），可以改用内置的压缩命令：
-     ```powershell
-     Compress-Archive -Path bigwork -DestinationPath bigwork.zip
-     ```
-     解压时同样使用 PowerShell：
-     ```powershell
-     Expand-Archive -Path bigwork.zip -DestinationPath .
-     ```
-     如果你安装了 Git Bash 或 WSL，也可以在这些环境中运行上面的 `tar` 命令以避免 Windows 路径空格导致的问题。
+```sql
+CREATE TABLE `users` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `username` VARCHAR(64) NOT NULL UNIQUE,
+  `password` VARCHAR(255) NOT NULL,
+  `display_name` VARCHAR(100) NOT NULL,
+  `email` VARCHAR(120) DEFAULT NULL,
+  `role` ENUM('student','admin') NOT NULL DEFAULT 'student',
+  `created_at` DATETIME NOT NULL,
+  `updated_at` DATETIME NOT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-3. **关联 GitHub 仓库**
-   ```bash
-   git remote remove origin 2>/dev/null || true
-   git remote add origin <你的 GitHub 仓库地址>
-   ```
+CREATE TABLE `site_settings` (
+  `key` VARCHAR(64) NOT NULL,
+  `value` TEXT,
+  `updated_at` DATETIME NOT NULL,
+  PRIMARY KEY (`key`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-4. **推送代码**
-   ```bash
-   git branch -M main
-   git push -u origin main
-   ```
+CREATE TABLE `admin_audit_logs` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `action` VARCHAR(120) NOT NULL,
+  `detail` TEXT,
+  `actor_name` VARCHAR(100),
+  `created_at` DATETIME NOT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+```
 
-完成后，你的 GitHub 仓库就会包含本项目的所有文件，其他人可以直接从 GitHub 上克隆或下载。
+### 学习与运营数据
+
+```sql
+CREATE TABLE `student_progress` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `user_id` BIGINT UNSIGNED NOT NULL,
+  `target_university` VARCHAR(120) DEFAULT NULL,
+  `weekly_study_hours` INT DEFAULT 0,
+  `completion_rate` DECIMAL(5,2) DEFAULT 0,
+  `updated_at` DATETIME NOT NULL,
+  PRIMARY KEY (`id`),
+  FOREIGN KEY (`user_id`) REFERENCES `users`(`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE `study_tasks` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `user_id` BIGINT UNSIGNED NOT NULL,
+  `title` VARCHAR(120) NOT NULL,
+  `completed` TINYINT(1) DEFAULT 0,
+  `completed_at` DATETIME DEFAULT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE `follow_up_tasks` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `title` VARCHAR(120) NOT NULL,
+  `status` ENUM('pending','done') NOT NULL DEFAULT 'pending',
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE `system_alerts` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `message` VARCHAR(255) NOT NULL,
+  `resolved` TINYINT(1) NOT NULL DEFAULT 0,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+```
+
+### 教务信息管理
+
+```sql
+CREATE TABLE `majors` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `name` VARCHAR(120) NOT NULL,
+  `description` TEXT,
+  `created_at` DATETIME NOT NULL,
+  `updated_at` DATETIME NOT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE `courses` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `title` VARCHAR(150) NOT NULL,
+  `description` TEXT,
+  `teacher` VARCHAR(100),
+  `credit` DECIMAL(4,1) DEFAULT NULL,
+  `major_id` BIGINT UNSIGNED DEFAULT NULL,
+  `created_at` DATETIME NOT NULL,
+  `updated_at` DATETIME NOT NULL,
+  PRIMARY KEY (`id`),
+  FOREIGN KEY (`major_id`) REFERENCES `majors`(`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE `course_materials` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `course_id` BIGINT UNSIGNED DEFAULT NULL,
+  `title` VARCHAR(150) NOT NULL,
+  `description` TEXT,
+  `file_url` VARCHAR(255),
+  `created_at` DATETIME NOT NULL,
+  `updated_at` DATETIME NOT NULL,
+  PRIMARY KEY (`id`),
+  FOREIGN KEY (`course_id`) REFERENCES `courses`(`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+```
+
+### 刷题题库
+
+```sql
+CREATE TABLE `practice_sets` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `title` VARCHAR(150) NOT NULL,
+  `description` TEXT,
+  `difficulty` VARCHAR(20) DEFAULT 'medium',
+  `tags` VARCHAR(255) DEFAULT NULL,
+  `created_by` BIGINT UNSIGNED DEFAULT NULL,
+  `created_at` DATETIME NOT NULL,
+  `updated_at` DATETIME NOT NULL,
+  PRIMARY KEY (`id`),
+  FOREIGN KEY (`created_by`) REFERENCES `users`(`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE `practice_questions` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `practice_set_id` BIGINT UNSIGNED NOT NULL,
+  `question_text` TEXT NOT NULL,
+  `answer_text` TEXT,
+  `explanation` TEXT,
+  `tags` VARCHAR(255),
+  `difficulty` VARCHAR(20) DEFAULT 'medium',
+  `created_by` BIGINT UNSIGNED DEFAULT NULL,
+  `created_at` DATETIME NOT NULL,
+  `updated_at` DATETIME NOT NULL,
+  PRIMARY KEY (`id`),
+  FOREIGN KEY (`practice_set_id`) REFERENCES `practice_sets`(`id`),
+  FOREIGN KEY (`created_by`) REFERENCES `users`(`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+```
+
+### 论坛交流
+
+```sql
+CREATE TABLE `forum_topics` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `title` VARCHAR(150) NOT NULL,
+  `description` TEXT,
+  `created_by` BIGINT UNSIGNED DEFAULT NULL,
+  `created_at` DATETIME NOT NULL,
+  `updated_at` DATETIME NOT NULL,
+  PRIMARY KEY (`id`),
+  FOREIGN KEY (`created_by`) REFERENCES `users`(`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE `forum_posts` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `topic_id` BIGINT UNSIGNED NOT NULL,
+  `user_id` BIGINT UNSIGNED DEFAULT NULL,
+  `content` TEXT NOT NULL,
+  `created_at` DATETIME NOT NULL,
+  `updated_at` DATETIME NOT NULL,
+  PRIMARY KEY (`id`),
+  FOREIGN KEY (`topic_id`) REFERENCES `forum_topics`(`id`),
+  FOREIGN KEY (`user_id`) REFERENCES `users`(`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+```
+
+准备好以上表结构后即可直接运行 `node server/src/index.js` 启动后端，并通过前端界面完成增删改查操作。
