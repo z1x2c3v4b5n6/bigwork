@@ -2,6 +2,7 @@ import {
   AppBar,
   Avatar,
   Box,
+  Chip,
   Container,
   Divider,
   Drawer,
@@ -36,6 +37,7 @@ const baseNavItems = [
   { label: '课程体系', path: '/courses', icon: <AssignmentIcon /> },
   { label: '刷题训练', path: '/practice', icon: <QuizIcon /> },
   { label: '学习日程', path: '/schedule', icon: <EventIcon /> },
+  { label: '考研圈子', path: '/community', icon: <ForumIcon /> },
   { label: '学习分析', path: '/analytics', icon: <TimelineIcon /> },
   { label: '个人中心', path: '/profile', icon: <PersonIcon /> },
 ];
@@ -144,9 +146,14 @@ const AppLayout = ({ mode, onToggleMode, children }: AppLayoutProps) => {
               <MenuIcon />
             </IconButton>
           )}
-          <Typography variant="h6" sx={{ flexGrow: 1 }}>
-            考研学习平台
-          </Typography>
+          <Box sx={{ display: 'flex', flexDirection: 'column', flexGrow: 1 }}>
+            <Typography variant="h6">考研学习平台</Typography>
+            {user && (
+              <Typography variant="caption" color="text.secondary">
+                {user.organization}
+              </Typography>
+            )}
+          </Box>
           <IconButton color="primary" onClick={onToggleMode}>
             {mode === 'light' ? <DarkModeIcon /> : <LightModeIcon />}
           </IconButton>
@@ -186,7 +193,7 @@ const AppLayout = ({ mode, onToggleMode, children }: AppLayoutProps) => {
       <Box component="main" sx={{ flexGrow: 1, bgcolor: 'background.default' }}>
         <Toolbar />
         <Container maxWidth="lg" sx={{ py: 4 }}>
-          {children}
+          <Outlet />
         </Container>
       </Box>
 

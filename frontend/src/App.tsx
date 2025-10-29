@@ -39,8 +39,9 @@ const App = () => {
             )}
           />
           <Route path="*" element={<NotFound />} />
-        </Routes>
-      </AppLayout>
+        </Route>
+        <Route path="*" element={<NotFound />} />
+      </Routes>
     </ThemeProvider>
   );
 };
