@@ -1,0 +1,139 @@
+import {
+  createContext,
+  ReactNode,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
+
+export type UserRole = 'student' | 'admin';
+
+export interface AuthUser {
+  id: string;
+  name: string;
+  role: UserRole;
+  email?: string;
+}
+
+export interface LoginPayload {
+  username: string;
+  password: string;
+}
+
+interface AuthContextValue {
+  user: AuthUser | null;
+  loading: boolean;
+  login: (credentials: LoginPayload) => Promise<void>;
+  logout: () => Promise<void>;
+  refresh: () => Promise<void>;
+}
+
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL?.replace(/\/?$/, '') ?? '';
+
+const AuthContext = createContext<AuthContextValue | undefined>(undefined);
+
+export const AuthProvider = ({ children }: { children: ReactNode }) => {
+  const [user, setUser] = useState<AuthUser | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const fetchSession = useCallback(async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/auth/session`, {
+        credentials: 'include',
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setUser(data?.user ?? null);
+      } else if (response.status === 401) {
+        setUser(null);
+      } else {
+        console.error('无法获取登录状态', response.statusText);
+        setUser(null);
+      }
+    } catch (error) {
+      console.error('获取登录状态时出现异常', error);
+      setUser(null);
+    } finally {
+      setLoading(false);
+    }
+  }, [API_BASE_URL]);
+
+  useEffect(() => {
+    fetchSession();
+  }, [fetchSession]);
+
+  const login = useCallback(async (credentials: LoginPayload) => {
+    setLoading(true);
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify(credentials),
+      });
+
+      if (!response.ok) {
+        const message = (await response.text()) || '登录失败，请检查账号或密码';
+        throw new Error(message);
+      }
+
+      const data = await response.json();
+      setUser(data?.user ?? null);
+    } finally {
+      setLoading(false);
+    }
+  }, [API_BASE_URL]);
+
+  const logout = useCallback(async () => {
+    setLoading(true);
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/auth/logout`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        const message = (await response.text()) || '退出登录失败';
+        throw new Error(message);
+      }
+    } finally {
+      setUser(null);
+      setLoading(false);
+    }
+  }, [API_BASE_URL]);
+
+  const refresh = useCallback(async () => {
+    setLoading(true);
+    await fetchSession();
+  }, [fetchSession]);
+
+  const value = useMemo(
+    () => ({
+      user,
+      loading,
+      login,
+      logout,
+      refresh,
+    }),
+    [user, loading, login, logout, refresh],
+  );
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+};
+
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+
+  if (!context) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+
+  return context;
+};
