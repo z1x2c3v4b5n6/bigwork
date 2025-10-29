@@ -1,4 +1,5 @@
 import { Box, Button, Paper, Stack, Typography } from '@mui/material';
+import { Link as RouterLink } from 'react-router-dom';
 import RocketLaunchIcon from '@mui/icons-material/RocketLaunch';
 import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 
@@ -33,10 +34,24 @@ const HeroBanner = ({ greeting, userName }: HeroBannerProps) => {
             我们根据你的复习进度生成了今日学习计划，集中突破重难点，并同步更新错题回顾清单。
           </Typography>
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} mt={4}>
-            <Button variant="contained" color="secondary" startIcon={<RocketLaunchIcon />} size="large">
+            <Button
+              component={RouterLink}
+              to="/practice"
+              variant="contained"
+              color="secondary"
+              startIcon={<RocketLaunchIcon />}
+              size="large"
+            >
               开始今日计划
             </Button>
-            <Button variant="outlined" color="inherit" startIcon={<CalendarMonthIcon />} size="large">
+            <Button
+              component={RouterLink}
+              to="/schedule"
+              variant="outlined"
+              color="inherit"
+              startIcon={<CalendarMonthIcon />}
+              size="large"
+            >
               查看一周安排
             </Button>
           </Stack>
