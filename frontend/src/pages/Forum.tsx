@@ -14,7 +14,7 @@ import {
   Typography,
 } from '@mui/material';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { FormEvent, useMemo, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useState } from 'react';
 import forumService, { ForumPost, ForumTopic } from '../services/forumService';
 
 const Forum = () => {
@@ -53,10 +53,13 @@ const Forum = () => {
 
   const createTopicMutation = useMutation({
     mutationFn: forumService.createForumTopic,
-    onSuccess: async () => {
+    onSuccess: async (topic) => {
       setTopicTitle('');
       setTopicDescription('');
       await queryClient.invalidateQueries({ queryKey: ['forum-topics'] });
+      if (topic?.id) {
+        setSelectedTopicId(topic.id);
+      }
     },
     onError: (error) => {
       const message = error instanceof Error ? error.message : '创建话题失败，请稍后再试';
@@ -251,3 +254,12 @@ const Forum = () => {
 };
 
 export default Forum;
+  useEffect(() => {
+    if (topics.length === 0) {
+      return;
+    }
+
+    if (selectedTopicId === null || !topics.some((topic) => topic.id === selectedTopicId)) {
+      setSelectedTopicId(topics[0].id);
+    }
+  }, [topics, selectedTopicId]);

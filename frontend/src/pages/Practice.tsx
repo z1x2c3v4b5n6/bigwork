@@ -110,7 +110,7 @@ const Practice = () => {
 
     await createSetMutation.mutateAsync({
       title: setTitle.trim(),
-      description: setSetDescription.trim() || undefined,
+      description: setDescription.trim() || undefined,
       tags,
     });
   };

@@ -28,7 +28,7 @@ export interface DashboardOverview {
   adminFocus?: AdminFocusSummary;
 }
 
-const dashboardEndpoint = import.meta.env.VITE_DASHBOARD_ENDPOINT ?? '/api/dashboard';
+const dashboardEndpoint = import.meta.env.VITE_DASHBOARD_ENDPOINT ?? '/api/learning/dashboard';
 
 const mergeWithFallback = (payload: DashboardOverview | undefined): DashboardOverview => {
   const fallback = dashboardFallback;
