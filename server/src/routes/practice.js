@@ -4,9 +4,11 @@ const {
   insertRecord,
   tableExists,
   getTableColumns,
+  getTableColumnDetails,
 } = require('../database');
 const { requireAuth } = require('../middleware/auth');
 const { normalizeDate, parseTags, stringifyTags } = require('../utils/formatters');
+const { normalizeIdentifier, normalizeValueForColumn } = require('../utils/db');
 
 const router = express.Router();
 
@@ -19,8 +21,11 @@ const getPracticeSetConfig = async () => {
     return null;
   }
 
+  const columnDetails = await getTableColumnDetails('practice_sets');
+
   return {
     columns,
+    columnDetails,
     id: resolveColumn(columns, ['id', 'set_id', 'practice_set_id']),
     title: resolveColumn(columns, ['title', 'name', 'set_title']),
     description: resolveColumn(columns, ['description', 'summary', 'intro']),
@@ -39,8 +44,11 @@ const getPracticeQuestionConfig = async () => {
     return null;
   }
 
+  const columnDetails = await getTableColumnDetails('practice_questions');
+
   return {
     columns,
+    columnDetails,
     id: resolveColumn(columns, ['id', 'question_id']),
     setId: resolveColumn(columns, ['practice_set_id', 'set_id', 'collection_id']),
     questionText: resolveColumn(columns, ['question_text', 'question', 'content']),
@@ -57,23 +65,40 @@ const createSetPayload = (config, { title, description, difficulty, tags, create
   const payload = {};
 
   if (config.title && title !== undefined) {
-    payload[config.title] = title;
+    payload[config.title] = normalizeValueForColumn(config.columnDetails, config.title, title);
   }
 
   if (config.description) {
-    payload[config.description] = description ?? null;
+    payload[config.description] = normalizeValueForColumn(
+      config.columnDetails,
+      config.description,
+      description ?? null,
+    );
   }
 
   if (config.difficulty && difficulty !== undefined) {
-    payload[config.difficulty] = difficulty;
+    payload[config.difficulty] = normalizeValueForColumn(
+      config.columnDetails,
+      config.difficulty,
+      difficulty,
+    );
   }
 
   if (config.tags) {
-    payload[config.tags] = stringifyTags(tags);
+    payload[config.tags] = normalizeValueForColumn(
+      config.columnDetails,
+      config.tags,
+      stringifyTags(tags),
+    );
   }
 
   if (config.createdBy) {
-    payload[config.createdBy] = createdBy ?? null;
+    const normalized = normalizeIdentifier(createdBy);
+    payload[config.createdBy] = normalizeValueForColumn(
+      config.columnDetails,
+      config.createdBy,
+      normalized,
+    );
   }
 
   return payload;
@@ -87,34 +112,58 @@ const createQuestionPayload = (
   const payload = {};
 
   if (config.setId) {
-    payload[config.setId] = setId;
+    payload[config.setId] = normalizeValueForColumn(
+      config.columnDetails,
+      config.setId,
+      setId,
+    );
   }
 
   if (config.questionText) {
-    payload[config.questionText] = questionText;
+    payload[config.questionText] = normalizeValueForColumn(
+      config.columnDetails,
+      config.questionText,
+      questionText,
+    );
   }
 
   if (config.answerText) {
-    payload[config.answerText] = answerText ?? null;
+    payload[config.answerText] = normalizeValueForColumn(
+      config.columnDetails,
+      config.answerText,
+      answerText ?? null,
+    );
   }
 
   if (config.explanation) {
-    payload[config.explanation] = explanation ?? null;
+    payload[config.explanation] = normalizeValueForColumn(
+      config.columnDetails,
+      config.explanation,
+      explanation ?? null,
+    );
   }
 
   if (config.tags) {
-    payload[config.tags] = stringifyTags(tags);
+    payload[config.tags] = normalizeValueForColumn(
+      config.columnDetails,
+      config.tags,
+      stringifyTags(tags),
+    );
   }
 
   if (config.difficulty && difficulty !== undefined) {
-    payload[config.difficulty] = difficulty;
+    payload[config.difficulty] = normalizeValueForColumn(
+      config.columnDetails,
+      config.difficulty,
+      difficulty,
+    );
   }
 
   return payload;
 };
 
 const formatSetRow = (row, index = 0) => ({
-  id: row.id != null ? Number(row.id) : index + 1,
+  id: row.id != null ? String(row.id) : String(index + 1),
   title: row.title || '未命名题单',
   description: row.description || '',
   difficulty: row.difficulty || 'medium',
@@ -125,7 +174,7 @@ const formatSetRow = (row, index = 0) => ({
 });
 
 const formatQuestionRow = (row, index = 0) => ({
-  id: row.id != null ? Number(row.id) : index + 1,
+  id: row.id != null ? String(row.id) : String(index + 1),
   questionText: row.question_text || '该题暂无题干',
   answerText: row.answer_text || '',
   explanation: row.explanation || '',
@@ -160,10 +209,32 @@ const seedPracticeContent = async (setConfig, questionConfig) => {
       return;
     }
 
-    const setId = setResult.insertId;
+    let setId = setResult.insertId;
+    if (!setId && setConfig.id) {
+      setId = setPayload[setConfig.id];
+    }
+
+    if (!setId && setConfig.id) {
+      const [row] = await query(
+        `SELECT ps.\`${setConfig.id}\` AS id
+           FROM practice_sets ps
+          ORDER BY ps.\`${setConfig.updatedAt || setConfig.createdAt || setConfig.id}\` DESC
+          LIMIT 1`,
+      );
+      if (row?.id != null) {
+        setId = row.id;
+      }
+    }
+
     if (!setId) {
       return;
     }
+
+    const normalizedSetId = normalizeValueForColumn(
+      questionConfig.columnDetails,
+      questionConfig.setId,
+      setId,
+    );
 
     const sampleQuestions = [
       {
@@ -190,7 +261,7 @@ const seedPracticeContent = async (setConfig, questionConfig) => {
     ];
 
     for (const question of sampleQuestions) {
-      const payload = createQuestionPayload(questionConfig, setId, question);
+      const payload = createQuestionPayload(questionConfig, normalizedSetId, question);
       await insertRecord('practice_questions', payload);
     }
   } catch (error) {
@@ -296,12 +367,13 @@ router.post('/sets', requireAuth, async (req, res) => {
       description,
       difficulty,
       tags,
-      createdBy: req.session.user ? Number(req.session.user.id) : null,
+      createdBy: req.session.user ? req.session.user.id : null,
     });
 
     const result = await insertRecord('practice_sets', payload);
 
-    res.status(201).json({ id: result.insertId });
+    const newId = result.insertId != null ? String(result.insertId) : null;
+    res.status(201).json({ id: newId });
   } catch (error) {
     console.error('创建题单失败', error);
     res.status(500).json({ message: '创建题单失败，请稍后重试' });
@@ -362,12 +434,22 @@ router.get('/sets/:setId/questions', requireAuth, async (req, res) => {
       ? `pq.\`${questionConfig.createdAt}\``
       : `pq.\`${questionConfig.id}\``;
 
+    const normalizedSetId = normalizeValueForColumn(
+      questionConfig.columnDetails,
+      questionConfig.setId,
+      normalizeIdentifier(setId),
+    );
+
+    if (normalizedSetId === null || normalizedSetId === undefined) {
+      return res.json({ questions: [] });
+    }
+
     const rows = await query(
       `SELECT ${selectFragments.join(', ')}
          FROM practice_questions pq
         WHERE pq.\`${questionConfig.setId}\` = :setId
         ORDER BY ${orderColumn} ASC, pq.\`${questionConfig.id}\` ASC`,
-      { setId },
+      { setId: normalizedSetId },
     );
 
     const questions = rows.map((row, index) => formatQuestionRow(row, index));
@@ -408,7 +490,17 @@ router.post('/sets/:setId/questions', requireAuth, async (req, res) => {
         .json({ message: 'practice_questions 表缺少题干字段（question_text/content），请补充数据表结构。' });
     }
 
-    const payload = createQuestionPayload(questionConfig, setId, {
+    const sanitizedSetId = normalizeValueForColumn(
+      questionConfig.columnDetails,
+      questionConfig.setId,
+      normalizeIdentifier(setId),
+    );
+
+    if (sanitizedSetId === null || sanitizedSetId === undefined) {
+      return res.status(400).json({ message: '题单编号无效，请刷新后重试' });
+    }
+
+    const payload = createQuestionPayload(questionConfig, sanitizedSetId, {
       questionText,
       answerText,
       explanation,
@@ -418,7 +510,8 @@ router.post('/sets/:setId/questions', requireAuth, async (req, res) => {
 
     const result = await insertRecord('practice_questions', payload);
 
-    res.status(201).json({ id: result.insertId });
+    const newId = result.insertId != null ? String(result.insertId) : null;
+    res.status(201).json({ id: newId });
   } catch (error) {
     console.error('创建题目失败', error);
     res.status(500).json({ message: '录入题目失败，请稍后重试' });

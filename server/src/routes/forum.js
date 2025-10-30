@@ -4,16 +4,18 @@ const {
   insertRecord,
   tableExists,
   getTableColumns,
+  getTableColumnDetails,
   deleteRecord,
 } = require('../database');
 const { requireAuth } = require('../middleware/auth');
 const { normalizeDate } = require('../utils/formatters');
 const { isAdminRole } = require('../utils/auth');
+const { normalizeIdentifier, normalizeValueForColumn } = require('../utils/db');
 
 const router = express.Router();
 
 const TOPIC_TABLE = 'forum_topics';
-const POST_TABLE = 'forum_posts';
+const POST_TABLE_CANDIDATES = ['forum_posts', 'forum_comments'];
 const LIKE_TABLE_CANDIDATES = ['forum_topic_likes', 'forum_likes'];
 
 const resolveColumn = (columns, candidates) => candidates.find((column) => columns.has(column)) || null;
@@ -41,9 +43,12 @@ const getForumTopicConfig = async () => {
     return null;
   }
 
+  const columnDetails = await getTableColumnDetails(tableName);
+
   return {
     tableName,
     columns,
+    columnDetails,
     id: resolveColumn(columns, ['id', 'topic_id']),
     title: resolveColumn(columns, ['title', 'name', 'subject']),
     description: resolveColumn(columns, ['description', 'summary', 'content']),
@@ -54,23 +59,29 @@ const getForumTopicConfig = async () => {
 };
 
 const getForumPostConfig = async () => {
-  const tableName = POST_TABLE;
-  const columns = await getTableColumns(tableName);
+  for (const tableName of POST_TABLE_CANDIDATES) {
+    const columns = await getTableColumns(tableName);
 
-  if (columns.size === 0) {
-    return null;
+    if (columns.size === 0) {
+      continue;
+    }
+
+    const columnDetails = await getTableColumnDetails(tableName);
+
+    return {
+      tableName,
+      columns,
+      columnDetails,
+      id: resolveColumn(columns, ['id', 'post_id', 'comment_id']),
+      topicId: resolveColumn(columns, ['topic_id', 'forum_topic_id', 'topicId']),
+      content: resolveColumn(columns, ['content', 'body', 'description']),
+      authorId: resolveColumn(columns, ['author_id', 'user_id', 'creator_id']),
+      createdAt: resolveColumn(columns, ['created_at', 'create_time']),
+      updatedAt: resolveColumn(columns, ['updated_at', 'update_time']),
+    };
   }
 
-  return {
-    tableName,
-    columns,
-    id: resolveColumn(columns, ['id', 'post_id']),
-    topicId: resolveColumn(columns, ['topic_id', 'forum_topic_id']),
-    content: resolveColumn(columns, ['content', 'body', 'description']),
-    authorId: resolveColumn(columns, ['author_id', 'user_id', 'creator_id']),
-    createdAt: resolveColumn(columns, ['created_at', 'create_time']),
-    updatedAt: resolveColumn(columns, ['updated_at', 'update_time']),
-  };
+  return null;
 };
 
 const getForumLikeConfig = async () => {
@@ -81,9 +92,12 @@ const getForumLikeConfig = async () => {
       continue;
     }
 
+    const columnDetails = await getTableColumnDetails(tableName);
+
     return {
       tableName,
       columns,
+      columnDetails,
       id: resolveColumn(columns, ['id', 'like_id']),
       topicId: resolveColumn(columns, ['topic_id', 'forum_topic_id', 'topicId']),
       userId: resolveColumn(columns, ['user_id', 'member_id', 'author_id']),
@@ -134,15 +148,24 @@ const createTopicPayload = (config, { title, description, authorId }) => {
   const payload = {};
 
   if (config.title) {
-    payload[config.title] = title;
+    payload[config.title] = normalizeValueForColumn(config.columnDetails, config.title, title);
   }
 
   if (config.description) {
-    payload[config.description] = description ?? null;
+    payload[config.description] = normalizeValueForColumn(
+      config.columnDetails,
+      config.description,
+      description ?? null,
+    );
   }
 
   if (config.authorId) {
-    payload[config.authorId] = authorId ?? null;
+    const normalized = normalizeIdentifier(authorId);
+    payload[config.authorId] = normalizeValueForColumn(
+      config.columnDetails,
+      config.authorId,
+      normalized,
+    );
   }
 
   return payload;
@@ -152,15 +175,28 @@ const createPostPayload = (config, { topicId, content, authorId }) => {
   const payload = {};
 
   if (config.topicId) {
-    payload[config.topicId] = topicId;
+    payload[config.topicId] = normalizeValueForColumn(
+      config.columnDetails,
+      config.topicId,
+      topicId,
+    );
   }
 
   if (config.content) {
-    payload[config.content] = content;
+    payload[config.content] = normalizeValueForColumn(
+      config.columnDetails,
+      config.content,
+      content,
+    );
   }
 
   if (config.authorId) {
-    payload[config.authorId] = authorId ?? null;
+    const normalized = normalizeIdentifier(authorId);
+    payload[config.authorId] = normalizeValueForColumn(
+      config.columnDetails,
+      config.authorId,
+      normalized,
+    );
   }
 
   return payload;
@@ -170,18 +206,27 @@ const createLikePayload = (config, { topicId, userId }) => {
   const payload = {};
 
   if (config.topicId) {
-    payload[config.topicId] = topicId;
+    payload[config.topicId] = normalizeValueForColumn(
+      config.columnDetails,
+      config.topicId,
+      topicId,
+    );
   }
 
   if (config.userId) {
-    payload[config.userId] = userId;
+    const normalized = normalizeIdentifier(userId);
+    payload[config.userId] = normalizeValueForColumn(
+      config.columnDetails,
+      config.userId,
+      normalized,
+    );
   }
 
   return payload;
 };
 
 const formatTopicRow = (row, index = 0, extras = {}) => ({
-  id: row.id != null ? Number(row.id) : index + 1,
+  id: row.id != null ? String(row.id) : String(index + 1),
   title: row.title || '未命名话题',
   description: row.description || '',
   author: row.author || '匿名用户',
@@ -193,7 +238,7 @@ const formatTopicRow = (row, index = 0, extras = {}) => ({
 });
 
 const formatPostRow = (row, index = 0, extras = {}) => ({
-  id: row.id != null ? Number(row.id) : index + 1,
+  id: row.id != null ? String(row.id) : String(index + 1),
   content: row.content || '',
   author: row.author || '匿名用户',
   createdAt: normalizeDate(row.created_at),
@@ -245,9 +290,19 @@ const countLikesForTopic = async (likeConfig, topicId) => {
     return 0;
   }
 
+  const normalizedTopicId = normalizeValueForColumn(
+    likeConfig.columnDetails,
+    likeConfig.topicId,
+    normalizeIdentifier(topicId),
+  );
+
+  if (normalizedTopicId === null || normalizedTopicId === undefined) {
+    return 0;
+  }
+
   const rows = await query(
     `SELECT COUNT(*) AS total FROM \`${likeConfig.tableName}\` WHERE \`${likeConfig.topicId}\` = :topicId`,
-    { topicId },
+    { topicId: normalizedTopicId },
   );
 
   return Number(rows[0]?.total ?? 0);
@@ -417,7 +472,7 @@ router.post('/topics', requireAuth, async (req, res) => {
     const payload = createTopicPayload(topicConfig, {
       title: rawTitle,
       description: rawDescription,
-      authorId: req.session.user ? Number(req.session.user.id) : null,
+      authorId: req.session.user ? req.session.user.id : null,
     });
 
     const result = await insertRecord(topicConfig.tableName, payload);
@@ -475,13 +530,23 @@ router.get('/topics/:topicId/posts', requireAuth, async (req, res) => {
       ? `fp.\`${postConfig.createdAt}\``
       : `fp.\`${postConfig.id}\``;
 
+    const normalizedTopicId = normalizeValueForColumn(
+      postConfig.columnDetails,
+      postConfig.topicId,
+      normalizeIdentifier(topicId),
+    );
+
+    if (normalizedTopicId === null || normalizedTopicId === undefined) {
+      return res.json({ posts: [] });
+    }
+
     const rows = await query(
       `SELECT ${selectFragments.join(', ')}
          FROM \`${postConfig.tableName}\` fp
          ${joinClause}
         WHERE fp.\`${postConfig.topicId}\` = :topicId
         ORDER BY ${orderColumn} ASC, fp.\`${postConfig.id}\` ASC`,
-      { topicId },
+      { topicId: normalizedTopicId },
     );
 
     const currentUserId = req.session.user?.id != null ? String(req.session.user.id) : null;
@@ -531,12 +596,13 @@ router.post('/topics/:topicId/posts', requireAuth, async (req, res) => {
     const payload = createPostPayload(postConfig, {
       topicId,
       content: rawContent,
-      authorId: req.session.user ? Number(req.session.user.id) : null,
+      authorId: req.session.user ? req.session.user.id : null,
     });
 
     const result = await insertRecord(postConfig.tableName, payload);
 
-    res.status(201).json({ id: result.insertId });
+    const newId = result.insertId != null ? String(result.insertId) : null;
+    res.status(201).json({ id: newId });
   } catch (error) {
     console.error('创建帖子失败', error);
     res.status(500).json({ message: '发布帖子失败，请稍后重试' });
@@ -561,12 +627,22 @@ router.delete('/topics/:topicId/posts/:postId', requireAuth, async (req, res) =>
       postConfig.authorId ? `fp.\`${postConfig.authorId}\` AS author_id` : 'NULL AS author_id',
     ];
 
+    const normalizedPostId = normalizeValueForColumn(
+      postConfig.columnDetails,
+      postConfig.id,
+      normalizeIdentifier(postId),
+    );
+
+    if (normalizedPostId === null || normalizedPostId === undefined) {
+      return res.status(400).json({ message: '帖子编号无效' });
+    }
+
     const rows = await query(
       `SELECT ${selectFragments.join(', ')}
          FROM \`${postConfig.tableName}\` fp
         WHERE fp.\`${postConfig.id}\` = :postId
         LIMIT 1`,
-      { postId },
+      { postId: normalizedPostId },
     );
 
     const record = rows[0];
@@ -577,7 +653,8 @@ router.delete('/topics/:topicId/posts/:postId', requireAuth, async (req, res) =>
 
     if (postConfig.topicId) {
       const recordTopicId = record.topic_id != null ? String(record.topic_id) : null;
-      if (recordTopicId && recordTopicId !== String(topicId)) {
+      const normalizedTopicId = normalizeIdentifier(topicId);
+      if (recordTopicId && normalizedTopicId && recordTopicId !== normalizedTopicId) {
         return res.status(400).json({ message: '帖子与话题不匹配' });
       }
     }
@@ -590,7 +667,7 @@ router.delete('/topics/:topicId/posts/:postId', requireAuth, async (req, res) =>
       return res.status(403).json({ message: '没有权限删除该帖子' });
     }
 
-    await deleteRecord(postConfig.tableName, postId, { idColumn: postConfig.id });
+    await deleteRecord(postConfig.tableName, normalizedPostId, { idColumn: postConfig.id });
 
     return res.json({ success: true });
   } catch (error) {
@@ -629,9 +706,39 @@ router.post('/topics/:topicId/likes', requireAuth, async (req, res) => {
         .json({ message: 'forum_topic_likes 表缺少 topic_id 或 user_id 字段，请补充数据表结构。' });
     }
 
+    const normalizedTopicId = normalizeValueForColumn(
+      topicConfig.columnDetails,
+      topicConfig.id,
+      normalizeIdentifier(topicId),
+    );
+
+    if (normalizedTopicId === null || normalizedTopicId === undefined) {
+      return res.status(400).json({ message: '话题编号无效' });
+    }
+
+    const likeTopicId = normalizeValueForColumn(
+      likeConfig.columnDetails,
+      likeConfig.topicId,
+      normalizeIdentifier(topicId),
+    );
+
+    if (likeTopicId === null || likeTopicId === undefined) {
+      return res.status(400).json({ message: '当前话题编号与点赞表不兼容' });
+    }
+
+    const normalizedUserId = normalizeValueForColumn(
+      likeConfig.columnDetails,
+      likeConfig.userId,
+      normalizeIdentifier(currentUserId),
+    );
+
+    if (normalizedUserId === null || normalizedUserId === undefined) {
+      return res.status(400).json({ message: '用户编号不符合点赞表要求' });
+    }
+
     const topicRows = await query(
       `SELECT 1 FROM \`${topicConfig.tableName}\` WHERE \`${topicConfig.id}\` = :topicId LIMIT 1`,
-      { topicId },
+      { topicId: normalizedTopicId },
     );
 
     if (topicRows.length === 0) {
@@ -644,22 +751,25 @@ router.post('/topics/:topicId/likes', requireAuth, async (req, res) => {
         WHERE fl.\`${likeConfig.topicId}\` = :topicId
           AND fl.\`${likeConfig.userId}\` = :userId
         LIMIT 1`,
-      { topicId, userId: currentUserId },
+      { topicId: likeTopicId, userId: normalizedUserId },
     );
 
     if (existing.length > 0) {
       await query(
         `DELETE FROM \`${likeConfig.tableName}\`
           WHERE \`${likeConfig.topicId}\` = :topicId AND \`${likeConfig.userId}\` = :userId`,
-        { topicId, userId: currentUserId },
+        { topicId: likeTopicId, userId: normalizedUserId },
       );
-      const likes = await countLikesForTopic(likeConfig, topicId);
+      const likes = await countLikesForTopic(likeConfig, likeTopicId);
       return res.json({ likes, liked: false });
     }
 
-    const payload = createLikePayload(likeConfig, { topicId, userId: currentUserId });
+    const payload = createLikePayload(likeConfig, {
+      topicId: likeTopicId,
+      userId: normalizedUserId,
+    });
     await insertRecord(likeConfig.tableName, payload);
-    const likes = await countLikesForTopic(likeConfig, topicId);
+    const likes = await countLikesForTopic(likeConfig, likeTopicId);
 
     return res.json({ likes, liked: true });
   } catch (error) {
