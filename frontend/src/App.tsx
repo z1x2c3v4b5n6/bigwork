@@ -28,6 +28,7 @@ const App = () => {
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route
+          path="/"
           element={(
             <RequireAuth>
               <AppLayout mode={mode} onToggleMode={() => setMode(mode === 'light' ? 'dark' : 'light')} />

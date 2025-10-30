@@ -61,12 +61,22 @@ const AppLayout = ({ mode, onToggleMode }: AppLayoutProps) => {
   const navigate = useNavigate();
   const { user, loading: authLoading, logout } = useAuth();
 
+  const isAdmin = useMemo(() => {
+    if (!user?.role) {
+      return false;
+    }
+
+    const rawRole = user.role;
+    const normalized = typeof rawRole === 'string' ? rawRole.trim().toLowerCase() : String(rawRole).toLowerCase();
+    return normalized === 'admin' || rawRole === '管理员';
+  }, [user?.role]);
+
   const navigationItems = useMemo(() => {
-    if (user?.role === 'admin') {
+    if (isAdmin) {
       return [...baseNavItems, adminNavItem];
     }
     return baseNavItems;
-  }, [user]);
+  }, [isAdmin]);
 
   const handleOpenAccountMenu = (event: MouseEvent<HTMLElement>) => {
     setAccountMenuAnchor(event.currentTarget);
@@ -159,7 +169,7 @@ const AppLayout = ({ mode, onToggleMode }: AppLayoutProps) => {
           <Tooltip
             title={
               user
-                ? `${user.name}（${user.role === 'admin' ? '管理员' : '学员'}）`
+                ? `${user.name}（${isAdmin ? '管理员' : '学员'}）`
                 : authLoading
                 ? '正在加载账号信息'
                 : '未登录'
@@ -209,7 +219,7 @@ const AppLayout = ({ mode, onToggleMode }: AppLayoutProps) => {
               {user.name}
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              {user.role === 'admin' ? '管理员' : '学员'}身份
+              {isAdmin ? '管理员' : '学员'}身份
             </Typography>
           </Box>
         ) : null}

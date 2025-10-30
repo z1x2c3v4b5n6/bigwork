@@ -1,3 +1,5 @@
+const { isAdminRole } = require('../utils/auth');
+
 const requireAuth = (req, res, next) => {
   if (req.session && req.session.user) {
     return next();
@@ -7,7 +9,7 @@ const requireAuth = (req, res, next) => {
 };
 
 const requireAdmin = (req, res, next) => {
-  if (req.session && req.session.user && req.session.user.role === 'admin') {
+  if (req.session && req.session.user && isAdminRole(req.session.user.role)) {
     return next();
   }
 

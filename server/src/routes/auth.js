@@ -2,6 +2,7 @@ const express = require('express');
 const bcrypt = require('bcryptjs');
 const { query } = require('../database');
 const { requireAuth } = require('../middleware/auth');
+const { normalizeRole } = require('../utils/auth');
 
 const { SESSION_NAME = 'connect.sid' } = process.env;
 
@@ -10,7 +11,7 @@ const router = express.Router();
 const serializeUser = (row) => ({
   id: String(row.id),
   name: row.display_name || row.username,
-  role: row.role,
+  role: normalizeRole(row.role),
   email: row.email || null,
 });
 
@@ -86,7 +87,17 @@ router.post('/login', async (req, res) => {
     }
 
     const record = rows[0];
-    const passwordMatch = await bcrypt.compare(password, record.password || '');
+    let passwordMatch = false;
+
+    try {
+      passwordMatch = await bcrypt.compare(password, record.password || '');
+    } catch (compareError) {
+      console.warn('密码校验异常，尝试使用明文比对', compareError.message);
+    }
+
+    if (!passwordMatch && record.password === password) {
+      passwordMatch = true;
+    }
 
     if (!passwordMatch) {
       return res.status(401).json({ message: '用户名或密码错误' });
@@ -103,10 +114,10 @@ router.post('/login', async (req, res) => {
 });
 
 router.post('/logout', requireAuth, (req, res) => {
-  req.session.destroy(() => {
-    res.clearCookie(SESSION_NAME);
-    res.json({ success: true });
-  });
+    req.session.destroy(() => {
+      res.clearCookie(SESSION_NAME);
+      res.json({ success: true });
+    });
 });
 
 module.exports = router;

@@ -3,7 +3,7 @@ const session = require('express-session');
 const cors = require('cors');
 const dotenv = require('dotenv');
 const path = require('path');
-const { pool } = require('./database');
+const { testConnection } = require('./database');
 
 const authRoutes = require('./routes/auth');
 const practiceRoutes = require('./routes/practice');
@@ -12,7 +12,7 @@ const adminRoutes = require('./routes/admin');
 
 dotenv.config({ path: path.resolve(__dirname, '..', '.env') });
 
-typeof pool.getConnection === 'function' && pool.getConnection().then((conn) => conn.release()).catch(() => {});
+void testConnection();
 
 const app = express();
 

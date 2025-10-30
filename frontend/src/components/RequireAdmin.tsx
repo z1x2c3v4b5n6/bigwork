@@ -19,7 +19,13 @@ const RequireAdmin = ({ children }: RequireAdminProps) => {
     );
   }
 
-  if (!user || user.role !== 'admin') {
+  const isAdmin = user?.role
+    ? typeof user.role === 'string'
+      ? user.role.trim().toLowerCase() === 'admin' || user.role === '管理员'
+      : String(user.role).toLowerCase() === 'admin'
+    : false;
+
+  if (!user || !isAdmin) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
