@@ -1,19 +1,20 @@
-export const ensureAuthenticated = (req, res, next) => {
-  if (!req.session?.user) {
-    return res.status(401).json({ message: '未登录或登录状态已过期' });
+const requireAuth = (req, res, next) => {
+  if (req.session && req.session.user) {
+    return next();
   }
 
-  return next();
+  return res.status(401).json({ message: '未登录或会话已失效' });
 };
 
-export const ensureAdmin = (req, res, next) => {
-  if (!req.session?.user) {
-    return res.status(401).json({ message: '未登录或登录状态已过期' });
+const requireAdmin = (req, res, next) => {
+  if (req.session && req.session.user && req.session.user.role === 'admin') {
+    return next();
   }
 
-  if (req.session.user.role !== 'admin') {
-    return res.status(403).json({ message: '需要管理员权限' });
-  }
+  return res.status(403).json({ message: '需要管理员权限' });
+};
 
-  return next();
+module.exports = {
+  requireAuth,
+  requireAdmin,
 };

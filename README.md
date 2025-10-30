@@ -19,6 +19,14 @@
 - **考研论坛**：`/forum` 页面提供话题与帖子增删，管理员可在后台进行话题、帖子审核与删除。
 - **接口约束**：服务端不会自动建表或填充种子数据，所有结构需按下方 SQL 手动执行。跨域默认允许 `5173/5174/5175` 端口，便于多实例调试。
 
+## 新增功能概览
+
+- **账号体系**：登录、注册直接对接数据库中的 `users` 表，AuthContext 会在路由层拦截未登录访问；退出登录后自动失去管理员权限。
+- **后台管理**：`/admin` 页面提供基础信息、用户、专业、课程、资料、论坛、统计查询等面板，所有操作均调用 `/api/admin/*` 接口写入数据库。
+- **刷题训练**：`/practice` 页面支持创建题单、录入题目、实时查看题库内容，全部存储于 `practice_sets`、`practice_questions` 表。
+- **考研论坛**：`/forum` 页面提供话题与帖子增删，管理员可在后台进行话题、帖子审核与删除。
+- **接口约束**：服务端不会自动建表或填充种子数据，所有结构需按下方 SQL 手动执行。跨域默认允许 `5173/5174/5175` 端口，便于多实例调试。
+
 ## 前后端目录与启动方式
 
 | 模块 | 目录 | 进入目录后运行的命令 | 默认端口 |
@@ -79,22 +87,29 @@
 
 ## 服务端接口与数据库表结构
 
-## Spring Boot 服务端与数据库说明
+## Node.js 服务端与数据库说明
 
 > **重要提醒**：后端不会自动建表或灌入种子数据，仍需在 MySQL 中手动维护结构。下面列出的都是业务需要的表及字段，字段类型推荐沿用 `BIGINT UNSIGNED` 主键、`DATETIME` 时间戳，并保持所有外键字段类型与主表一致。
 
-### 如何启动 Spring Boot 服务
+### 如何启动 Node.js 服务
 
-1. 在 `server/` 目录下确认已经安装 JDK 17+ 与 Maven（或使用自己熟悉的构建工具）。
-2. 准备数据库并设置以下环境变量（或在启动命令前写入）：
-   - `DB_HOST`：数据库主机（默认 `localhost`）
-   - `DB_PORT`：数据库端口（默认 `3306`）
-   - `DB_NAME`：目标数据库名称
-   - `DB_USER` / `DB_PASSWORD`：数据库账号与密码
-   - `PORT`：服务监听端口，默认 `3000`
-3. 切换到 `server/` 目录后执行 `mvn spring-boot:run`，看到 `Started BigworkApplication` 日志后即可通过前端访问。
+1. 在 `server/` 目录下确认已经安装 Node.js 18+ 与 npm / pnpm / yarn 中任意一种包管理器。
+2. 根据 `.env.example` 创建 `.env` 并填入数据库、会话、CORS 等配置：
+   - `DB_HOST` / `DB_PORT` / `DB_NAME` / `DB_USER` / `DB_PASSWORD`
+   - `ALLOWED_ORIGINS`（默认允许 `5173-5175` 端口，多个地址用逗号分隔）
+   - `SESSION_SECRET`、`SESSION_NAME`、`SESSION_MAX_AGE`、`SESSION_SAME_SITE`、`SESSION_COOKIE_SECURE`
+   - `PORT`（默认 `3000`）
+3. 安装依赖并启动服务：
+   ```bash
+   cd server
+   npm install        # 或 pnpm install / yarn install
+   npm run start      # 生产模式
+   # 或
+   npm run dev        # 带热重载的开发模式
+   ```
+4. 控制台看到 `Server is running on http://localhost:3000` 后，即可通过前端页面访问接口。
 
-主要接口全部提供在 `/api` 前缀下，支持跨域并默认携带 Cookie 维持会话：
+主要接口全部挂载在 `/api` 前缀下，支持跨域并默认携带 Session Cookie：
 
 - `/api/auth/*`：登录、注册、查询会话、退出登录
 - `/api/practice/*`：刷题题单、题目增删查
@@ -123,4 +138,4 @@
   - `forum_topics`：`id`、`title`、`description`、`author_id`、`created_at`、`updated_at`
   - `forum_posts`：`id`、`topic_id`、`author_id`、`content`、`created_at`、`updated_at`
 
-确保以上数据表准备就绪后即可直接使用 Spring Boot 服务，通过前端界面完成所有增删改查与管理操作。
+确保以上数据表准备就绪后即可直接使用 Node.js 服务，通过前端界面完成所有增删改查与管理操作。

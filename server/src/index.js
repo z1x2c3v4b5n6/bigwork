@@ -1,41 +1,41 @@
-import express from 'express';
-import session from 'express-session';
-import cors from 'cors';
-import dotenv from 'dotenv';
+const express = require('express');
+const session = require('express-session');
+const cors = require('cors');
+const dotenv = require('dotenv');
+const path = require('path');
+const { pool } = require('./database');
 
-import authRouter from './routes/auth.js';
-import adminRouter from './routes/admin.js';
-import practiceRouter from './routes/practice.js';
-import forumRouter from './routes/forum.js';
-import { getPool } from './config/database.js';
+const authRoutes = require('./routes/auth');
+const practiceRoutes = require('./routes/practice');
+const forumRoutes = require('./routes/forum');
+const adminRoutes = require('./routes/admin');
 
-dotenv.config();
+dotenv.config({ path: path.resolve(__dirname, '..', '.env') });
+
+typeof pool.getConnection === 'function' && pool.getConnection().then((conn) => conn.release()).catch(() => {});
 
 const app = express();
 
-const defaultOrigins = ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:5175'];
+const {
+  PORT = 3000,
+  ALLOWED_ORIGINS = 'http://localhost:5173,http://localhost:5174,http://localhost:5175',
+  SESSION_SECRET = 'replace_me',
+  SESSION_NAME = 'kaoyan.sid',
+  SESSION_MAX_AGE = 7 * 24 * 60 * 60 * 1000,
+  SESSION_COOKIE_SECURE = 'false',
+  SESSION_SAME_SITE = 'lax',
+} = process.env;
 
-const allowedOrigins = (process.env.ALLOWED_ORIGINS ?? defaultOrigins.join(','))
-  .split(',')
-  .map((origin) => origin.trim())
-  .filter(Boolean);
-
-const allowAllOrigins = allowedOrigins.includes('*');
+const allowedOrigins = ALLOWED_ORIGINS.split(',').map((origin) => origin.trim()).filter(Boolean);
 
 app.use(
   cors({
-    origin(origin, callback) {
-      if (!origin) {
-        return callback(null, true);
+    origin: (origin, callback) => {
+      if (!origin || allowedOrigins.includes(origin)) {
+        return callback(null, origin);
       }
-
-      if (allowAllOrigins || allowedOrigins.includes(origin)) {
-        return callback(null, true);
-      }
-
-      const error = new Error(`Origin ${origin} is not allowed by CORS`);
-      console.warn(error.message);
-      return callback(error);
+      console.warn(`阻止来自未授权来源的请求: ${origin}`);
+      return callback(new Error('不被允许的来源'));
     },
     credentials: true,
   }),
@@ -45,44 +45,40 @@ app.use(express.json());
 
 app.use(
   session({
-    name: process.env.SESSION_NAME ?? 'kaoyan.sid',
-    secret: process.env.SESSION_SECRET ?? 'dev-secret-change-me',
+    name: SESSION_NAME,
+    secret: SESSION_SECRET,
     resave: false,
     saveUninitialized: false,
     cookie: {
       httpOnly: true,
-      sameSite: process.env.SESSION_SAME_SITE ?? 'lax',
-      secure: process.env.SESSION_COOKIE_SECURE === 'true',
-      maxAge: Number(process.env.SESSION_MAX_AGE ?? 1000 * 60 * 60 * 24 * 7),
+      secure: SESSION_COOKIE_SECURE === 'true',
+      sameSite: (SESSION_SAME_SITE || 'lax').toLowerCase(),
+      maxAge: Number(SESSION_MAX_AGE) || 7 * 24 * 60 * 60 * 1000,
     },
   }),
 );
 
-app.get('/health', async (req, res, next) => {
-  try {
-    const pool = getPool();
-    await pool.query('SELECT 1');
-    res.json({ status: 'ok' });
-  } catch (error) {
-    next(error);
-  }
+app.use('/api/auth', authRoutes);
+app.use('/api/practice', practiceRoutes);
+app.use('/api/forum', forumRoutes);
+app.use('/api/admin', adminRoutes);
+
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok' });
 });
 
-app.use('/api/auth', authRouter);
-app.use('/api/admin', adminRouter);
-app.use('/api/practice', practiceRouter);
-app.use('/api/forum', forumRouter);
-
-app.use('/api/*', (req, res) => {
-  res.status(404).json({ message: '接口未找到' });
+app.use('/api', (req, res) => {
+  res.status(404).json({ message: '未找到对应接口' });
 });
 
 app.use((err, req, res, next) => {
-  console.error('请求处理失败:', err);
-  res.status(500).json({ message: '服务器异常，请稍后重试' });
-});
+  if (err && err.message === '不被允许的来源') {
+    return res.status(403).json({ message: '当前来源未被允许访问接口' });
+  }
 
-const PORT = Number(process.env.PORT ?? 3000);
+  console.error('接口出现未捕获异常', err);
+  return res.status(500).json({ message: '服务器内部错误，请稍后重试' });
+});
 
 app.listen(PORT, () => {
   console.log(`Server is running on http://localhost:${PORT}`);

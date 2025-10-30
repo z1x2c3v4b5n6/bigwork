@@ -1,100 +1,114 @@
-import { Router } from 'express';
-import { ensureAuthenticated, ensureAdmin } from '../middleware/auth.js';
-import { query } from '../config/database.js';
-import { toMySQLDateTime } from '../utils/datetime.js';
+const express = require('express');
+const { query } = require('../database');
+const { requireAuth } = require('../middleware/auth');
+const { normalizeDate } = require('../utils/formatters');
 
-const router = Router();
+const router = express.Router();
 
-router.get('/topics', ensureAuthenticated, async (req, res, next) => {
+router.get('/topics', requireAuth, async (req, res) => {
   try {
-    const topics = await query(
-      'SELECT ft.id, ft.title, ft.description, ft.created_at, ft.updated_at, u.display_name AS author\n       FROM forum_topics ft\n       LEFT JOIN users u ON u.id = ft.created_by\n       ORDER BY ft.updated_at DESC\n       LIMIT 100',
+    const rows = await query(
+      `SELECT ft.id, ft.title, ft.description, ft.created_at, ft.updated_at,
+              COALESCE(u.display_name, u.username, '匿名用户') AS author
+         FROM forum_topics ft
+    LEFT JOIN users u ON u.id = ft.author_id
+        ORDER BY ft.updated_at DESC, ft.created_at DESC`,
     );
 
-    const mapped = topics.map((row) => ({
+    const topics = rows.map((row) => ({
       id: row.id,
       title: row.title,
-      description: row.description ?? '',
-      author: row.author ?? '匿名用户',
-      createdAt: row.created_at ? toMySQLDateTime(row.created_at) : null,
-      updatedAt: row.updated_at ? toMySQLDateTime(row.updated_at) : null,
+      description: row.description || '',
+      author: row.author || '匿名用户',
+      createdAt: normalizeDate(row.created_at),
+      updatedAt: normalizeDate(row.updated_at),
     }));
 
-    res.json({ topics: mapped });
+    res.json({ topics });
   } catch (error) {
-    next(error);
+    console.error('获取话题失败', error);
+    res.status(500).json({ message: '加载考研圈子失败，请稍后重试' });
   }
 });
 
-router.post('/topics', ensureAuthenticated, async (req, res, next) => {
+router.post('/topics', requireAuth, async (req, res) => {
+  const { title, description = '' } = req.body || {};
+
+  if (!title) {
+    return res.status(400).json({ message: '话题标题不能为空' });
+  }
+
   try {
-    const { title, description } = req.body ?? {};
-
-    if (!title) {
-      return res.status(400).json({ message: '话题标题不能为空' });
-    }
-
     const result = await query(
-      'INSERT INTO forum_topics (title, description, created_at, updated_at, created_by) VALUES (?, ?, NOW(), NOW(), ?)',
-      [title, description ?? null, req.session.user.id],
+      `INSERT INTO forum_topics (title, description, author_id, created_at, updated_at)
+       VALUES (:title, :description, :authorId, NOW(), NOW())`,
+      {
+        title,
+        description: description || null,
+        authorId: req.session.user ? req.session.user.id : null,
+      },
     );
 
     res.status(201).json({ id: result.insertId, title });
   } catch (error) {
-    next(error);
+    console.error('创建话题失败', error);
+    res.status(500).json({ message: '创建话题失败，请稍后重试' });
   }
 });
 
-router.get('/topics/:topicId/posts', ensureAuthenticated, async (req, res, next) => {
+router.get('/topics/:topicId/posts', requireAuth, async (req, res) => {
+  const { topicId } = req.params;
+
   try {
-    const { topicId } = req.params;
-    const posts = await query(
-      'SELECT fp.id, fp.content, fp.created_at, fp.updated_at, u.display_name AS author\n       FROM forum_posts fp\n       LEFT JOIN users u ON u.id = fp.user_id\n       WHERE fp.topic_id = ?\n       ORDER BY fp.created_at ASC',
-      [topicId],
+    const rows = await query(
+      `SELECT fp.id, fp.content, fp.created_at, fp.updated_at,
+              COALESCE(u.display_name, u.username, '匿名用户') AS author
+         FROM forum_posts fp
+    LEFT JOIN users u ON u.id = fp.author_id
+        WHERE fp.topic_id = :topicId
+        ORDER BY fp.created_at ASC`,
+      { topicId },
     );
 
-    const mapped = posts.map((row) => ({
+    const posts = rows.map((row) => ({
       id: row.id,
       content: row.content,
-      author: row.author ?? '匿名用户',
-      createdAt: row.created_at ? toMySQLDateTime(row.created_at) : null,
-      updatedAt: row.updated_at ? toMySQLDateTime(row.updated_at) : null,
+      author: row.author || '匿名用户',
+      createdAt: normalizeDate(row.created_at),
+      updatedAt: normalizeDate(row.updated_at),
     }));
 
-    res.json({ posts: mapped });
+    res.json({ posts });
   } catch (error) {
-    next(error);
+    console.error('获取帖子失败', error);
+    res.status(500).json({ message: '加载帖子失败，请稍后重试' });
   }
 });
 
-router.post('/topics/:topicId/posts', ensureAuthenticated, async (req, res, next) => {
+router.post('/topics/:topicId/posts', requireAuth, async (req, res) => {
+  const { topicId } = req.params;
+  const { content } = req.body || {};
+
+  if (!content) {
+    return res.status(400).json({ message: '帖子内容不能为空' });
+  }
+
   try {
-    const { topicId } = req.params;
-    const { content } = req.body ?? {};
-
-    if (!content) {
-      return res.status(400).json({ message: '帖子内容不能为空' });
-    }
-
     const result = await query(
-      'INSERT INTO forum_posts (topic_id, user_id, content, created_at, updated_at) VALUES (?, ?, ?, NOW(), NOW())',
-      [topicId, req.session.user.id, content],
+      `INSERT INTO forum_posts (topic_id, author_id, content, created_at, updated_at)
+       VALUES (:topicId, :authorId, :content, NOW(), NOW())`,
+      {
+        topicId,
+        authorId: req.session.user ? req.session.user.id : null,
+        content,
+      },
     );
 
     res.status(201).json({ id: result.insertId });
   } catch (error) {
-    next(error);
+    console.error('创建帖子失败', error);
+    res.status(500).json({ message: '发布帖子失败，请稍后重试' });
   }
 });
 
-router.delete('/topics/:topicId/posts/:postId', ensureAdmin, async (req, res, next) => {
-  try {
-    const { postId } = req.params;
-    await query('DELETE FROM forum_posts WHERE id = ?', [postId]);
-    res.json({ success: true });
-  } catch (error) {
-    next(error);
-  }
-});
-
-export default router;
+module.exports = router;
