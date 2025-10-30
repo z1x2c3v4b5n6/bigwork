@@ -177,6 +177,15 @@ const getPracticeQuestionConfig = async () => {
   };
 };
 
+const normalizeLimit = (value, fallback) => {
+  const parsed = Number.parseInt(value, 10);
+  if (Number.isNaN(parsed) || parsed <= 0) {
+    return fallback;
+  }
+
+  return Math.min(parsed, 100);
+};
+
 const loadCourses = async (limit = 12) => {
   const config = await getCourseConfig();
   if (!config) {
@@ -204,8 +213,7 @@ const loadCourses = async (limit = 12) => {
     `SELECT ${selectFragments.join(', ')}
        FROM courses c
       ORDER BY ${orderColumn} DESC
-      LIMIT :limit`,
-    { limit },
+      LIMIT ${normalizeLimit(limit, 12)}`,
   );
 
   return rows.map((row, index) => formatCourseRow(row, index));
@@ -229,7 +237,7 @@ const loadSchedule = async (userId, limit = 20) => {
   ];
 
   const whereClauses = [];
-  const params = { limit };
+  const params = {};
 
   if (config.userId && userId) {
     whereClauses.push(`s.\`${config.userId}\` = :userId`);
@@ -244,7 +252,7 @@ const loadSchedule = async (userId, limit = 20) => {
        FROM ${config.table} s
        ${whereSql}
       ORDER BY ${orderColumn} ASC
-      LIMIT :limit`,
+      LIMIT ${normalizeLimit(limit, 20)}`,
     params,
   );
 
@@ -290,8 +298,7 @@ const loadPracticePreview = async (limit = 3) => {
        ${joinClause}
       GROUP BY ps.\`${setConfig.id}\`
       ORDER BY ${orderColumn} DESC
-      LIMIT :limit`,
-    { limit },
+      LIMIT ${normalizeLimit(limit, 3)}`,
   );
 
   return rows.map((row, index) => ({
