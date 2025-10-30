@@ -4,9 +4,11 @@ const {
   insertRecord,
   tableExists,
   getTableColumns,
+  getTableColumnDetails,
 } = require('../database');
 const { requireAuth } = require('../middleware/auth');
 const { normalizeDate, toMySqlDateTime } = require('../utils/formatters');
+const { normalizeIdentifier, normalizeValueForColumn } = require('../utils/db');
 
 const router = express.Router();
 
@@ -19,9 +21,12 @@ const getCourseConfig = async () => {
     return null;
   }
 
+  const columnDetails = await getTableColumnDetails('courses');
+
   return {
     table: 'courses',
     columns,
+    columnDetails,
     id: resolveColumn(columns, ['id', 'course_id']),
     title: resolveColumn(columns, ['title', 'name', 'course_name']),
     teacher: resolveColumn(columns, ['teacher', 'teacher_name', 'lecturer']),
@@ -47,27 +52,47 @@ const createCoursePayload = (config, { title, teacher, category, progress, nextT
   const payload = {};
 
   if (config.title) {
-    payload[config.title] = title;
+    payload[config.title] = normalizeValueForColumn(config.columnDetails, config.title, title);
   }
 
   if (config.teacher) {
-    payload[config.teacher] = teacher ?? null;
+    payload[config.teacher] = normalizeValueForColumn(
+      config.columnDetails,
+      config.teacher,
+      teacher ?? null,
+    );
   }
 
   if (config.category) {
-    payload[config.category] = category ?? null;
+    payload[config.category] = normalizeValueForColumn(
+      config.columnDetails,
+      config.category,
+      category ?? null,
+    );
   }
 
   if (config.progress) {
-    payload[config.progress] = progress ?? 0;
+    payload[config.progress] = normalizeValueForColumn(
+      config.columnDetails,
+      config.progress,
+      progress ?? 0,
+    );
   }
 
   if (config.nextTask) {
-    payload[config.nextTask] = nextTask ?? null;
+    payload[config.nextTask] = normalizeValueForColumn(
+      config.columnDetails,
+      config.nextTask,
+      nextTask ?? null,
+    );
   }
 
   if (config.description) {
-    payload[config.description] = description ?? null;
+    payload[config.description] = normalizeValueForColumn(
+      config.columnDetails,
+      config.description,
+      description ?? null,
+    );
   }
 
   return payload;
@@ -82,9 +107,12 @@ const getScheduleConfig = async () => {
       continue;
     }
 
+    const columnDetails = await getTableColumnDetails(table);
+
     return {
       table,
       columns,
+      columnDetails,
       id: resolveColumn(columns, ['id', 'event_id', 'task_id']),
       title: resolveColumn(columns, ['title', 'name', 'task_name']),
       type: resolveColumn(columns, ['type', 'category', 'task_type']),
@@ -106,7 +134,11 @@ const formatScheduleRow = (row, index = 0) => ({
   title: row.title || '待办事项',
   type: row.type || '自习',
   start: normalizeDate(row.start_time) || normalizeDate(row.created_at) || new Date().toISOString(),
-  end: normalizeDate(row.end_time) || normalizeDate(row.updated_at) || normalizeDate(row.start_time) || new Date().toISOString(),
+  end:
+    normalizeDate(row.end_time) ||
+    normalizeDate(row.updated_at) ||
+    normalizeDate(row.start_time) ||
+    new Date().toISOString(),
   location: row.location || undefined,
 });
 
@@ -114,11 +146,15 @@ const createSchedulePayload = (config, { title, type, start, end, allDay, userId
   const payload = {};
 
   if (config.title) {
-    payload[config.title] = title;
+    payload[config.title] = normalizeValueForColumn(config.columnDetails, config.title, title);
   }
 
   if (config.type) {
-    payload[config.type] = type ?? '自习';
+    payload[config.type] = normalizeValueForColumn(
+      config.columnDetails,
+      config.type,
+      type ?? '自习',
+    );
   }
 
   if (config.start) {
@@ -130,15 +166,28 @@ const createSchedulePayload = (config, { title, type, start, end, allDay, userId
   }
 
   if (config.allDay) {
-    payload[config.allDay] = allDay ? 1 : 0;
+    payload[config.allDay] = normalizeValueForColumn(
+      config.columnDetails,
+      config.allDay,
+      allDay ? 1 : 0,
+    );
   }
 
   if (config.location) {
-    payload[config.location] = location ?? null;
+    payload[config.location] = normalizeValueForColumn(
+      config.columnDetails,
+      config.location,
+      location ?? null,
+    );
   }
 
   if (config.userId) {
-    payload[config.userId] = userId ?? null;
+    const normalized = normalizeIdentifier(userId);
+    payload[config.userId] = normalizeValueForColumn(
+      config.columnDetails,
+      config.userId,
+      normalized,
+    );
   }
 
   return payload;
@@ -151,8 +200,11 @@ const getPracticeSetConfig = async () => {
     return null;
   }
 
+  const columnDetails = await getTableColumnDetails('practice_sets');
+
   return {
     columns,
+    columnDetails,
     id: resolveColumn(columns, ['id', 'set_id', 'practice_set_id']),
     title: resolveColumn(columns, ['title', 'name', 'set_title']),
     description: resolveColumn(columns, ['description', 'summary', 'intro']),
@@ -170,8 +222,11 @@ const getPracticeQuestionConfig = async () => {
     return null;
   }
 
+  const columnDetails = await getTableColumnDetails('practice_questions');
+
   return {
     columns,
+    columnDetails,
     id: resolveColumn(columns, ['id', 'question_id']),
     setId: resolveColumn(columns, ['practice_set_id', 'set_id', 'collection_id']),
   };
@@ -240,8 +295,16 @@ const loadSchedule = async (userId, limit = 20) => {
   const params = {};
 
   if (config.userId && userId) {
-    whereClauses.push(`s.\`${config.userId}\` = :userId`);
-    params.userId = userId;
+    const normalizedUserId = normalizeValueForColumn(
+      config.columnDetails,
+      config.userId,
+      normalizeIdentifier(userId),
+    );
+
+    if (normalizedUserId !== null && normalizedUserId !== undefined) {
+      whereClauses.push(`s.\`${config.userId}\` = :userId`);
+      params.userId = normalizedUserId;
+    }
   }
 
   const whereSql = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
@@ -375,7 +438,7 @@ router.get('/dashboard', requireAuth, async (req, res) => {
     const [courses, practiceSets, schedule, stats] = await Promise.all([
       loadCourses(6),
       loadPracticePreview(3),
-      loadSchedule(req.session?.user?.id ? Number(req.session.user.id) : null, 6),
+      loadSchedule(req.session?.user?.id ? req.session.user.id : null, 6),
       buildStats(),
     ]);
 
@@ -450,7 +513,7 @@ router.post('/courses', requireAuth, async (req, res) => {
 
 router.get('/schedule', requireAuth, async (req, res) => {
   try {
-    const schedule = await loadSchedule(req.session?.user?.id ? Number(req.session.user.id) : null);
+    const schedule = await loadSchedule(req.session?.user?.id ? req.session.user.id : null);
     res.json({ schedule });
   } catch (error) {
     console.error('获取学习日程失败', error);
@@ -480,7 +543,7 @@ router.post('/schedule', requireAuth, async (req, res) => {
       start,
       end,
       allDay,
-      userId: req.session?.user?.id ? Number(req.session.user.id) : null,
+      userId: req.session?.user?.id ? req.session.user.id : null,
       location,
     });
 

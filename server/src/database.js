@@ -78,6 +78,7 @@ const transactional = async (handler) => {
 };
 
 const tableColumnCache = new Map();
+const tableColumnDetailsCache = new Map();
 
 const getTableColumns = async (table) => {
   if (!table) {
@@ -107,11 +108,57 @@ const getTableColumns = async (table) => {
 
 const clearTableColumnCache = () => {
   tableColumnCache.clear();
+  tableColumnDetailsCache.clear();
 };
 
 const tableExists = async (table) => {
   const columns = await getTableColumns(table);
   return columns.size > 0;
+};
+
+const getTableColumnDetails = async (table) => {
+  if (!table) {
+    return new Map();
+  }
+
+  if (tableColumnDetailsCache.has(table)) {
+    return tableColumnDetailsCache.get(table);
+  }
+
+  try {
+    const rows = await query(
+      `SELECT COLUMN_NAME, DATA_TYPE, CHARACTER_MAXIMUM_LENGTH
+         FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_SCHEMA = :schema AND TABLE_NAME = :table`,
+      { schema: DB_NAME, table },
+    );
+
+    const details = new Map();
+
+    rows.forEach((row) => {
+      const name = row.COLUMN_NAME || row.column_name;
+      if (!name) {
+        return;
+      }
+
+      const dataType = row.DATA_TYPE || row.data_type || null;
+      const maxLengthRaw = row.CHARACTER_MAXIMUM_LENGTH ?? row.character_maximum_length;
+      const maxLength = maxLengthRaw != null ? Number(maxLengthRaw) : null;
+
+      details.set(name, {
+        dataType,
+        maxLength: Number.isFinite(maxLength) ? maxLength : null,
+      });
+    });
+
+    tableColumnDetailsCache.set(table, details);
+    return details;
+  } catch (error) {
+    console.warn(`读取数据表 ${table} 字段详情失败：${error.message}`);
+    const empty = new Map();
+    tableColumnDetailsCache.set(table, empty);
+    return empty;
+  }
 };
 
 const buildInsertStatement = (table, payload, columns) => {
@@ -212,6 +259,7 @@ module.exports = {
   query,
   transactional,
   getTableColumns,
+  getTableColumnDetails,
   clearTableColumnCache,
   tableExists,
   insertRecord,
