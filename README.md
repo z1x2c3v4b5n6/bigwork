@@ -11,18 +11,51 @@
 - **考研论坛**：`/forum` 页面提供话题与帖子增删，管理员可在后台进行话题、帖子审核与删除。
 - **接口约束**：服务端不会自动建表或填充种子数据，所有结构需按下方 SQL 手动执行。跨域默认允许 `5173/5174/5175` 端口，便于多实例调试。
 
-## 前端如何连接现有后端
+## 新增功能概览
+
+- **账号体系**：登录、注册直接对接数据库中的 `users` 表，AuthContext 会在路由层拦截未登录访问；退出登录后自动失去管理员权限。
+- **后台管理**：`/admin` 页面提供基础信息、用户、专业、课程、资料、论坛、统计查询等面板，所有操作均调用 `/api/admin/*` 接口写入数据库。
+- **刷题训练**：`/practice` 页面支持创建题单、录入题目、实时查看题库内容，全部存储于 `practice_sets`、`practice_questions` 表。
+- **考研论坛**：`/forum` 页面提供话题与帖子增删，管理员可在后台进行话题、帖子审核与删除。
+- **接口约束**：服务端不会自动建表或填充种子数据，所有结构需按下方 SQL 手动执行。跨域默认允许 `5173/5174/5175` 端口，便于多实例调试。
+
+## 新增功能概览
+
+- **账号体系**：登录、注册直接对接数据库中的 `users` 表，AuthContext 会在路由层拦截未登录访问；退出登录后自动失去管理员权限。
+- **后台管理**：`/admin` 页面提供基础信息、用户、专业、课程、资料、论坛、统计查询等面板，所有操作均调用 `/api/admin/*` 接口写入数据库。
+- **刷题训练**：`/practice` 页面支持创建题单、录入题目、实时查看题库内容，全部存储于 `practice_sets`、`practice_questions` 表。
+- **考研论坛**：`/forum` 页面提供话题与帖子增删，管理员可在后台进行话题、帖子审核与删除。
+- **接口约束**：服务端不会自动建表或填充种子数据，所有结构需按下方 SQL 手动执行。跨域默认允许 `5173/5174/5175` 端口，便于多实例调试。
+
+## 前后端目录与启动方式
+
+| 模块 | 目录 | 进入目录后运行的命令 | 默认端口 |
+| ---- | ---- | ------------------- | -------- |
+| 前端（Vite + React） | `frontend/` | `npm install` → `npm run dev` | `5173` |
+| 后端（Express API + MySQL） | `server/` | `npm install` → `npm run dev`（或 `npm start`） | `3000` |
+
+> ⚠️ 请分别在两个独立的终端中运行前端和后端，并在启动后端前确认本地 MySQL 已运行。首次启动会自动建库建表并写入示例数据。
+
+### 前端对接后端接口
 
 1. **配置接口地址**
    - 将 `frontend/.env.example` 复制为 `frontend/.env.local`（或 `.env`），并根据后端部署情况修改：
      ```bash
      VITE_API_BASE_URL=http://localhost:3000      # 你的后端基础地址
-     VITE_DASHBOARD_ENDPOINT=/dashboard-overview  # 返回看板总览的接口路径
+     VITE_DASHBOARD_ENDPOINT=/api/dashboard       # 返回看板总览的接口路径
+     VITE_SCHEDULE_ENDPOINT=/api/schedule         # 日程相关接口
+     VITE_PRACTICE_ENDPOINT=/api/practice         # 练习题单接口
+     VITE_FORUM_ENDPOINT=/api/forum/topics        # 圈子交流接口
+     VITE_ADMIN_OVERVIEW_ENDPOINT=/api/admin/overview
+     VITE_ADMIN_COURSES_ENDPOINT=/api/admin/courses
+     VITE_ADMIN_SYNC_ENDPOINT=/api/admin/sync
+     VITE_MAJORS_ENDPOINT=/api/majors
+     VITE_MATERIALS_ENDPOINT=/api/materials
      VITE_API_WITH_CREDENTIALS=false              # 如果需要携带 Cookie/Session，改为 true
      ```
    - `.env.local` 会被 Vite 自动加载，`VITE_` 前缀会注入到浏览器端代码中。不要在仓库中提交真实的私有地址或密钥。
 
-2. **返回统一的数据结构**
+2. **数据结构参考**
    - 前端默认会请求 `GET {VITE_API_BASE_URL}{VITE_DASHBOARD_ENDPOINT}` 并期望返回如下字段（可以按需增减，缺失时会自动使用内置示例数据兜底）：
      ```jsonc
      {
@@ -44,14 +77,15 @@
      ```
    - `stats` 数组中的 `id` 建议使用 `studyTime`、`questionDrill`、`courseFocus`、`mockRank` 之一，以便前端自动匹配相应图标和配色。
 
-3. **在前端页面中查看接口数据**
-   - `Home`、`Courses`、`Practice`、`Schedule` 页面通过 `useDashboardData` 钩子调用后端，当接口可用时会展示实时数据；如果请求失败，则会显示错误提示并保留示例数据。
-   - 你可以在 `frontend/src/services/dashboardService.ts` 中自定义字段映射逻辑，例如追加新的统计项、练习类型或使用不同的接口路径。
+3. **页面对应关系**
+   - `Home`、`Courses` 页面使用 `useDashboardData` 钩子获取总览数据，并根据登录角色（学员或管理员）展示差异化的总览卡片和提醒。
+   - `Practice` 页面依赖 `/api/practice/*` 系列接口，支持获取题目、开始作答、提交测验以及查看“最新一次练习”摘要。
+   - `Schedule` 页面通过 `/api/schedule` 读写个人行程，新建的日程会同步到首页时间轴和统计区域。
+   - `Community` 页面连接 `/api/forum/topics`，用于发帖、评论、点赞；后端内置敏感词过滤并可标记待审核内容。
+   - `Profile` 页面调用 `/api/users/:id` 与 `/api/majors`，允许学员与管理员分别维护自己的资料、目标和负责方向。
+   - `AdminDashboard` 页面组合 `/api/admin/*`、`/api/materials` 等接口，提供课程发布、资料管理、圈子巡检与统计视图。
 
-4. **联调建议**
-   - 保证后端允许跨域访问（CORS），特别是在前端使用 `npm run dev` 时端口通常为 `5173`。
-   - 若后端需要 Cookie 或 Session，可以在 `.env.local` 中把 `VITE_API_WITH_CREDENTIALS` 设置为 `true`，并在后端设置允许携带凭据。
-   - 推荐使用 `npm run dev` 启动前端后，通过浏览器开发者工具或 `Network` 面板确认请求是否成功、数据结构是否匹配。
+## 服务端接口与数据库表结构
 
 ## Node.js 服务端与数据库说明
 
