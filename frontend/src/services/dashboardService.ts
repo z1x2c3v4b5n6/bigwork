@@ -17,7 +17,7 @@ export interface DashboardOverview {
   recommendation: string;
 }
 
-const dashboardEndpoint = import.meta.env.VITE_DASHBOARD_ENDPOINT ?? '/dashboard';
+const dashboardEndpoint = import.meta.env.VITE_DASHBOARD_ENDPOINT ?? '/api/learning/dashboard';
 
 const mergeWithFallback = (payload: Partial<DashboardOverview> | undefined): DashboardOverview => {
   const fallback = dashboardFallback;

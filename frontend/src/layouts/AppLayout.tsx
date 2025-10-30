@@ -10,7 +10,10 @@ import {
   ListItemButton,
   ListItemIcon,
   ListItemText,
+  Menu,
+  MenuItem,
   Toolbar,
+  Tooltip,
   Typography,
   useMediaQuery,
 } from '@mui/material';
@@ -23,31 +26,81 @@ import TimelineIcon from '@mui/icons-material/Timeline';
 import PersonIcon from '@mui/icons-material/Person';
 import DarkModeIcon from '@mui/icons-material/DarkMode';
 import LightModeIcon from '@mui/icons-material/LightMode';
-import { ReactNode, useMemo, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
+import ForumIcon from '@mui/icons-material/Forum';
+import { MouseEvent, useMemo, useState } from 'react';
+import { Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 
-const navItems = [
+const baseNavItems = [
   { label: '概览', path: '/', icon: <SchoolIcon /> },
   { label: '课程体系', path: '/courses', icon: <AssignmentIcon /> },
   { label: '刷题训练', path: '/practice', icon: <QuizIcon /> },
   { label: '学习日程', path: '/schedule', icon: <EventIcon /> },
   { label: '学习分析', path: '/analytics', icon: <TimelineIcon /> },
+  { label: '考研论坛', path: '/forum', icon: <ForumIcon /> },
   { label: '个人中心', path: '/profile', icon: <PersonIcon /> },
 ];
+
+const adminNavItem = { label: '后台管理', path: '/admin', icon: <AdminPanelSettingsIcon /> };
 
 interface AppLayoutProps {
   mode: 'light' | 'dark';
   onToggleMode: () => void;
-  children: ReactNode;
 }
 
 const drawerWidth = 240;
 
-const AppLayout = ({ mode, onToggleMode, children }: AppLayoutProps) => {
+const AppLayout = ({ mode, onToggleMode }: AppLayoutProps) => {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [accountMenuAnchor, setAccountMenuAnchor] = useState<null | HTMLElement>(null);
   const isDesktop = useMediaQuery('(min-width:1024px)');
   const location = useLocation();
   const navigate = useNavigate();
+  const { user, loading: authLoading, logout } = useAuth();
+
+  const isAdmin = useMemo(() => {
+    if (!user?.role) {
+      return false;
+    }
+
+    const rawRole = user.role;
+    const normalized = typeof rawRole === 'string' ? rawRole.trim().toLowerCase() : String(rawRole).toLowerCase();
+    return normalized === 'admin' || rawRole === '管理员';
+  }, [user?.role]);
+
+  const navigationItems = useMemo(() => {
+    if (isAdmin) {
+      return [...baseNavItems, adminNavItem];
+    }
+    return baseNavItems;
+  }, [isAdmin]);
+
+  const handleOpenAccountMenu = (event: MouseEvent<HTMLElement>) => {
+    setAccountMenuAnchor(event.currentTarget);
+  };
+
+  const handleCloseAccountMenu = () => {
+    setAccountMenuAnchor(null);
+  };
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+    } catch (error) {
+      console.error('退出登录失败', error);
+    } finally {
+      handleCloseAccountMenu();
+      navigate('/login', { replace: true });
+    }
+  };
+
+  const handleNavigateToLogin = () => {
+    handleCloseAccountMenu();
+    navigate('/login');
+  };
+
+  const userInitial = user?.name?.[0] ?? (authLoading ? '…' : '访');
 
   const drawerContent = useMemo(
     () => (
@@ -65,7 +118,7 @@ const AppLayout = ({ mode, onToggleMode, children }: AppLayoutProps) => {
         </Toolbar>
         <Divider />
         <List sx={{ flexGrow: 1 }}>
-          {navItems.map((item) => (
+          {navigationItems.map((item) => (
             <ListItemButton
               key={item.path}
               selected={location.pathname === item.path}
@@ -88,7 +141,7 @@ const AppLayout = ({ mode, onToggleMode, children }: AppLayoutProps) => {
         </Box>
       </Box>
     ),
-    [location.pathname, navigate],
+    [location.pathname, navigate, navigationItems],
   );
 
   return (
@@ -106,7 +159,19 @@ const AppLayout = ({ mode, onToggleMode, children }: AppLayoutProps) => {
           <IconButton color="primary" onClick={onToggleMode}>
             {mode === 'light' ? <DarkModeIcon /> : <LightModeIcon />}
           </IconButton>
-          <Avatar sx={{ ml: 2 }}>ZS</Avatar>
+          <Tooltip
+            title={
+              user
+                ? `${user.name}（${isAdmin ? '管理员' : '学员'}）`
+                : authLoading
+                ? '正在加载账号信息'
+                : '未登录'
+            }
+          >
+            <IconButton onClick={handleOpenAccountMenu} size="small" sx={{ ml: 2 }}>
+              <Avatar sx={{ width: 36, height: 36 }}>{userInitial}</Avatar>
+            </IconButton>
+          </Tooltip>
         </Toolbar>
       </AppBar>
 
@@ -130,9 +195,36 @@ const AppLayout = ({ mode, onToggleMode, children }: AppLayoutProps) => {
       <Box component="main" sx={{ flexGrow: 1, bgcolor: 'background.default' }}>
         <Toolbar />
         <Container maxWidth="lg" sx={{ py: 4 }}>
-          {children}
+          <Outlet />
         </Container>
       </Box>
+
+      <Menu
+        anchorEl={accountMenuAnchor}
+        open={Boolean(accountMenuAnchor)}
+        onClose={handleCloseAccountMenu}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+        transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+      >
+        {user ? (
+          <Box component="li" sx={{ px: 2, py: 1.5, listStyle: 'none' }}>
+            <Typography variant="subtitle2" fontWeight={600}>
+              {user.name}
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              {isAdmin ? '管理员' : '学员'}身份
+            </Typography>
+          </Box>
+        ) : null}
+        {user ? <Divider component="li" sx={{ my: 0.5 }} /> : null}
+        {authLoading ? (
+          <MenuItem disabled>正在加载账号信息…</MenuItem>
+        ) : user ? (
+          <MenuItem onClick={() => { void handleLogout(); }}>退出登录</MenuItem>
+        ) : (
+          <MenuItem onClick={handleNavigateToLogin}>前往登录</MenuItem>
+        )}
+      </Menu>
     </Box>
   );
 };

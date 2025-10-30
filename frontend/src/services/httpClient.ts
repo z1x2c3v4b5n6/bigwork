@@ -5,7 +5,7 @@ const baseURL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:3000';
 const withCredentialsEnv = import.meta.env.VITE_API_WITH_CREDENTIALS;
 const withCredentials = withCredentialsEnv
   ? withCredentialsEnv.toLowerCase() === 'true'
-  : false;
+  : true;
 
 const httpClient = axios.create({
   baseURL,
