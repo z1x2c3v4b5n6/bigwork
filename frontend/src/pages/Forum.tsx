@@ -2,8 +2,10 @@ import {
   Alert,
   Box,
   Button,
+  Chip,
   Divider,
   Grid,
+  IconButton,
   List,
   ListItem,
   ListItemButton,
@@ -11,11 +13,29 @@ import {
   Paper,
   Stack,
   TextField,
+  Tooltip,
   Typography,
 } from '@mui/material';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { FormEvent, useEffect, useMemo, useState } from 'react';
+import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutline';
+import ThumbUpAltOutlinedIcon from '@mui/icons-material/ThumbUpAltOutlined';
+import ThumbUpAltIcon from '@mui/icons-material/ThumbUpAlt';
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import forumService, { ForumPost, ForumTopic } from '../services/forumService';
+
+const formatDateTime = (value: string | null | undefined) => {
+  if (!value) {
+    return '刚刚';
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return date.toLocaleString('zh-CN', { hour12: false });
+};
 
 const Forum = () => {
   const queryClient = useQueryClient();
@@ -51,6 +71,17 @@ const Forum = () => {
     enabled: selectedTopicId !== null,
   });
 
+  useEffect(() => {
+    if (topics.length === 0) {
+      setSelectedTopicId(null);
+      return;
+    }
+
+    if (selectedTopicId === null || !topics.some((topic) => topic.id === selectedTopicId)) {
+      setSelectedTopicId(topics[0].id);
+    }
+  }, [topics, selectedTopicId]);
+
   const createTopicMutation = useMutation({
     mutationFn: forumService.createForumTopic,
     onSuccess: async (topic) => {
@@ -71,10 +102,41 @@ const Forum = () => {
     mutationFn: (payload: { content: string }) => forumService.createForumPost(selectedTopicId as number, payload),
     onSuccess: async () => {
       setPostContent('');
-      await queryClient.invalidateQueries({ queryKey: ['forum-posts', selectedTopicId] });
+      if (selectedTopicId !== null) {
+        await queryClient.invalidateQueries({ queryKey: ['forum-posts', selectedTopicId] });
+      }
+      await queryClient.invalidateQueries({ queryKey: ['forum-topics'] });
     },
     onError: (error) => {
       const message = error instanceof Error ? error.message : '发送帖子失败，请稍后再试';
+      setErrorMessage(message);
+    },
+  });
+
+  const toggleLikeMutation = useMutation({
+    mutationFn: (topicId: number) => forumService.toggleTopicLike(topicId),
+    onSuccess: ({ likes, liked }, topicId) => {
+      queryClient.setQueryData<ForumTopic[]>(['forum-topics'], (previous = []) =>
+        previous.map((topic) =>
+          topic.id === topicId ? { ...topic, likes, likedByMe: liked } : topic,
+        ),
+      );
+    },
+    onError: (error) => {
+      const message = error instanceof Error ? error.message : '点赞失败，请稍后再试';
+      setErrorMessage(message);
+    },
+  });
+
+  const deletePostMutation = useMutation({
+    mutationFn: ({ topicId, postId }: { topicId: number; postId: number }) =>
+      forumService.deleteForumPost(topicId, postId),
+    onSuccess: async (_data, variables) => {
+      await queryClient.invalidateQueries({ queryKey: ['forum-posts', variables.topicId] });
+      await queryClient.invalidateQueries({ queryKey: ['forum-topics'] });
+    },
+    onError: (error) => {
+      const message = error instanceof Error ? error.message : '删除帖子失败，请稍后再试';
       setErrorMessage(message);
     },
   });
@@ -88,7 +150,10 @@ const Forum = () => {
       return;
     }
 
-    await createTopicMutation.mutateAsync({ title: topicTitle.trim(), description: topicDescription.trim() || undefined });
+    await createTopicMutation.mutateAsync({
+      title: topicTitle.trim(),
+      description: topicDescription.trim() || undefined,
+    });
   };
 
   const handleCreatePost = async (event: FormEvent<HTMLFormElement>) => {
@@ -106,6 +171,30 @@ const Forum = () => {
     }
 
     await createPostMutation.mutateAsync({ content: postContent.trim() });
+  };
+
+  const handleToggleLike = async () => {
+    if (selectedTopicId === null) {
+      setErrorMessage('请先选择一个话题');
+      return;
+    }
+
+    setErrorMessage(null);
+    await toggleLikeMutation.mutateAsync(selectedTopicId);
+  };
+
+  const handleDeletePost = async (postId: number) => {
+    if (selectedTopicId === null) {
+      return;
+    }
+
+    setErrorMessage(null);
+    const confirmed = typeof window !== 'undefined' ? window.confirm('确定要删除这条回复吗？') : true;
+    if (!confirmed) {
+      return;
+    }
+
+    await deletePostMutation.mutateAsync({ topicId: selectedTopicId, postId });
   };
 
   return (
@@ -150,10 +239,34 @@ const Forum = () => {
                           setSelectedTopicId(topic.id);
                           setErrorMessage(null);
                         }}
+                        sx={{ alignItems: 'flex-start', py: 1.5 }}
                       >
                         <ListItemText
-                          primary={topic.title}
-                          secondary={`${topic.author} · ${topic.updatedAt ?? '刚刚更新'}`}
+                          primary={
+                            <Stack direction="row" justifyContent="space-between" alignItems="center" gap={1}>
+                              <Typography variant="subtitle1" fontWeight={600} sx={{ pr: 1 }}>
+                                {topic.title}
+                              </Typography>
+                              <Stack direction="row" spacing={1}>
+                                <Chip
+                                  icon={<ChatBubbleOutlineIcon fontSize="small" />}
+                                  label={topic.replies}
+                                  size="small"
+                                />
+                                <Chip
+                                  icon={<ThumbUpAltOutlinedIcon fontSize="small" />}
+                                  label={topic.likes}
+                                  size="small"
+                                  color={topic.likedByMe ? 'primary' : 'default'}
+                                />
+                              </Stack>
+                            </Stack>
+                          }
+                          secondary={
+                            <Typography variant="body2" color="text.secondary">
+                              {`${topic.author || '匿名用户'} · ${formatDateTime(topic.updatedAt ?? topic.createdAt)}`}
+                            </Typography>
+                          }
                         />
                       </ListItemButton>
                     </ListItem>
@@ -187,22 +300,63 @@ const Forum = () => {
           </Paper>
         </Grid>
         <Grid item xs={12} md={8}>
-          <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid', borderColor: 'divider', minHeight: 480 }}>
+          <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid', borderColor: 'divider', minHeight: 520 }}>
             <Stack spacing={3} sx={{ height: '100%' }}>
               <Box>
-                <Typography variant="h6" fontWeight={600}>
-                  {selectedTopic ? selectedTopic.title : '请选择一个话题'}
-                </Typography>
-                {selectedTopic ? (
-                  <Typography variant="body2" color="text.secondary" mt={1}>
-                    {selectedTopic.description || '该话题暂无描述。'}
+                <Stack spacing={1}>
+                  <Typography variant="h6" fontWeight={600}>
+                    {selectedTopic ? selectedTopic.title : '请选择一个话题'}
                   </Typography>
-                ) : null}
-                {postsError ? (
-                  <Alert severity="error" sx={{ mt: 2 }} action={<Button color="inherit" onClick={() => refetchPosts()}>重试</Button>}>
-                    无法加载帖子内容。
-                  </Alert>
-                ) : null}
+                  {selectedTopic ? (
+                    <>
+                      <Typography variant="body2" color="text.secondary">
+                        {selectedTopic.description || '该话题暂无描述。'}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {`${selectedTopic.author || '匿名用户'} · ${formatDateTime(selectedTopic.updatedAt ?? selectedTopic.createdAt)}`}
+                      </Typography>
+                      <Stack
+                        direction={{ xs: 'column', sm: 'row' }}
+                        spacing={1.5}
+                        mt={1}
+                        alignItems={{ xs: 'flex-start', sm: 'center' }}
+                      >
+                        <Stack direction="row" spacing={1}>
+                          <Chip
+                            icon={<ChatBubbleOutlineIcon fontSize="small" />}
+                            label={`回复 ${selectedTopic.replies}`}
+                            size="small"
+                          />
+                          <Chip
+                            icon={<ThumbUpAltOutlinedIcon fontSize="small" />}
+                            label={`点赞 ${selectedTopic.likes}`}
+                            size="small"
+                            color={selectedTopic.likedByMe ? 'primary' : 'default'}
+                          />
+                        </Stack>
+                        <Button
+                          type="button"
+                          variant={selectedTopic.likedByMe ? 'contained' : 'outlined'}
+                          color={selectedTopic.likedByMe ? 'primary' : 'inherit'}
+                          startIcon={selectedTopic.likedByMe ? <ThumbUpAltIcon /> : <ThumbUpAltOutlinedIcon />}
+                          onClick={handleToggleLike}
+                          disabled={toggleLikeMutation.isPending}
+                        >
+                          {toggleLikeMutation.isPending
+                            ? '更新中…'
+                            : selectedTopic.likedByMe
+                            ? `已赞 ${selectedTopic.likes}`
+                            : `点赞 ${selectedTopic.likes}`}
+                        </Button>
+                      </Stack>
+                    </>
+                  ) : null}
+                  {postsError ? (
+                    <Alert severity="error" sx={{ mt: 2 }} action={<Button color="inherit" onClick={() => refetchPosts()}>重试</Button>}>
+                      无法加载帖子内容。
+                    </Alert>
+                  ) : null}
+                </Stack>
               </Box>
               <Divider />
               <Stack spacing={2} sx={{ flexGrow: 1, overflow: 'auto' }}>
@@ -216,12 +370,28 @@ const Forum = () => {
                   </Typography>
                 ) : (
                   posts.map((post) => (
-                    <Box key={post.id} sx={{ p: 2, borderRadius: 2, bgcolor: 'grey.50' }}>
-                      <Typography variant="body1" mb={1}>
-                        {post.content}
-                      </Typography>
+                    <Box key={post.id} sx={{ p: 2, borderRadius: 2, bgcolor: 'grey.50', border: '1px solid', borderColor: 'divider' }}>
+                      <Stack direction="row" justifyContent="space-between" alignItems="flex-start" spacing={1}>
+                        <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap' }}>
+                          {post.content}
+                        </Typography>
+                        {post.canDelete ? (
+                          <Tooltip title="删除回复">
+                            <span>
+                              <IconButton
+                                size="small"
+                                onClick={() => handleDeletePost(post.id)}
+                                disabled={deletePostMutation.isPending}
+                              >
+                                <DeleteOutlineIcon fontSize="small" />
+                              </IconButton>
+                            </span>
+                          </Tooltip>
+                        ) : null}
+                      </Stack>
                       <Typography variant="caption" color="text.secondary">
-                        {`${post.author} · ${post.createdAt ?? '刚刚发布'}`}
+                        {`${post.author || '匿名用户'} · ${formatDateTime(post.updatedAt ?? post.createdAt)}`}
+                        {post.isAuthor ? '（我的发言）' : ''}
                       </Typography>
                     </Box>
                   ))
@@ -240,7 +410,11 @@ const Forum = () => {
                     minRows={3}
                     disabled={selectedTopicId === null}
                   />
-                  <Button type="submit" variant="contained" disabled={createPostMutation.isPending || selectedTopicId === null}>
+                  <Button
+                    type="submit"
+                    variant="contained"
+                    disabled={createPostMutation.isPending || selectedTopicId === null}
+                  >
                     {createPostMutation.isPending ? '发送中…' : '发送'}
                   </Button>
                 </Stack>
@@ -254,12 +428,3 @@ const Forum = () => {
 };
 
 export default Forum;
-  useEffect(() => {
-    if (topics.length === 0) {
-      return;
-    }
-
-    if (selectedTopicId === null || !topics.some((topic) => topic.id === selectedTopicId)) {
-      setSelectedTopicId(topics[0].id);
-    }
-  }, [topics, selectedTopicId]);
