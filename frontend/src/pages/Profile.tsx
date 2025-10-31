@@ -18,7 +18,7 @@ import {
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
-import { useEffect, useMemo, useState } from 'react';
+import { ChangeEvent, useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -28,6 +28,9 @@ import {
   type MajorOption,
   type UserProfile,
 } from '../services/userService';
+import uploadService from '../services/uploadService';
+import { readFileAsDataUrl } from '../utils/fileUtils';
+import { resolveAssetUrl } from '../utils/url';
 
 const Profile = () => {
   const { user, refreshUser } = useAuth();
@@ -43,6 +46,8 @@ const Profile = () => {
     bio: '',
   });
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null);
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const [avatarUploading, setAvatarUploading] = useState(false);
 
   const profileQuery = useQuery<UserProfile>({
     queryKey: ['profile', user?.id],
@@ -68,8 +73,9 @@ const Profile = () => {
         majorId: profile.majorId ?? '',
         bio: profile.bio ?? '',
       });
+      setAvatarPreview(resolveAssetUrl(profile.avatar ?? user?.avatar ?? null));
     }
-  }, [profileQuery.data]);
+  }, [profileQuery.data, user?.avatar]);
 
   const updateProfileMutation = useMutation({
     mutationFn: (payload: Parameters<typeof updateUserProfile>[1]) => updateUserProfile(user!.id, payload),
@@ -82,6 +88,55 @@ const Profile = () => {
       setFeedback({ type: 'error', message: '保存失败，请稍后重试。' });
     },
   });
+
+  const avatarMutation = useMutation({
+    mutationFn: (payload: { avatar: string }) => updateUserProfile(user!.id, payload),
+    onSuccess: (updated) => {
+      setFeedback({ type: 'success', message: '头像已更新。' });
+      refreshUser(updated);
+      queryClient.setQueryData(['profile', user?.id], updated);
+    },
+    onError: () => {
+      setFeedback({ type: 'error', message: '上传头像失败，请稍后重试。' });
+    },
+  });
+
+  const handleAvatarChange = async (event: ChangeEvent<HTMLInputElement>) => {
+    if (!user) {
+      return;
+    }
+
+    const file = event.target.files?.[0];
+    if (!file) {
+      return;
+    }
+
+    if (!file.type.startsWith('image/')) {
+      setFeedback({ type: 'error', message: '请上传图片格式的头像文件。' });
+      return;
+    }
+
+    if (file.size > 2 * 1024 * 1024) {
+      setFeedback({ type: 'error', message: '头像大小不能超过 2MB。' });
+      return;
+    }
+
+    try {
+      setAvatarUploading(true);
+      const dataUrl = await readFileAsDataUrl(file);
+      const result = await uploadService.uploadAvatar({ dataUrl, filename: file.name });
+      const absoluteUrl = resolveAssetUrl(result.url) ?? result.url;
+      setAvatarPreview(absoluteUrl);
+      await avatarMutation.mutateAsync({ avatar: result.url });
+    } catch (error) {
+      setFeedback({ type: 'error', message: '上传头像失败，请稍后重试。' });
+    } finally {
+      setAvatarUploading(false);
+      if (event.target) {
+        event.target.value = '';
+      }
+    }
+  };
 
   const handleSave = async () => {
     if (!user) return;
@@ -125,7 +180,7 @@ const Profile = () => {
 
   return (
     <Stack spacing={4}>
-      {(profileQuery.isLoading || updateProfileMutation.isPending || majorsQuery.isLoading) && <LinearProgress />}
+      {(profileQuery.isLoading || updateProfileMutation.isPending || avatarMutation.isPending || avatarUploading || majorsQuery.isLoading) && <LinearProgress />}
 
       <Box>
         <Typography variant="h4" fontWeight={700} gutterBottom>
@@ -161,8 +216,12 @@ const Profile = () => {
         <Grid item xs={12} md={4}>
           <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid', borderColor: 'divider' }}>
             <Stack spacing={2} alignItems="center">
-              <Avatar sx={{ width: 88, height: 88, bgcolor: 'primary.main', fontSize: 32 }}>
-                {profile?.avatar ?? profile?.name?.slice(0, 1) ?? '研'}
+              <Avatar
+                sx={{ width: 88, height: 88, bgcolor: 'primary.main', fontSize: 32 }}
+                src={avatarPreview ?? undefined}
+                alt={profile?.name ?? '用户头像'}
+              >
+                {profile?.name?.slice(0, 1) ?? '研'}
               </Avatar>
               <Typography variant="h6" fontWeight={600}>
                 {profile?.name ?? '未登录用户'}
@@ -175,10 +234,15 @@ const Profile = () => {
               <Button
                 variant="outlined"
                 startIcon={<CloudUploadIcon />}
-                onClick={() => setFeedback({ type: 'info', message: '头像上传功能即将开放，可暂时使用姓名首字。' })}
+                component="label"
+                disabled={avatarUploading || avatarMutation.isPending}
               >
-                上传头像
+                {avatarUploading || avatarMutation.isPending ? '上传中…' : '上传头像'}
+                <input type="file" accept="image/*" hidden onChange={handleAvatarChange} />
               </Button>
+              <Typography variant="caption" color="text.secondary">
+                支持 JPG/PNG 等图片格式，建议尺寸 400×400，大小不超过 2MB。
+              </Typography>
               <Divider flexItem />
               <Stack spacing={1} sx={{ width: '100%' }}>
                 <Typography variant="subtitle2" color="text.secondary">

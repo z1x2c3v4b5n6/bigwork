@@ -28,9 +28,10 @@ import AlarmOnIcon from '@mui/icons-material/AlarmOn';
 import AddCircleIcon from '@mui/icons-material/AddCircle';
 import EventAvailableIcon from '@mui/icons-material/EventAvailable';
 import dayjs from 'dayjs';
-import { FormEvent, useState } from 'react';
+import { FormEvent, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import learningService, { ScheduleEntry } from '../services/learningService';
+import ScheduleTimeline from '../components/ScheduleTimeline';
 
 const Schedule = () => {
   const queryClient = useQueryClient();
@@ -41,6 +42,19 @@ const Schedule = () => {
   const [end, setEnd] = useState('');
   const [location, setLocation] = useState('');
   const [allDay, setAllDay] = useState(false);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [isDialogOpen, setDialogOpen] = useState(false);
+  const createInitialDialogState = () => ({
+    title: '',
+    date: dayjs().format('YYYY-MM-DD'),
+    startTime: '',
+    endTime: '',
+    location: '',
+    focus: '',
+    tags: '',
+    type: '自习' as ScheduleEntry['type'],
+  });
+  const [formState, setFormState] = useState(() => createInitialDialogState());
 
   const {
     data: schedule = [],
@@ -61,6 +75,9 @@ const Schedule = () => {
       setEnd('');
       setLocation('');
       setAllDay(false);
+      setFormState(createInitialDialogState());
+      setSuccessMessage('已添加新的学习安排。');
+      setErrorMessage(null);
       await queryClient.invalidateQueries({ queryKey: ['learning-schedule'] });
     },
     onError: (error) => {
@@ -68,6 +85,8 @@ const Schedule = () => {
       setErrorMessage(message);
     },
   });
+
+  const isCreating = createScheduleMutation.isPending;
 
   const handleCreateSchedule = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -87,6 +106,89 @@ const Schedule = () => {
       location: location.trim() || undefined,
     });
   };
+
+  const handleDialogSubmit = async () => {
+    setErrorMessage(null);
+
+    if (!formState.title.trim()) {
+      setErrorMessage('请填写事件名称');
+      return;
+    }
+
+    if (!formState.date || !formState.startTime || !formState.endTime) {
+      setErrorMessage('请选择日期与开始/结束时间');
+      return;
+    }
+
+    const startTime = `${formState.date}T${formState.startTime}`;
+    const endTime = `${formState.date}T${formState.endTime}`;
+
+    const tags = formState.tags
+      .split(',')
+      .map((tag) => tag.trim())
+      .filter(Boolean);
+
+    await createScheduleMutation.mutateAsync({
+      title: formState.title.trim(),
+      type: formState.type || '自习',
+      start: startTime,
+      end: endTime,
+      location: formState.location.trim() || undefined,
+      focus: formState.focus.trim() || undefined,
+      tags,
+    });
+
+    setDialogOpen(false);
+    setFormState(createInitialDialogState());
+  };
+
+  const sortedSchedule = useMemo(() => {
+    return schedule.slice().sort((a, b) => dayjs(a.start).valueOf() - dayjs(b.start).valueOf());
+  }, [schedule]);
+
+  const totalHours = useMemo(() => {
+    const totalMinutes = schedule.reduce((sum, item) => {
+      const startTime = dayjs(item.start);
+      const endTime = dayjs(item.end);
+      const minutes = Math.max(0, endTime.diff(startTime, 'minute'));
+      return sum + minutes;
+    }, 0);
+    return (totalMinutes / 60).toFixed(1);
+  }, [schedule]);
+
+  const focusCount = useMemo(() => schedule.filter((item) => Boolean(item.focus?.trim())).length, [schedule]);
+
+  const liveSessions = useMemo(() => schedule.filter((item) => item.type === '直播课').length, [schedule]);
+
+  const upcomingEvent = useMemo(() => {
+    if (schedule.length === 0) {
+      return null;
+    }
+    const now = dayjs();
+    const upcoming = schedule
+      .filter((item) => dayjs(item.start).isAfter(now))
+      .sort((a, b) => dayjs(a.start).valueOf() - dayjs(b.start).valueOf());
+    if (upcoming.length > 0) {
+      return upcoming[0];
+    }
+    return schedule.slice().sort((a, b) => dayjs(b.start).valueOf() - dayjs(a.start).valueOf())[0];
+  }, [schedule]);
+
+  const tagFrequency = useMemo(() => {
+    const counts = new Map<string, number>();
+    schedule.forEach((item) => {
+      (item.tags ?? []).forEach((tag) => {
+        const trimmed = tag.trim();
+        if (!trimmed) return;
+        counts.set(trimmed, (counts.get(trimmed) ?? 0) + 1);
+      });
+    });
+    return Array.from(counts.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 6);
+  }, [schedule]);
+
+  const timelineItems = useMemo(() => sortedSchedule.slice(0, 6), [sortedSchedule]);
 
   return (
     <Stack spacing={4}>
@@ -398,7 +500,7 @@ const Schedule = () => {
               value={formState.type}
               select
               onChange={(event) =>
-                setFormState((prev) => ({ ...prev, type: event.target.value as ScheduleItem['type'] }))
+                setFormState((prev) => ({ ...prev, type: event.target.value as ScheduleEntry['type'] }))
               }
             >
               <MenuItem value="自习">自习</MenuItem>
@@ -413,7 +515,7 @@ const Schedule = () => {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setDialogOpen(false)}>取消</Button>
-          <Button variant="contained" onClick={handleCreateSchedule} disabled={isCreating}>
+          <Button variant="contained" onClick={handleDialogSubmit} disabled={isCreating}>
             {isCreating ? '创建中…' : '添加到日程'}
           </Button>
         </DialogActions>

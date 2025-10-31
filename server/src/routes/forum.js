@@ -8,7 +8,7 @@ const {
   deleteRecord,
 } = require('../database');
 const { requireAuth } = require('../middleware/auth');
-const { normalizeDate } = require('../utils/formatters');
+const { normalizeDate, parseTags, stringifyTags } = require('../utils/formatters');
 const { isAdminRole } = require('../utils/auth');
 const { normalizeIdentifier, normalizeValueForColumn } = require('../utils/db');
 
@@ -53,6 +53,7 @@ const getForumTopicConfig = async () => {
     title: resolveColumn(columns, ['title', 'name', 'subject']),
     description: resolveColumn(columns, ['description', 'summary', 'content']),
     authorId: resolveColumn(columns, ['author_id', 'user_id', 'creator_id']),
+    tags: resolveColumn(columns, ['tags', 'tags_json', 'tag_list']),
     createdAt: resolveColumn(columns, ['created_at', 'create_time']),
     updatedAt: resolveColumn(columns, ['updated_at', 'update_time']),
   };
@@ -144,7 +145,7 @@ const getUserJoinConfig = async (alias = 'u') => {
   };
 };
 
-const createTopicPayload = (config, { title, description, authorId }) => {
+const createTopicPayload = (config, { title, description, authorId, tags }) => {
   const payload = {};
 
   if (config.title) {
@@ -156,6 +157,14 @@ const createTopicPayload = (config, { title, description, authorId }) => {
       config.columnDetails,
       config.description,
       description ?? null,
+    );
+  }
+
+  if (config.tags) {
+    payload[config.tags] = normalizeValueForColumn(
+      config.columnDetails,
+      config.tags,
+      stringifyTags(tags),
     );
   }
 
@@ -225,17 +234,23 @@ const createLikePayload = (config, { topicId, userId }) => {
   return payload;
 };
 
-const formatTopicRow = (row, index = 0, extras = {}) => ({
-  id: row.id != null ? String(row.id) : String(index + 1),
-  title: row.title || '未命名话题',
-  description: row.description || '',
-  author: row.author || '匿名用户',
-  createdAt: normalizeDate(row.created_at),
-  updatedAt: normalizeDate(row.updated_at),
-  replies: Number(extras.replies ?? row.replies ?? row.reply_count ?? 0),
-  likes: Number(extras.likes ?? row.likes ?? row.like_count ?? 0),
-  likedByMe: Boolean(extras.likedByMe ?? row.liked_by_me ?? false),
-});
+const formatTopicRow = (row, index = 0, extras = {}) => {
+  const liked = Boolean(extras.likedByMe ?? extras.likedByUser ?? row.liked_by_me ?? false);
+
+  return {
+    id: row.id != null ? String(row.id) : String(index + 1),
+    title: row.title || '未命名话题',
+    description: row.description || '',
+    author: row.author || '匿名用户',
+    tags: parseTags(row.tags),
+    createdAt: normalizeDate(row.created_at),
+    updatedAt: normalizeDate(row.updated_at),
+    replies: Number(extras.replies ?? row.replies ?? row.reply_count ?? 0),
+    likes: Number(extras.likes ?? row.likes ?? row.like_count ?? 0),
+    likedByMe: liked,
+    likedByUser: liked,
+  };
+};
 
 const formatPostRow = (row, index = 0, extras = {}) => ({
   id: row.id != null ? String(row.id) : String(index + 1),
@@ -261,18 +276,22 @@ const seedForumTopics = async (topicConfig) => {
       {
         title: '初试经验交流',
         description: '分享全年复习规划、时间管理和自我调节心得，欢迎晒出你的复习进度表。',
+        tags: ['规划', '经验'],
       },
       {
         title: '院校信息互助',
         description: '讨论目标院校专业课复习资料、复试要求与往年录取情况，共建情报库。',
+        tags: ['院校', '信息'],
       },
       {
         title: '每日打卡与互励',
         description: '记录当天完成的任务、复盘心得或遇到的困难，互相监督保持节奏。',
+        tags: ['打卡', '互励'],
       },
       {
         title: '复试准备与面试攻略',
         description: '整理复试题库、材料准备清单以及常见问答经验，提前做好规划。',
+        tags: ['复试', '面试'],
       },
     ];
 
@@ -337,6 +356,7 @@ router.get('/topics', requireAuth, async (req, res) => {
       `ft.\`${topicConfig.id}\` AS id`,
       `ft.\`${topicConfig.title}\` AS title`,
       topicConfig.description ? `ft.\`${topicConfig.description}\` AS description` : 'NULL AS description',
+      topicConfig.tags ? `ft.\`${topicConfig.tags}\` AS tags` : 'NULL AS tags',
       topicConfig.createdAt ? `ft.\`${topicConfig.createdAt}\` AS created_at` : 'NULL AS created_at',
       topicConfig.updatedAt ? `ft.\`${topicConfig.updatedAt}\` AS updated_at` : 'NULL AS updated_at',
       authorSelect,
@@ -449,6 +469,15 @@ router.get('/topics', requireAuth, async (req, res) => {
 router.post('/topics', requireAuth, async (req, res) => {
   const rawTitle = typeof req.body?.title === 'string' ? req.body.title.trim() : '';
   const rawDescription = typeof req.body?.description === 'string' ? req.body.description.trim() : '';
+  const rawTags = req.body?.tags;
+  const tags = Array.isArray(rawTags)
+    ? rawTags.map((tag) => String(tag).trim()).filter(Boolean)
+    : typeof rawTags === 'string'
+    ? rawTags
+        .split(',')
+        .map((tag) => tag.trim())
+        .filter(Boolean)
+    : [];
 
   if (!rawTitle) {
     return res.status(400).json({ message: '话题标题不能为空' });
@@ -473,11 +502,12 @@ router.post('/topics', requireAuth, async (req, res) => {
       title: rawTitle,
       description: rawDescription,
       authorId: req.session.user ? req.session.user.id : null,
+      tags,
     });
 
     const result = await insertRecord(topicConfig.tableName, payload);
 
-    res.status(201).json({ id: result.insertId, title: rawTitle });
+    res.status(201).json({ id: result.insertId, title: rawTitle, tags });
   } catch (error) {
     console.error('创建话题失败', error);
     res.status(500).json({ message: '创建话题失败，请稍后重试' });

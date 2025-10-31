@@ -3,6 +3,7 @@ const session = require('express-session');
 const cors = require('cors');
 const dotenv = require('dotenv');
 const path = require('path');
+const fs = require('fs');
 const { testConnection } = require('./database');
 
 const authRoutes = require('./routes/auth');
@@ -12,6 +13,7 @@ const adminRoutes = require('./routes/admin');
 const learningRoutes = require('./routes/learning');
 const userRoutes = require('./routes/users');
 const majorRoutes = require('./routes/majors');
+const uploadRoutes = require('./routes/uploads');
 
 dotenv.config({ path: path.resolve(__dirname, '..', '.env') });
 
@@ -44,7 +46,13 @@ app.use(
   }),
 );
 
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
+
+const uploadsDir = path.resolve(__dirname, '..', 'uploads');
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
+app.use('/uploads', express.static(uploadsDir));
 
 app.use(
   session({
@@ -68,6 +76,7 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/learning', learningRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/majors', majorRoutes);
+app.use('/api/uploads', uploadRoutes);
 
 app.get('/health', (req, res) => {
   res.json({ status: 'ok' });

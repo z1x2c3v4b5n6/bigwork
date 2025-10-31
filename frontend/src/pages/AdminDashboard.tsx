@@ -4,12 +4,14 @@ import GroupIcon from '@mui/icons-material/Group';
 import AssessmentIcon from '@mui/icons-material/Assessment';
 import InsightsIcon from '@mui/icons-material/Insights';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
+import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import {
   Alert,
   Avatar,
   Box,
   Button,
   Chip,
+  Collapse,
   Divider,
   FormControl,
   FormHelperText,
@@ -37,7 +39,7 @@ import {
   Typography,
 } from '@mui/material';
 import dayjs from 'dayjs';
-import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
 import adminService, {
@@ -50,6 +52,9 @@ import adminService, {
   MaterialRecord,
   StatisticsOverview,
 } from '../services/adminService';
+import uploadService from '../services/uploadService';
+import { readFileAsDataUrl, formatFileSize } from '../utils/fileUtils';
+import { resolveAssetUrl } from '../utils/url';
 
 const numberFormatter = new Intl.NumberFormat('zh-CN');
 
@@ -73,6 +78,9 @@ const AdminDashboard = () => {
   const [majorForm, setMajorForm] = useState({ name: '', description: '' });
   const [courseForm, setCourseForm] = useState({ title: '', description: '', teacher: '', credit: '', majorId: '' });
   const [materialForm, setMaterialForm] = useState({ title: '', description: '', fileUrl: '', courseId: '' });
+  const [materialUploadInfo, setMaterialUploadInfo] = useState<{ name: string; size: number } | null>(null);
+  const [materialUploading, setMaterialUploading] = useState(false);
+  const [materialUploadError, setMaterialUploadError] = useState<string | null>(null);
   const [statisticsSearch, setStatisticsSearch] = useState('');
   const [searchResult, setSearchResult] = useState<{
     users: AdminUser[];
@@ -82,6 +90,35 @@ const AdminDashboard = () => {
     forumTopics: { id: number; title: string; description: string | null }[];
   } | null>(null);
   const [forumTopicId, setForumTopicId] = useState<number | null>(null);
+  const [actionFeedback, setActionFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+
+  const getErrorMessage = (error: unknown, fallback: string) => {
+    if (error && typeof error === 'object') {
+      const maybeMessage = (error as { message?: string }).message;
+      if (maybeMessage && typeof maybeMessage === 'string' && maybeMessage.trim()) {
+        return maybeMessage;
+      }
+
+      const responseData = (error as { response?: { data?: unknown } }).response?.data;
+      if (responseData && typeof responseData === 'object' && 'message' in responseData) {
+        const message = (responseData as { message?: unknown }).message;
+        if (typeof message === 'string' && message.trim()) {
+          return message;
+        }
+      }
+    }
+
+    return fallback;
+  };
+
+  useEffect(() => {
+    if (!actionFeedback) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => setActionFeedback(null), 5000);
+    return () => window.clearTimeout(timer);
+  }, [actionFeedback]);
 
   const dashboardQuery = useQuery<AdminDashboardResponse>({
     queryKey: ['admin-dashboard'],
@@ -191,15 +228,46 @@ const AdminDashboard = () => {
     enabled: activeTab === 'forum' && forumTopicId !== null,
   });
 
+  const materialPreviewUrl = materialForm.fileUrl
+    ? resolveAssetUrl(materialForm.fileUrl) ?? materialForm.fileUrl
+    : '';
+
+  const handleMaterialFileSelect = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) {
+      return;
+    }
+
+    try {
+      setMaterialUploadError(null);
+      setMaterialUploading(true);
+      const dataUrl = await readFileAsDataUrl(file);
+      const result = await uploadService.uploadMaterial({ dataUrl, filename: file.name });
+      setMaterialForm((prev) => ({ ...prev, fileUrl: result.url }));
+      setMaterialUploadInfo({ name: result.fileName || file.name, size: result.size });
+    } catch (error) {
+      console.error('上传资料失败', error);
+      setMaterialUploadError('上传失败，请稍后重试。');
+      setMaterialUploadInfo(null);
+    } finally {
+      setMaterialUploading(false);
+      if (event.target) {
+        event.target.value = '';
+      }
+    }
+  };
+
   const updateSettingsMutation = useMutation({
     mutationFn: adminService.updateAdminSettings,
     onSuccess: async () => {
-      setSettingsMessage('设置保存成功');
       await queryClient.invalidateQueries({ queryKey: ['admin-settings'] });
+      setSettingsMessage('设置保存成功');
+      setActionFeedback({ type: 'success', message: '平台设置已保存。' });
     },
     onError: (error) => {
-      const message = error instanceof Error ? error.message : '保存失败，请稍后再试';
+      const message = getErrorMessage(error, '保存失败，请稍后再试');
       setSettingsMessage(message);
+      setActionFeedback({ type: 'error', message });
     },
   });
 
@@ -208,6 +276,10 @@ const AdminDashboard = () => {
     onSuccess: async () => {
       setUserForm({ username: '', password: '', displayName: '', email: '', role: 'student' });
       await queryClient.invalidateQueries({ queryKey: ['admin-users'] });
+      setActionFeedback({ type: 'success', message: '已新增管理员账户。' });
+    },
+    onError: (error) => {
+      setActionFeedback({ type: 'error', message: getErrorMessage(error, '创建管理员失败，请稍后重试。') });
     },
   });
 
@@ -216,6 +288,10 @@ const AdminDashboard = () => {
       adminService.updateAdminUser(id, payload),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['admin-users'] });
+      setActionFeedback({ type: 'success', message: '账户信息已更新。' });
+    },
+    onError: (error) => {
+      setActionFeedback({ type: 'error', message: getErrorMessage(error, '更新管理员信息失败，请稍后重试。') });
     },
   });
 
@@ -223,6 +299,10 @@ const AdminDashboard = () => {
     mutationFn: (id: number) => adminService.deleteAdminUser(id),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['admin-users'] });
+      setActionFeedback({ type: 'success', message: '已删除管理员账户。' });
+    },
+    onError: (error) => {
+      setActionFeedback({ type: 'error', message: getErrorMessage(error, '删除管理员失败，请稍后重试。') });
     },
   });
 
@@ -231,6 +311,10 @@ const AdminDashboard = () => {
     onSuccess: async () => {
       setMajorForm({ name: '', description: '' });
       await queryClient.invalidateQueries({ queryKey: ['admin-majors'] });
+      setActionFeedback({ type: 'success', message: '新增专业成功。' });
+    },
+    onError: (error) => {
+      setActionFeedback({ type: 'error', message: getErrorMessage(error, '创建专业失败，请稍后重试。') });
     },
   });
 
@@ -239,6 +323,10 @@ const AdminDashboard = () => {
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['admin-majors'] });
       await queryClient.invalidateQueries({ queryKey: ['admin-courses'] });
+      setActionFeedback({ type: 'success', message: '已删除专业。' });
+    },
+    onError: (error) => {
+      setActionFeedback({ type: 'error', message: getErrorMessage(error, '删除专业失败，请稍后重试。') });
     },
   });
 
@@ -247,6 +335,10 @@ const AdminDashboard = () => {
     onSuccess: async () => {
       setCourseForm({ title: '', description: '', teacher: '', credit: '', majorId: '' });
       await queryClient.invalidateQueries({ queryKey: ['admin-courses'] });
+      setActionFeedback({ type: 'success', message: '课程已创建。' });
+    },
+    onError: (error) => {
+      setActionFeedback({ type: 'error', message: getErrorMessage(error, '创建课程失败，请稍后重试。') });
     },
   });
 
@@ -255,6 +347,10 @@ const AdminDashboard = () => {
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['admin-courses'] });
       await queryClient.invalidateQueries({ queryKey: ['admin-materials'] });
+      setActionFeedback({ type: 'success', message: '已删除课程。' });
+    },
+    onError: (error) => {
+      setActionFeedback({ type: 'error', message: getErrorMessage(error, '删除课程失败，请稍后重试。') });
     },
   });
 
@@ -262,7 +358,13 @@ const AdminDashboard = () => {
     mutationFn: adminService.createMaterial,
     onSuccess: async () => {
       setMaterialForm({ title: '', description: '', fileUrl: '', courseId: '' });
+      setMaterialUploadInfo(null);
+      setMaterialUploadError(null);
       await queryClient.invalidateQueries({ queryKey: ['admin-materials'] });
+      setActionFeedback({ type: 'success', message: '资料已保存。' });
+    },
+    onError: (error) => {
+      setActionFeedback({ type: 'error', message: getErrorMessage(error, '创建资料失败，请稍后重试。') });
     },
   });
 
@@ -270,6 +372,10 @@ const AdminDashboard = () => {
     mutationFn: (id: number) => adminService.deleteMaterial(id),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['admin-materials'] });
+      setActionFeedback({ type: 'success', message: '已删除资料。' });
+    },
+    onError: (error) => {
+      setActionFeedback({ type: 'error', message: getErrorMessage(error, '删除资料失败，请稍后重试。') });
     },
   });
 
@@ -279,6 +385,10 @@ const AdminDashboard = () => {
       await queryClient.invalidateQueries({ queryKey: ['admin-forum-topics'] });
       await queryClient.invalidateQueries({ queryKey: ['admin-forum-posts'] });
       setForumTopicId(null);
+      setActionFeedback({ type: 'success', message: '已删除论坛话题。' });
+    },
+    onError: (error) => {
+      setActionFeedback({ type: 'error', message: getErrorMessage(error, '删除论坛话题失败，请稍后重试。') });
     },
   });
 
@@ -286,13 +396,21 @@ const AdminDashboard = () => {
     mutationFn: (id: number) => adminService.deleteAdminForumPost(id),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['admin-forum-posts', forumTopicId] });
+      setActionFeedback({ type: 'success', message: '已删除帖子。' });
+    },
+    onError: (error) => {
+      setActionFeedback({ type: 'error', message: getErrorMessage(error, '删除帖子失败，请稍后重试。') });
     },
   });
 
   const handleSettingsSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setSettingsMessage(null);
-    await updateSettingsMutation.mutateAsync(settingsDraft);
+    try {
+      await updateSettingsMutation.mutateAsync(settingsDraft);
+    } catch (error) {
+      console.error('保存平台设置失败', error);
+    }
   };
 
   const handleUserSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -301,13 +419,17 @@ const AdminDashboard = () => {
       return;
     }
 
-    await createUserMutation.mutateAsync({
-      username: userForm.username,
-      password: userForm.password,
-      displayName: userForm.displayName,
-      email: userForm.email || undefined,
-      role: userForm.role,
-    });
+    try {
+      await createUserMutation.mutateAsync({
+        username: userForm.username,
+        password: userForm.password,
+        displayName: userForm.displayName,
+        email: userForm.email || undefined,
+        role: userForm.role,
+      });
+    } catch (error) {
+      console.error('创建管理员失败', error);
+    }
   };
 
   const handleMajorSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -316,7 +438,11 @@ const AdminDashboard = () => {
       return;
     }
 
-    await createMajorMutation.mutateAsync({ name: majorForm.name, description: majorForm.description || undefined });
+    try {
+      await createMajorMutation.mutateAsync({ name: majorForm.name, description: majorForm.description || undefined });
+    } catch (error) {
+      console.error('创建专业失败', error);
+    }
   };
 
   const handleCourseSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -325,13 +451,17 @@ const AdminDashboard = () => {
       return;
     }
 
-    await createCourseMutation.mutateAsync({
-      title: courseForm.title,
-      description: courseForm.description || undefined,
-      teacher: courseForm.teacher || undefined,
-      credit: courseForm.credit ? Number(courseForm.credit) : undefined,
-      majorId: courseForm.majorId ? Number(courseForm.majorId) : undefined,
-    });
+    try {
+      await createCourseMutation.mutateAsync({
+        title: courseForm.title,
+        description: courseForm.description || undefined,
+        teacher: courseForm.teacher || undefined,
+        credit: courseForm.credit ? Number(courseForm.credit) : undefined,
+        majorId: courseForm.majorId ? Number(courseForm.majorId) : undefined,
+      });
+    } catch (error) {
+      console.error('创建课程失败', error);
+    }
   };
 
   const handleMaterialSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -340,12 +470,16 @@ const AdminDashboard = () => {
       return;
     }
 
-    await createMaterialMutation.mutateAsync({
-      title: materialForm.title,
-      description: materialForm.description || undefined,
-      fileUrl: materialForm.fileUrl || undefined,
-      courseId: materialForm.courseId ? Number(materialForm.courseId) : undefined,
-    });
+    try {
+      await createMaterialMutation.mutateAsync({
+        title: materialForm.title,
+        description: materialForm.description || undefined,
+        fileUrl: materialForm.fileUrl || undefined,
+        courseId: materialForm.courseId ? Number(materialForm.courseId) : undefined,
+      });
+    } catch (error) {
+      console.error('创建资料失败', error);
+    }
   };
 
   const handleStatisticsSearch = async (event: FormEvent<HTMLFormElement>) => {
@@ -355,8 +489,13 @@ const AdminDashboard = () => {
       return;
     }
 
-    const result = await adminService.searchAdminData(statisticsSearch.trim());
-    setSearchResult(result);
+    try {
+      const result = await adminService.searchAdminData(statisticsSearch.trim());
+      setSearchResult(result);
+    } catch (error) {
+      console.error('搜索失败', error);
+      setActionFeedback({ type: 'error', message: getErrorMessage(error, '搜索失败，请稍后再试。') });
+    }
   };
 
   if (authLoading || dashboardQuery.isLoading) {
@@ -401,6 +540,17 @@ const AdminDashboard = () => {
 
   return (
     <Stack spacing={3}>
+      <Collapse in={Boolean(actionFeedback)}>
+        {actionFeedback ? (
+          <Alert
+            severity={actionFeedback.type}
+            onClose={() => setActionFeedback(null)}
+            sx={{ borderRadius: 2 }}
+          >
+            {actionFeedback.message}
+          </Alert>
+        ) : null}
+      </Collapse>
       <Stack direction={{ xs: 'column', md: 'row' }} alignItems={{ xs: 'flex-start', md: 'center' }} justifyContent="space-between" spacing={2}>
         <Box>
           <Typography variant="h4" fontWeight={700} gutterBottom>
@@ -976,11 +1126,57 @@ const AdminDashboard = () => {
                   />
                 </Grid>
                 <Grid item xs={12} md={6}>
-                  <TextField
-                    label="文件链接（可选）"
-                    value={materialForm.fileUrl}
-                    onChange={(event) => setMaterialForm((prev) => ({ ...prev, fileUrl: event.target.value }))}
-                  />
+                  <Stack spacing={1}>
+                    <Button
+                      variant="outlined"
+                      startIcon={<CloudUploadIcon />}
+                      component="label"
+                      disabled={materialUploading}
+                    >
+                      {materialUploading ? '上传中…' : '上传资料文件'}
+                      <input type="file" hidden onChange={handleMaterialFileSelect} />
+                    </Button>
+                    {materialUploadInfo ? (
+                      <Stack direction="row" spacing={1} alignItems="center">
+                        <Chip label={materialUploadInfo.name} variant="outlined" />
+                        <Typography variant="caption" color="text.secondary">
+                          {formatFileSize(materialUploadInfo.size)}
+                        </Typography>
+                      </Stack>
+                    ) : (
+                      <Typography variant="caption" color="text.secondary">
+                        支持 PDF/Word/图片等格式，上传后自动生成访问链接。
+                      </Typography>
+                    )}
+                    {materialUploadError && (
+                      <Typography variant="caption" color="error">
+                        {materialUploadError}
+                      </Typography>
+                    )}
+                    <TextField
+                      label="文件链接"
+                      value={materialPreviewUrl}
+                      InputProps={{ readOnly: true }}
+                      helperText={
+                        materialForm.fileUrl
+                          ? '链接将在保存后向学员开放访问'
+                          : '可手动修改为外部链接，或留空仅保存资料说明'
+                      }
+                    />
+                    {materialPreviewUrl ? (
+                      <Button
+                        variant="text"
+                        size="small"
+                        component="a"
+                        href={materialPreviewUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        sx={{ alignSelf: 'flex-start' }}
+                      >
+                        预览资料链接
+                      </Button>
+                    ) : null}
+                  </Stack>
                 </Grid>
                 <Grid item xs={12} md={6}>
                   <FormControl fullWidth>
@@ -999,8 +1195,8 @@ const AdminDashboard = () => {
                   </FormControl>
                 </Grid>
               </Grid>
-              <Button type="submit" variant="contained" disabled={createMaterialMutation.isPending}>
-                {createMaterialMutation.isPending ? '创建中…' : '保存资料'}
+              <Button type="submit" variant="contained" disabled={createMaterialMutation.isPending || materialUploading}>
+                {createMaterialMutation.isPending || materialUploading ? '创建中…' : '保存资料'}
               </Button>
             </Stack>
           </Paper>
@@ -1036,9 +1232,39 @@ const AdminDashboard = () => {
                     <ListItemText
                       primary={material.title}
                       secondary={
-                        material.courseTitle
-                          ? `${material.courseTitle}${material.description ? ` · ${material.description}` : ''}`
-                          : material.description ?? '暂无描述'
+                        <Stack spacing={0.5} alignItems="flex-start">
+                          {material.description ? (
+                            <Typography variant="body2" color="text.secondary">
+                              {material.description}
+                            </Typography>
+                          ) : (
+                            <Typography variant="body2" color="text.secondary">
+                              暂无描述
+                            </Typography>
+                          )}
+                          {material.courseTitle ? (
+                            <Typography variant="caption" color="text.secondary">
+                              关联课程：{material.courseTitle}
+                            </Typography>
+                          ) : null}
+                          {material.fileUrl ? (
+                            <Button
+                              variant="text"
+                              size="small"
+                              component="a"
+                              href={(resolveAssetUrl(material.fileUrl) ?? material.fileUrl) || '#'}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              sx={{ px: 0 }}
+                            >
+                              查看资料
+                            </Button>
+                          ) : (
+                            <Typography variant="caption" color="text.secondary">
+                              尚未上传文件
+                            </Typography>
+                          )}
+                        </Stack>
                       }
                     />
                   </ListItem>
