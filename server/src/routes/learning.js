@@ -7,7 +7,7 @@ const {
   getTableColumnDetails,
 } = require('../database');
 const { requireAuth } = require('../middleware/auth');
-const { normalizeDate, toMySqlDateTime } = require('../utils/formatters');
+const { normalizeDate, parseTags, stringifyTags, toMySqlDateTime } = require('../utils/formatters');
 const { normalizeIdentifier, normalizeValueForColumn } = require('../utils/db');
 
 const router = express.Router();
@@ -115,12 +115,14 @@ const getScheduleConfig = async () => {
       columnDetails,
       id: resolveColumn(columns, ['id', 'event_id', 'task_id']),
       title: resolveColumn(columns, ['title', 'name', 'task_name']),
-      type: resolveColumn(columns, ['type', 'category', 'task_type']),
+      type: resolveColumn(columns, ['type', 'category', 'task_type', 'event_type']),
       start: resolveColumn(columns, ['start_time', 'start_at', 'begin_time']),
       end: resolveColumn(columns, ['end_time', 'end_at', 'finish_time']),
       allDay: resolveColumn(columns, ['all_day', 'is_all_day']),
       location: resolveColumn(columns, ['location', 'place']),
       userId: resolveColumn(columns, ['user_id', 'student_id', 'owner_id']),
+      focus: resolveColumn(columns, ['focus', 'goal', 'notes']),
+      tags: resolveColumn(columns, ['tags', 'tags_json', 'tag_list']),
       createdAt: resolveColumn(columns, ['created_at', 'create_time']),
       updatedAt: resolveColumn(columns, ['updated_at', 'update_time']),
     };
@@ -139,10 +141,16 @@ const formatScheduleRow = (row, index = 0) => ({
     normalizeDate(row.updated_at) ||
     normalizeDate(row.start_time) ||
     new Date().toISOString(),
+  allDay: Boolean(row.all_day ?? row.is_all_day ?? 0),
   location: row.location || undefined,
+  focus: row.focus || undefined,
+  tags: parseTags(row.tags),
 });
 
-const createSchedulePayload = (config, { title, type, start, end, allDay, userId, location }) => {
+const createSchedulePayload = (
+  config,
+  { title, type, start, end, allDay, userId, location, focus, tags },
+) => {
   const payload = {};
 
   if (config.title) {
@@ -178,6 +186,22 @@ const createSchedulePayload = (config, { title, type, start, end, allDay, userId
       config.columnDetails,
       config.location,
       location ?? null,
+    );
+  }
+
+  if (config.focus) {
+    payload[config.focus] = normalizeValueForColumn(
+      config.columnDetails,
+      config.focus,
+      focus ?? null,
+    );
+  }
+
+  if (config.tags) {
+    payload[config.tags] = normalizeValueForColumn(
+      config.columnDetails,
+      config.tags,
+      stringifyTags(tags),
     );
   }
 
@@ -286,7 +310,10 @@ const loadSchedule = async (userId, limit = 20) => {
     config.type ? `s.\`${config.type}\` AS type` : "'自习' AS type",
     `s.\`${config.start}\` AS start_time`,
     `s.\`${config.end}\` AS end_time`,
+    config.allDay ? `s.\`${config.allDay}\` AS all_day` : 'NULL AS all_day',
     config.location ? `s.\`${config.location}\` AS location` : 'NULL AS location',
+    config.focus ? `s.\`${config.focus}\` AS focus` : 'NULL AS focus',
+    config.tags ? `s.\`${config.tags}\` AS tags` : 'NULL AS tags',
     config.createdAt ? `s.\`${config.createdAt}\` AS created_at` : 'NULL AS created_at',
     config.updatedAt ? `s.\`${config.updatedAt}\` AS updated_at` : 'NULL AS updated_at',
   ];
@@ -522,7 +549,7 @@ router.get('/schedule', requireAuth, async (req, res) => {
 });
 
 router.post('/schedule', requireAuth, async (req, res) => {
-  const { title, type = '自习', start, end, allDay = false, location } = req.body || {};
+  const { title, type = '自习', start, end, allDay = false, location, focus, tags } = req.body || {};
 
   if (!title || !start || !end) {
     return res.status(400).json({ message: '请填写日程标题、开始时间与结束时间' });
@@ -545,6 +572,8 @@ router.post('/schedule', requireAuth, async (req, res) => {
       allDay,
       userId: req.session?.user?.id ? req.session.user.id : null,
       location,
+      focus,
+      tags,
     });
 
     const result = await insertRecord(config.table, payload);
