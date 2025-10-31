@@ -10,6 +10,8 @@ const practiceRoutes = require('./routes/practice');
 const forumRoutes = require('./routes/forum');
 const adminRoutes = require('./routes/admin');
 const learningRoutes = require('./routes/learning');
+const userRoutes = require('./routes/users');
+const majorRoutes = require('./routes/majors');
 
 dotenv.config({ path: path.resolve(__dirname, '..', '.env') });
 
@@ -64,6 +66,8 @@ app.use('/api/practice', practiceRoutes);
 app.use('/api/forum', forumRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/learning', learningRoutes);
+app.use('/api/users', userRoutes);
+app.use('/api/majors', majorRoutes);
 
 app.get('/health', (req, res) => {
   res.json({ status: 'ok' });

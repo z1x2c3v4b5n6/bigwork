@@ -26,6 +26,7 @@ import {
   fetchUserProfile,
   updateUserProfile,
   type MajorOption,
+  type UserProfile,
 } from '../services/userService';
 
 const Profile = () => {
@@ -43,7 +44,7 @@ const Profile = () => {
   });
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null);
 
-  const profileQuery = useQuery({
+  const profileQuery = useQuery<UserProfile>({
     queryKey: ['profile', user?.id],
     queryFn: () => fetchUserProfile(user!.id),
     enabled: Boolean(user?.id),
@@ -100,7 +101,7 @@ const Profile = () => {
     }
   };
 
-  const profile = profileQuery.data ?? user;
+  const profile = profileQuery.data ?? (user as UserProfile | null);
   const isAdmin = (profile?.role ?? user?.role) === 'admin';
   const majors = majorsQuery.data ?? [];
 

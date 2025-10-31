@@ -14,6 +14,38 @@ const router = express.Router();
 
 const resolveColumn = (columns, candidates) => candidates.find((column) => columns.has(column)) || null;
 
+let cachedDefaultMajorId = null;
+let defaultMajorChecked = false;
+
+const getDefaultMajorId = async () => {
+  if (defaultMajorChecked) {
+    return cachedDefaultMajorId;
+  }
+
+  defaultMajorChecked = true;
+
+  if (!(await tableExists('majors'))) {
+    cachedDefaultMajorId = null;
+    return cachedDefaultMajorId;
+  }
+
+  const majorColumns = await getTableColumns('majors');
+  const idColumn = resolveColumn(majorColumns, ['id', 'major_id']);
+  const nameColumn = resolveColumn(majorColumns, ['name', 'major_name', 'title']);
+
+  if (!idColumn) {
+    cachedDefaultMajorId = null;
+    return cachedDefaultMajorId;
+  }
+
+  const orderColumn = nameColumn || idColumn;
+  const rows = await query(
+    `SELECT m.\`${idColumn}\` AS id FROM majors m ORDER BY m.\`${orderColumn}\` ASC LIMIT 1`,
+  );
+  cachedDefaultMajorId = rows[0]?.id || null;
+  return cachedDefaultMajorId;
+};
+
 const getCourseConfig = async () => {
   const columns = await getTableColumns('courses');
 
@@ -28,11 +60,12 @@ const getCourseConfig = async () => {
     columns,
     columnDetails,
     id: resolveColumn(columns, ['id', 'course_id']),
+    majorId: resolveColumn(columns, ['major_id', 'majorid', 'major']),
     title: resolveColumn(columns, ['title', 'name', 'course_name']),
     teacher: resolveColumn(columns, ['teacher', 'teacher_name', 'lecturer']),
     category: resolveColumn(columns, ['category', 'type', 'course_category']),
     progress: resolveColumn(columns, ['progress', 'completion', 'completion_rate']),
-    nextTask: resolveColumn(columns, ['next_task', 'upcoming_task', 'next_step']),
+    nextTask: resolveColumn(columns, ['next_task', 'upcoming_task', 'next_step', 'schedule_info', 'release_window']),
     description: resolveColumn(columns, ['description', 'summary', 'intro']),
     createdAt: resolveColumn(columns, ['created_at', 'create_time']),
     updatedAt: resolveColumn(columns, ['updated_at', 'update_time']),
@@ -48,18 +81,25 @@ const formatCourseRow = (row, index = 0) => ({
   nextTask: row.next_task || '请为课程安排下一次学习任务',
 });
 
-const createCoursePayload = (config, { title, teacher, category, progress, nextTask, description }) => {
+const createCoursePayload = (
+  config,
+  { title, teacher, category, progress, nextTask, description, majorId },
+) => {
   const payload = {};
 
   if (config.title) {
     payload[config.title] = normalizeValueForColumn(config.columnDetails, config.title, title);
   }
 
+  if (config.majorId && majorId !== undefined) {
+    payload[config.majorId] = normalizeValueForColumn(config.columnDetails, config.majorId, majorId);
+  }
+
   if (config.teacher) {
     payload[config.teacher] = normalizeValueForColumn(
       config.columnDetails,
       config.teacher,
-      teacher ?? null,
+      teacher ?? '待定讲师',
     );
   }
 
@@ -67,7 +107,7 @@ const createCoursePayload = (config, { title, teacher, category, progress, nextT
     payload[config.category] = normalizeValueForColumn(
       config.columnDetails,
       config.category,
-      category ?? null,
+      category ?? '公共课',
     );
   }
 
@@ -298,7 +338,7 @@ const loadCourses = async (limit = 12) => {
   return rows.map((row, index) => formatCourseRow(row, index));
 };
 
-const loadSchedule = async (userId, limit = 20) => {
+const loadSchedule = async (sessionUser, limit = 20) => {
   const config = await getScheduleConfig();
   if (!config || !config.start || !config.end) {
     return [];
@@ -321,11 +361,14 @@ const loadSchedule = async (userId, limit = 20) => {
   const whereClauses = [];
   const params = {};
 
-  if (config.userId && userId) {
+  const isAdmin = sessionUser?.role === 'admin';
+  const rawUserId = sessionUser?.id;
+
+  if (config.userId && rawUserId && !isAdmin) {
     const normalizedUserId = normalizeValueForColumn(
       config.columnDetails,
       config.userId,
-      normalizeIdentifier(userId),
+      normalizeIdentifier(rawUserId),
     );
 
     if (normalizedUserId !== null && normalizedUserId !== undefined) {
@@ -465,7 +508,7 @@ router.get('/dashboard', requireAuth, async (req, res) => {
     const [courses, practiceSets, schedule, stats] = await Promise.all([
       loadCourses(6),
       loadPracticePreview(3),
-      loadSchedule(req.session?.user?.id ? req.session.user.id : null, 6),
+      loadSchedule(req.session?.user || null, 6),
       buildStats(),
     ]);
 
@@ -499,7 +542,7 @@ router.get('/courses', requireAuth, async (req, res) => {
 });
 
 router.post('/courses', requireAuth, async (req, res) => {
-  const { title, teacher, category, progress = 0, nextTask, description } = req.body || {};
+  const { title, teacher, category, progress = 0, nextTask, description, majorId } = req.body || {};
 
   if (!title) {
     return res.status(400).json({ message: '课程标题不能为空' });
@@ -520,6 +563,22 @@ router.post('/courses', requireAuth, async (req, res) => {
         .json({ message: 'courses 表缺少标题字段（title/name），请补充数据表结构。' });
     }
 
+    let resolvedMajorId = normalizeIdentifier(majorId);
+
+    if (!resolvedMajorId && req.session?.user?.majorId) {
+      resolvedMajorId = normalizeIdentifier(req.session.user.majorId);
+    }
+
+    if (!resolvedMajorId && config.majorId) {
+      resolvedMajorId = await getDefaultMajorId();
+    }
+
+    if (config.majorId && !resolvedMajorId) {
+      return res
+        .status(400)
+        .json({ message: '无法确定课程所属专业，请先在个人资料中设置目标专业或在创建时指定 majorId。' });
+    }
+
     const payload = createCoursePayload(config, {
       title,
       teacher,
@@ -527,6 +586,7 @@ router.post('/courses', requireAuth, async (req, res) => {
       progress: Math.min(100, Math.max(0, Number(progress))),
       nextTask,
       description,
+      majorId: resolvedMajorId,
     });
 
     const result = await insertRecord('courses', payload);
@@ -540,7 +600,7 @@ router.post('/courses', requireAuth, async (req, res) => {
 
 router.get('/schedule', requireAuth, async (req, res) => {
   try {
-    const schedule = await loadSchedule(req.session?.user?.id ? req.session.user.id : null);
+    const schedule = await loadSchedule(req.session?.user || null);
     res.json({ schedule });
   } catch (error) {
     console.error('获取学习日程失败', error);

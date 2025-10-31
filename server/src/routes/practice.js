@@ -28,7 +28,7 @@ const getPracticeSetConfig = async () => {
     columnDetails,
     id: resolveColumn(columns, ['id', 'set_id', 'practice_set_id']),
     title: resolveColumn(columns, ['title', 'name', 'set_title']),
-    description: resolveColumn(columns, ['description', 'summary', 'intro']),
+    description: resolveColumn(columns, ['description', 'summary', 'intro', 'focus']),
     difficulty: resolveColumn(columns, ['difficulty', 'level']),
     tags: resolveColumn(columns, ['tags', 'tags_json', 'tag_list']),
     createdBy: resolveColumn(columns, ['created_by', 'creator_id', 'owner_id']),
@@ -51,11 +51,14 @@ const getPracticeQuestionConfig = async () => {
     columnDetails,
     id: resolveColumn(columns, ['id', 'question_id']),
     setId: resolveColumn(columns, ['practice_set_id', 'set_id', 'collection_id']),
-    questionText: resolveColumn(columns, ['question_text', 'question', 'content']),
-    answerText: resolveColumn(columns, ['answer_text', 'answer', 'solution']),
+    questionText: resolveColumn(columns, ['question_text', 'question', 'content', 'stem']),
+    answerText: resolveColumn(columns, ['answer_text', 'answer', 'solution', 'correct_options']),
     explanation: resolveColumn(columns, ['explanation', 'analysis', 'commentary']),
-    tags: resolveColumn(columns, ['tags', 'tags_json', 'tag_list']),
+    tags: resolveColumn(columns, ['tags', 'tags_json', 'tag_list', 'knowledge_point']),
     difficulty: resolveColumn(columns, ['difficulty', 'level']),
+    questionType: resolveColumn(columns, ['question_type', 'type']),
+    optionsJson: resolveColumn(columns, ['options_json', 'options', 'option_list']),
+    correctOptions: resolveColumn(columns, ['correct_options', 'answers_json']),
     createdAt: resolveColumn(columns, ['created_at', 'create_time']),
     updatedAt: resolveColumn(columns, ['updated_at', 'update_time']),
   };
@@ -119,6 +122,14 @@ const createQuestionPayload = (
     );
   }
 
+  if (config.questionType) {
+    payload[config.questionType] = normalizeValueForColumn(
+      config.columnDetails,
+      config.questionType,
+      'single',
+    );
+  }
+
   if (config.questionText) {
     payload[config.questionText] = normalizeValueForColumn(
       config.columnDetails,
@@ -140,6 +151,27 @@ const createQuestionPayload = (
       config.columnDetails,
       config.explanation,
       explanation ?? null,
+    );
+  }
+
+  if (config.optionsJson && !(config.optionsJson in payload)) {
+    payload[config.optionsJson] = normalizeValueForColumn(
+      config.columnDetails,
+      config.optionsJson,
+      JSON.stringify([]),
+    );
+  }
+
+  if (config.correctOptions && !(config.correctOptions in payload)) {
+    const answerValue = Array.isArray(answerText)
+      ? JSON.stringify(answerText)
+      : answerText != null
+      ? String(answerText)
+      : JSON.stringify([]);
+    payload[config.correctOptions] = normalizeValueForColumn(
+      config.columnDetails,
+      config.correctOptions,
+      answerValue,
     );
   }
 
