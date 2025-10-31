@@ -8,10 +8,10 @@ import {
   dashboardFallback,
 } from '../data/dashboard';
 import type { UserRole } from '../context/AuthContext';
-import type { AdminCourse } from './adminService';
+import type { CourseRecord } from './adminService';
 
 export interface AdminFocusSummary {
-  courseDrafts: AdminCourse[];
+  courseDrafts: CourseRecord[];
   reviewQueue: { id: string; title: string; content: string; createdAt?: string }[];
   recentRegistrations: { id: string; name: string; majorName: string; createdAt?: string }[];
   dataQuality: { majors: number; practiceSets: number; forumTopics: number };

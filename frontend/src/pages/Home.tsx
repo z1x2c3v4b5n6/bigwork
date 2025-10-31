@@ -116,7 +116,11 @@ const Home = () => {
                       {draft.title}
                     </Typography>
                     <Typography variant="body2" color="text.secondary">
-                      讲师：{draft.teacher} · 状态：{draft.status === 'published' ? '已发布' : '待发布'} · {draft.releaseWindow ?? '待排期'}
+                      讲师：{draft.teacher ?? '待补充'} · 专业：{draft.majorName ?? '未指定'} · 学分：
+                      {draft.credit != null ? draft.credit : '待定'}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      {draft.description ?? '课程简介尚未完善，建议补充课程亮点与适合人群。'}
                     </Typography>
                   </Box>
                 ))}

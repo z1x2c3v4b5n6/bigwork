@@ -7,6 +7,7 @@ import {
   useMemo,
   useState,
 } from 'react';
+import { resolveAssetUrl } from '../utils/url';
 
 export type UserRole = 'student' | 'admin';
 
@@ -14,7 +15,14 @@ export interface AuthUser {
   id: string;
   name: string;
   role: UserRole;
-  email?: string;
+  email?: string | null;
+  phone?: string | null;
+  organization?: string | null;
+  goal?: string | null;
+  majorId?: string | null;
+  majorName?: string | null;
+  avatar?: string | null;
+  bio?: string | null;
 }
 
 export interface LoginPayload {
@@ -36,6 +44,7 @@ interface AuthContextValue {
   register: (payload: RegisterPayload) => Promise<void>;
   logout: () => Promise<void>;
   refresh: () => Promise<void>;
+  refreshUser: (user: AuthUser | null) => void;
 }
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL?.replace(/\/?$/, '') ?? '';
@@ -61,6 +70,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const normalizeUser = useCallback((raw: AuthUser | null | undefined): AuthUser | null => {
+    if (!raw) {
+      return null;
+    }
+
+    return {
+      ...raw,
+      avatar: resolveAssetUrl(raw.avatar) ?? undefined,
+    };
+  }, []);
+
   const fetchSession = useCallback(async () => {
     try {
       const response = await fetch(`${API_BASE_URL}/api/auth/session`, {
@@ -69,7 +89,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       if (response.ok) {
         const data = await parseResponseBody(response);
-        setUser((data as { user?: AuthUser }).user ?? null);
+        const nextUser = (data as { user?: AuthUser }).user ?? null;
+        setUser(normalizeUser(nextUser));
       } else if (response.status === 401) {
         setUser(null);
       } else {
@@ -84,7 +105,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } finally {
       setLoading(false);
     }
-  }, [API_BASE_URL]);
+  }, [API_BASE_URL, normalizeUser]);
 
   useEffect(() => {
     fetchSession();
@@ -110,11 +131,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
 
       const data = await parseResponseBody(response);
-      setUser((data as { user?: AuthUser }).user ?? null);
+      const nextUser = (data as { user?: AuthUser }).user ?? null;
+      setUser(normalizeUser(nextUser));
     } finally {
       setLoading(false);
     }
-  }, [API_BASE_URL]);
+  }, [API_BASE_URL, normalizeUser]);
 
   const register = useCallback(async (payload: RegisterPayload) => {
     setLoading(true);
@@ -136,11 +158,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
 
       const data = await parseResponseBody(response);
-      setUser((data as { user?: AuthUser }).user ?? null);
+      const nextUser = (data as { user?: AuthUser }).user ?? null;
+      setUser(normalizeUser(nextUser));
     } finally {
       setLoading(false);
     }
-  }, [API_BASE_URL]);
+  }, [API_BASE_URL, normalizeUser]);
 
   const logout = useCallback(async () => {
     setLoading(true);
@@ -167,6 +190,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     await fetchSession();
   }, [fetchSession]);
 
+  const refreshUser = useCallback(
+    (nextUser: AuthUser | null) => {
+      setUser(normalizeUser(nextUser));
+    },
+    [normalizeUser],
+  );
+
   const value = useMemo(
     () => ({
       user,
@@ -175,8 +205,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       register,
       logout,
       refresh,
+      refreshUser,
     }),
-    [user, loading, login, register, logout, refresh],
+    [user, loading, login, register, logout, refresh, refreshUser],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

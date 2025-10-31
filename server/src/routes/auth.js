@@ -17,9 +17,15 @@ const buildUserColumnMap = (columns) => ({
   displayName: resolveColumn(columns, ['display_name', 'name', 'full_name']),
   email: resolveColumn(columns, ['email', 'email_address']),
   role: resolveColumn(columns, ['role', 'user_role']),
+  phone: resolveColumn(columns, ['phone', 'mobile', 'phone_number']),
+  organization: resolveColumn(columns, ['organization', 'school', 'company']),
+  goal: resolveColumn(columns, ['goal', 'target', 'plan']),
+  majorId: resolveColumn(columns, ['major_id', 'majorid', 'major']),
+  avatar: resolveColumn(columns, ['avatar', 'avatar_url', 'profile_picture']),
+  bio: resolveColumn(columns, ['bio', 'introduction', 'profile']),
 });
 
-const buildUserSelectFragments = (map, { includePassword = false } = {}) => {
+const buildUserSelectFragments = (map, { includePassword = false, includeProfile = false, majorAlias = null } = {}) => {
   const fragments = [];
 
   fragments.push(map.id ? `u.\`${map.id}\` AS id` : 'NULL AS id');
@@ -39,6 +45,25 @@ const buildUserSelectFragments = (map, { includePassword = false } = {}) => {
   fragments.push(map.email ? `u.\`${map.email}\` AS email` : 'NULL AS email');
   fragments.push(map.role ? `u.\`${map.role}\` AS role` : "'student' AS role");
 
+  if (includeProfile) {
+    fragments.push(map.phone ? `u.\`${map.phone}\` AS phone` : 'NULL AS phone');
+    fragments.push(map.organization ? `u.\`${map.organization}\` AS organization` : 'NULL AS organization');
+    fragments.push(map.goal ? `u.\`${map.goal}\` AS goal` : 'NULL AS goal');
+    fragments.push(map.avatar ? `u.\`${map.avatar}\` AS avatar` : 'NULL AS avatar');
+    fragments.push(map.bio ? `u.\`${map.bio}\` AS bio` : 'NULL AS bio');
+    if (map.majorId) {
+      fragments.push(`u.\`${map.majorId}\` AS major_id`);
+      if (majorAlias) {
+        fragments.push(`${majorAlias}.\`name\` AS major_name`);
+      } else {
+        fragments.push('NULL AS major_name');
+      }
+    } else {
+      fragments.push('NULL AS major_id');
+      fragments.push('NULL AS major_name');
+    }
+  }
+
   return fragments;
 };
 
@@ -55,10 +80,17 @@ const fetchUserByUsername = async (username) => {
     throw new Error('users 表缺少 username 字段，请确认字段名是否为 username。');
   }
 
-  const selectFragments = buildUserSelectFragments(map, { includePassword: true });
+  const includeProfile = Boolean(map.phone || map.organization || map.goal || map.majorId || map.avatar || map.bio);
+  const selectFragments = buildUserSelectFragments(map, {
+    includePassword: true,
+    includeProfile,
+    majorAlias: includeProfile && map.majorId ? 'm' : null,
+  });
+
+  const joinClause = includeProfile && map.majorId ? 'LEFT JOIN majors m ON m.id = u.\`' + map.majorId + '\`' : '';
 
   const rows = await query(
-    `SELECT ${selectFragments.join(', ')} FROM users u WHERE u.\`${map.username}\` = :username LIMIT 1`,
+    `SELECT ${selectFragments.join(', ')} FROM users u ${joinClause} WHERE u.\`${map.username}\` = :username LIMIT 1`,
     { username },
   );
 
@@ -70,6 +102,13 @@ const serializeUser = (row) => ({
   name: row?.display_name || row?.username || '未命名用户',
   role: normalizeRole(row?.role),
   email: row?.email || null,
+  phone: row?.phone || null,
+  organization: row?.organization || null,
+  goal: row?.goal || null,
+  majorId: row?.major_id ? String(row.major_id) : null,
+  majorName: row?.major_name || null,
+  avatar: row?.avatar || null,
+  bio: row?.bio || null,
 });
 
 router.get('/session', (req, res) => {
