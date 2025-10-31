@@ -61,15 +61,7 @@ const AppLayout = ({ mode, onToggleMode }: AppLayoutProps) => {
   const navigate = useNavigate();
   const { user, loading: authLoading, logout } = useAuth();
 
-  const isAdmin = useMemo(() => {
-    if (!user?.role) {
-      return false;
-    }
-
-    const rawRole = user.role;
-    const normalized = typeof rawRole === 'string' ? rawRole.trim().toLowerCase() : String(rawRole).toLowerCase();
-    return normalized === 'admin' || rawRole === '管理员';
-  }, [user?.role]);
+  const isAdmin = useMemo(() => user?.role === 'admin', [user?.role]);
 
   const navigationItems = useMemo(() => {
     if (isAdmin) {
@@ -103,6 +95,7 @@ const AppLayout = ({ mode, onToggleMode }: AppLayoutProps) => {
   };
 
   const userInitial = user?.name?.[0] ?? (authLoading ? '…' : '访');
+  const avatarSrc = user?.avatar ?? undefined;
 
   const drawerContent = useMemo(
     () => (
@@ -176,7 +169,9 @@ const AppLayout = ({ mode, onToggleMode }: AppLayoutProps) => {
             }
           >
             <IconButton onClick={handleOpenAccountMenu} size="small" sx={{ ml: 2 }}>
-              <Avatar sx={{ width: 36, height: 36 }}>{userInitial}</Avatar>
+              <Avatar sx={{ width: 36, height: 36 }} src={avatarSrc} alt={user?.name}>
+                {userInitial}
+              </Avatar>
             </IconButton>
           </Tooltip>
         </Toolbar>

@@ -14,6 +14,44 @@ const { normalizeRole } = require('../utils/auth');
 
 const router = express.Router();
 
+const quoteIdentifier = (identifier = '') => `\`${identifier}\``;
+
+const pickColumn = (columns = new Set(), candidates = []) => {
+  for (const candidate of candidates) {
+    if (columns.has(candidate)) {
+      return candidate;
+    }
+  }
+  return null;
+};
+
+const aliasOrDefault = (alias, column, as, fallbackExpression) => {
+  if (column) {
+    const tablePrefix = alias ? `${alias}.` : '';
+    return `${tablePrefix}${quoteIdentifier(column)} AS ${as}`;
+  }
+  return `${fallbackExpression} AS ${as}`;
+};
+
+const buildPayload = (columns = new Set(), entries = []) => {
+  const payload = {};
+  entries.forEach(([column, value]) => {
+    if (column && columns.has(column) && value !== undefined) {
+      payload[column] = value;
+    }
+  });
+  return payload;
+};
+
+const normalizeNumeric = (value) => {
+  if (value === undefined || value === null || value === '') {
+    return null;
+  }
+
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : null;
+};
+
 const safeCount = async (table, clause = '', params = {}) => {
   if (!(await tableExists(table))) {
     return 0;
@@ -333,17 +371,20 @@ router.get('/majors', requireAdmin, async (req, res) => {
     }
 
     const columns = await getTableColumns('majors');
+    const nameColumn = pickColumn(columns, ['name', 'title', 'major_name']);
+    const descriptionColumn = pickColumn(columns, ['description', 'detail', 'intro', 'summary']);
+
     const selectFragments = [
-      'id',
-      columns.has('name') ? 'name' : "'' AS name",
-      columns.has('description') ? 'description' : 'NULL AS description',
+      'm.id',
+      aliasOrDefault('m', nameColumn, 'name', "'未命名专业'"),
+      aliasOrDefault('m', descriptionColumn, 'description', 'NULL'),
     ];
 
-    const rows = await query(`SELECT ${selectFragments.join(', ')} FROM majors ORDER BY id DESC`);
+    const rows = await query(`SELECT ${selectFragments.join(', ')} FROM majors m ORDER BY m.id DESC`);
     const majors = rows.map((row) => ({
       id: Number(row.id),
-      name: row.name,
-      description: row.description || null,
+      name: row.name || '未命名专业',
+      description: row.description ?? null,
     }));
 
     res.json({ majors });
@@ -361,7 +402,20 @@ router.post('/majors', requireAdmin, async (req, res) => {
   }
 
   try {
-    await insertRecord('majors', { name, description: description || null });
+    const columns = await getTableColumns('majors');
+    const nameColumn = pickColumn(columns, ['name', 'title', 'major_name']);
+    const descriptionColumn = pickColumn(columns, ['description', 'detail', 'intro', 'summary']);
+
+    if (!nameColumn) {
+      return res.status(500).json({ message: '专业表缺少名称字段，无法创建记录' });
+    }
+
+    const payload = buildPayload(columns, [
+      [nameColumn, name],
+      [descriptionColumn, description ? description : null],
+    ]);
+
+    await insertRecord('majors', payload);
     await logAdminAction(req, '创建专业', `新增专业 ${name}`);
 
     res.status(201).json({ success: true });
@@ -376,10 +430,20 @@ router.put('/majors/:id', requireAdmin, async (req, res) => {
   const { name, description } = req.body || {};
 
   try {
-    await updateRecord('majors', id, {
-      name,
-      description: description || null,
-    });
+    const columns = await getTableColumns('majors');
+    const nameColumn = pickColumn(columns, ['name', 'title', 'major_name']);
+    const descriptionColumn = pickColumn(columns, ['description', 'detail', 'intro', 'summary']);
+
+    const payload = buildPayload(columns, [
+      [nameColumn, name],
+      [descriptionColumn, description !== undefined ? description || null : undefined],
+    ]);
+
+    if (Object.keys(payload).length === 0) {
+      return res.status(400).json({ message: '未提供可更新的字段' });
+    }
+
+    await updateRecord('majors', id, payload);
 
     await logAdminAction(req, '更新专业', `调整专业 ${id}`);
 
@@ -414,21 +478,30 @@ router.get('/courses', requireAdmin, async (req, res) => {
     }
 
     const courseColumns = await getTableColumns('courses');
-    const hasMajors = courseColumns.has('major_id') && (await tableExists('majors'));
+    const titleColumn = pickColumn(courseColumns, ['title', 'name', 'course_title', 'courseName']);
+    const descriptionColumn = pickColumn(courseColumns, ['description', 'detail', 'intro', 'summary']);
+    const teacherColumn = pickColumn(courseColumns, ['teacher', 'lecturer', 'instructor']);
+    const creditColumn = pickColumn(courseColumns, ['credit', 'credits', 'credit_hours']);
+    const majorIdColumn = pickColumn(courseColumns, ['major_id', 'majorId', 'major', 'majorID']);
+
+    const hasMajors = Boolean(majorIdColumn) && (await tableExists('majors'));
+
     const selectFragments = [
       'c.id',
-      'c.title',
-      courseColumns.has('description') ? 'c.description' : 'NULL AS description',
-      courseColumns.has('teacher') ? 'c.teacher' : 'NULL AS teacher',
-      courseColumns.has('credit') ? 'c.credit' : 'NULL AS credit',
-      courseColumns.has('major_id') ? 'c.major_id' : 'NULL AS major_id',
+      aliasOrDefault('c', titleColumn, 'title', "'未命名课程'"),
+      aliasOrDefault('c', descriptionColumn, 'description', 'NULL'),
+      aliasOrDefault('c', teacherColumn, 'teacher', 'NULL'),
+      aliasOrDefault('c', creditColumn, 'credit', 'NULL'),
+      aliasOrDefault('c', majorIdColumn, 'major_id', 'NULL'),
     ];
 
+    let joinClause = '';
     if (hasMajors) {
-      selectFragments.push('m.name AS major_name');
+      const majorColumns = await getTableColumns('majors');
+      const majorNameColumn = pickColumn(majorColumns, ['name', 'title', 'major_name']);
+      selectFragments.push(aliasOrDefault('m', majorNameColumn, 'major_name', "'未分配专业'"));
+      joinClause = `LEFT JOIN majors m ON m.id = c.${quoteIdentifier(majorIdColumn)}`;
     }
-
-    const joinClause = hasMajors ? 'LEFT JOIN majors m ON m.id = c.major_id' : '';
 
     const rows = await query(
       `SELECT ${selectFragments.join(', ')}
@@ -439,12 +512,12 @@ router.get('/courses', requireAdmin, async (req, res) => {
 
     const courses = rows.map((row) => ({
       id: Number(row.id),
-      title: row.title,
-      description: row.description || null,
-      teacher: row.teacher || null,
-      credit: row.credit !== null ? Number(row.credit) : null,
-      majorId: row.major_id !== null ? Number(row.major_id) : null,
-      majorName: row.major_name || null,
+      title: row.title || '未命名课程',
+      description: row.description ?? null,
+      teacher: row.teacher ?? null,
+      credit: row.credit !== null && row.credit !== undefined ? Number(row.credit) : null,
+      majorId: row.major_id !== null && row.major_id !== undefined ? Number(row.major_id) : null,
+      majorName: row.major_name ?? null,
     }));
 
     res.json({ courses });
@@ -462,13 +535,26 @@ router.post('/courses', requireAdmin, async (req, res) => {
   }
 
   try {
-    await insertRecord('courses', {
-      title,
-      description: description || null,
-      teacher: teacher || null,
-      credit: credit !== undefined && credit !== null && credit !== '' ? Number(credit) : null,
-      major_id: majorId ? Number(majorId) : null,
-    });
+    const columns = await getTableColumns('courses');
+    const titleColumn = pickColumn(columns, ['title', 'name', 'course_title', 'courseName']);
+    const descriptionColumn = pickColumn(columns, ['description', 'detail', 'intro', 'summary']);
+    const teacherColumn = pickColumn(columns, ['teacher', 'lecturer', 'instructor']);
+    const creditColumn = pickColumn(columns, ['credit', 'credits', 'credit_hours']);
+    const majorIdColumn = pickColumn(columns, ['major_id', 'majorId', 'major', 'majorID']);
+
+    if (!titleColumn) {
+      return res.status(500).json({ message: '课程表缺少标题字段，无法创建记录' });
+    }
+
+    const payload = buildPayload(columns, [
+      [titleColumn, title],
+      [descriptionColumn, description ? description : null],
+      [teacherColumn, teacher ? teacher : null],
+      [creditColumn, normalizeNumeric(credit)],
+      [majorIdColumn, majorId ? normalizeNumeric(majorId) : null],
+    ]);
+
+    await insertRecord('courses', payload);
 
     await logAdminAction(req, '创建课程', `新增课程 ${title}`);
 
@@ -484,13 +570,26 @@ router.put('/courses/:id', requireAdmin, async (req, res) => {
   const { title, description, teacher, credit, majorId } = req.body || {};
 
   try {
-    await updateRecord('courses', id, {
-      title,
-      description: description || null,
-      teacher: teacher || null,
-      credit: credit !== undefined && credit !== null && credit !== '' ? Number(credit) : null,
-      major_id: majorId ? Number(majorId) : null,
-    });
+    const columns = await getTableColumns('courses');
+    const titleColumn = pickColumn(columns, ['title', 'name', 'course_title', 'courseName']);
+    const descriptionColumn = pickColumn(columns, ['description', 'detail', 'intro', 'summary']);
+    const teacherColumn = pickColumn(columns, ['teacher', 'lecturer', 'instructor']);
+    const creditColumn = pickColumn(columns, ['credit', 'credits', 'credit_hours']);
+    const majorIdColumn = pickColumn(columns, ['major_id', 'majorId', 'major', 'majorID']);
+
+    const payload = buildPayload(columns, [
+      [titleColumn, title],
+      [descriptionColumn, description !== undefined ? description || null : undefined],
+      [teacherColumn, teacher !== undefined ? teacher || null : undefined],
+      [creditColumn, credit !== undefined ? normalizeNumeric(credit) : undefined],
+      [majorIdColumn, majorId !== undefined ? normalizeNumeric(majorId) : undefined],
+    ]);
+
+    if (Object.keys(payload).length === 0) {
+      return res.status(400).json({ message: '未提供可更新的字段' });
+    }
+
+    await updateRecord('courses', id, payload);
 
     await logAdminAction(req, '更新课程', `调整课程 ${id}`);
 
@@ -525,20 +624,27 @@ router.get('/materials', requireAdmin, async (req, res) => {
     }
 
     const materialColumns = await getTableColumns('course_materials');
-    const hasCourses = materialColumns.has('course_id') && (await tableExists('courses'));
+    const titleColumn = pickColumn(materialColumns, ['title', 'name', 'material_title']);
+    const descriptionColumn = pickColumn(materialColumns, ['description', 'detail', 'intro', 'summary']);
+    const fileUrlColumn = pickColumn(materialColumns, ['file_url', 'url', 'path', 'link']);
+    const courseIdColumn = pickColumn(materialColumns, ['course_id', 'courseId', 'course', 'courseID']);
+
+    const hasCourses = Boolean(courseIdColumn) && (await tableExists('courses'));
     const selectFragments = [
       'm.id',
-      'm.title',
-      materialColumns.has('description') ? 'm.description' : 'NULL AS description',
-      materialColumns.has('file_url') ? 'm.file_url' : 'NULL AS file_url',
-      materialColumns.has('course_id') ? 'm.course_id' : 'NULL AS course_id',
+      aliasOrDefault('m', titleColumn, 'title', "'未命名资料'"),
+      aliasOrDefault('m', descriptionColumn, 'description', 'NULL'),
+      aliasOrDefault('m', fileUrlColumn, 'file_url', 'NULL'),
+      aliasOrDefault('m', courseIdColumn, 'course_id', 'NULL'),
     ];
 
+    let joinClause = '';
     if (hasCourses) {
-      selectFragments.push('c.title AS course_title');
+      const courseColumns = await getTableColumns('courses');
+      const courseTitleColumn = pickColumn(courseColumns, ['title', 'name', 'course_title', 'courseName']);
+      selectFragments.push(aliasOrDefault('c', courseTitleColumn, 'course_title', "'未命名课程'"));
+      joinClause = `LEFT JOIN courses c ON c.id = m.${quoteIdentifier(courseIdColumn)}`;
     }
-
-    const joinClause = hasCourses ? 'LEFT JOIN courses c ON c.id = m.course_id' : '';
 
     const rows = await query(
       `SELECT ${selectFragments.join(', ')}
@@ -549,11 +655,11 @@ router.get('/materials', requireAdmin, async (req, res) => {
 
     const materials = rows.map((row) => ({
       id: Number(row.id),
-      title: row.title,
-      description: row.description || null,
-      fileUrl: row.file_url || null,
-      courseId: row.course_id !== null ? Number(row.course_id) : null,
-      courseTitle: row.course_title || null,
+      title: row.title || '未命名资料',
+      description: row.description ?? null,
+      fileUrl: row.file_url ?? null,
+      courseId: row.course_id !== null && row.course_id !== undefined ? Number(row.course_id) : null,
+      courseTitle: row.course_title ?? null,
     }));
 
     res.json({ materials });
@@ -571,12 +677,24 @@ router.post('/materials', requireAdmin, async (req, res) => {
   }
 
   try {
-    await insertRecord('course_materials', {
-      title,
-      description: description || null,
-      file_url: fileUrl || null,
-      course_id: courseId ? Number(courseId) : null,
-    });
+    const columns = await getTableColumns('course_materials');
+    const titleColumn = pickColumn(columns, ['title', 'name', 'material_title']);
+    const descriptionColumn = pickColumn(columns, ['description', 'detail', 'intro', 'summary']);
+    const fileUrlColumn = pickColumn(columns, ['file_url', 'url', 'path', 'link']);
+    const courseIdColumn = pickColumn(columns, ['course_id', 'courseId', 'course', 'courseID']);
+
+    if (!titleColumn) {
+      return res.status(500).json({ message: '资料表缺少标题字段，无法创建记录' });
+    }
+
+    const payload = buildPayload(columns, [
+      [titleColumn, title],
+      [descriptionColumn, description ? description : null],
+      [fileUrlColumn, fileUrl ? fileUrl : null],
+      [courseIdColumn, courseId ? normalizeNumeric(courseId) : null],
+    ]);
+
+    await insertRecord('course_materials', payload);
 
     await logAdminAction(req, '创建资料', `新增资料 ${title}`);
 
@@ -592,12 +710,24 @@ router.put('/materials/:id', requireAdmin, async (req, res) => {
   const { title, description, fileUrl, courseId } = req.body || {};
 
   try {
-    await updateRecord('course_materials', id, {
-      title,
-      description: description || null,
-      file_url: fileUrl || null,
-      course_id: courseId ? Number(courseId) : null,
-    });
+    const columns = await getTableColumns('course_materials');
+    const titleColumn = pickColumn(columns, ['title', 'name', 'material_title']);
+    const descriptionColumn = pickColumn(columns, ['description', 'detail', 'intro', 'summary']);
+    const fileUrlColumn = pickColumn(columns, ['file_url', 'url', 'path', 'link']);
+    const courseIdColumn = pickColumn(columns, ['course_id', 'courseId', 'course', 'courseID']);
+
+    const payload = buildPayload(columns, [
+      [titleColumn, title],
+      [descriptionColumn, description !== undefined ? description || null : undefined],
+      [fileUrlColumn, fileUrl !== undefined ? fileUrl || null : undefined],
+      [courseIdColumn, courseId !== undefined ? normalizeNumeric(courseId) : undefined],
+    ]);
+
+    if (Object.keys(payload).length === 0) {
+      return res.status(400).json({ message: '未提供可更新的字段' });
+    }
+
+    await updateRecord('course_materials', id, payload);
 
     await logAdminAction(req, '更新资料', `调整资料 ${id}`);
 
@@ -629,30 +759,35 @@ router.get('/forum/topics', requireAdmin, async (req, res) => {
     }
 
     const columns = await getTableColumns('forum_topics');
+    const titleColumn = pickColumn(columns, ['title', 'name', 'topic_title']);
+    const descriptionColumn = pickColumn(columns, ['description', 'detail', 'content', 'body']);
+    const createdColumn = pickColumn(columns, ['created_at', 'createdAt', 'created']);
+    const updatedColumn = pickColumn(columns, ['updated_at', 'updatedAt', 'updated']);
+
     const selectFragments = [
-      'id',
-      columns.has('title') ? 'title' : "'' AS title",
-      columns.has('description') ? 'description' : 'NULL AS description',
-      columns.has('created_at') ? 'created_at' : 'NULL AS created_at',
-      columns.has('updated_at') ? 'updated_at' : 'NULL AS updated_at',
+      'ft.id',
+      aliasOrDefault('ft', titleColumn, 'title', "'未命名话题'"),
+      aliasOrDefault('ft', descriptionColumn, 'description', 'NULL'),
+      aliasOrDefault('ft', createdColumn, 'created_at', 'NULL'),
+      aliasOrDefault('ft', updatedColumn, 'updated_at', 'NULL'),
     ];
 
-    const orderColumn = columns.has('updated_at')
-      ? 'updated_at'
-      : columns.has('created_at')
-      ? 'created_at'
-      : 'id';
+    const orderColumn = updatedColumn
+      ? `ft.${quoteIdentifier(updatedColumn)}`
+      : createdColumn
+      ? `ft.${quoteIdentifier(createdColumn)}`
+      : 'ft.id';
 
     const rows = await query(
       `SELECT ${selectFragments.join(', ')}
-         FROM forum_topics
-        ORDER BY ${orderColumn} DESC, id DESC`,
+         FROM forum_topics ft
+        ORDER BY ${orderColumn} DESC, ft.id DESC`,
     );
 
     const topics = rows.map((row) => ({
       id: Number(row.id),
-      title: row.title,
-      description: row.description || null,
+      title: row.title || '未命名话题',
+      description: row.description ?? null,
       created_at: normalizeDate(row.created_at),
       updated_at: normalizeDate(row.updated_at),
     }));
@@ -673,6 +808,15 @@ router.get('/forum/topics/:topicId/posts', requireAdmin, async (req, res) => {
     }
 
     const postColumns = await getTableColumns('forum_posts');
+    const contentColumn = pickColumn(postColumns, ['content', 'body', 'message', 'text']);
+    const createdColumn = pickColumn(postColumns, ['created_at', 'createdAt', 'created']);
+    const updatedColumn = pickColumn(postColumns, ['updated_at', 'updatedAt', 'updated']);
+    const topicIdColumn = pickColumn(postColumns, ['topic_id', 'topicId', 'topic']);
+
+    if (!topicIdColumn) {
+      return res.json({ posts: [] });
+    }
+
     const hasUsers = await tableExists('users');
     const joinClause = hasUsers ? 'LEFT JOIN users u ON u.id = fp.author_id' : '';
     const authorSelect = hasUsers
@@ -681,26 +825,26 @@ router.get('/forum/topics/:topicId/posts', requireAdmin, async (req, res) => {
 
     const selectFragments = [
       'fp.id',
-      postColumns.has('content') ? 'fp.content' : "'' AS content",
-      postColumns.has('created_at') ? 'fp.created_at' : 'NULL AS created_at',
-      postColumns.has('updated_at') ? 'fp.updated_at' : 'NULL AS updated_at',
+      aliasOrDefault('fp', contentColumn, 'content', "''"),
+      aliasOrDefault('fp', createdColumn, 'created_at', 'NULL'),
+      aliasOrDefault('fp', updatedColumn, 'updated_at', 'NULL'),
       authorSelect,
     ];
 
-    const orderColumn = postColumns.has('created_at') ? 'fp.created_at' : 'fp.id';
+    const orderColumn = createdColumn ? `fp.${quoteIdentifier(createdColumn)}` : 'fp.id';
 
     const rows = await query(
       `SELECT ${selectFragments.join(', ')}
          FROM forum_posts fp
          ${joinClause}
-        WHERE fp.topic_id = :topicId
+        WHERE fp.${quoteIdentifier(topicIdColumn)} = :topicId
         ORDER BY ${orderColumn} ASC, fp.id ASC`,
       { topicId },
     );
 
     const posts = rows.map((row) => ({
       id: Number(row.id),
-      content: row.content,
+      content: row.content || '',
       author: row.author || '匿名用户',
       created_at: normalizeDate(row.created_at),
       updated_at: normalizeDate(row.updated_at),
@@ -829,32 +973,34 @@ router.get('/statistics/search', requireAdmin, async (req, res) => {
         return [];
       }
       const columns = await getTableColumns('majors');
-      if (!columns.has('name')) {
+      const nameColumn = pickColumn(columns, ['name', 'title', 'major_name']);
+      if (!nameColumn) {
         return [];
       }
-      const conditions = ['name LIKE :keyword'];
-      if (columns.has('description')) {
-        conditions.push('description LIKE :keyword');
+      const descriptionColumn = pickColumn(columns, ['description', 'detail', 'intro', 'summary']);
+      const conditions = [`m.${quoteIdentifier(nameColumn)} LIKE :keyword`];
+      if (descriptionColumn) {
+        conditions.push(`m.${quoteIdentifier(descriptionColumn)} LIKE :keyword`);
       }
 
       const selectFragments = [
-        'id',
-        'name',
-        columns.has('description') ? 'description' : 'NULL AS description',
+        'm.id',
+        aliasOrDefault('m', nameColumn, 'name', "'未命名专业'"),
+        aliasOrDefault('m', descriptionColumn, 'description', 'NULL'),
       ];
 
       const rows = await query(
         `SELECT ${selectFragments.join(', ')}
-           FROM majors
+           FROM majors m
           WHERE ${conditions.join(' OR ')}
-          ORDER BY id DESC
+          ORDER BY m.id DESC
           LIMIT 20`,
         { keyword: wildcard },
       );
       return rows.map((row) => ({
         id: Number(row.id),
-        name: row.name,
-        description: row.description || null,
+        name: row.name || '未命名专业',
+        description: row.description ?? null,
       }));
     })());
 
@@ -863,28 +1009,34 @@ router.get('/statistics/search', requireAdmin, async (req, res) => {
         return [];
       }
       const courseColumns = await getTableColumns('courses');
-      if (!courseColumns.has('title')) {
+      const titleColumn = pickColumn(courseColumns, ['title', 'name', 'course_title', 'courseName']);
+      if (!titleColumn) {
         return [];
       }
-      const hasMajors = courseColumns.has('major_id') && (await tableExists('majors'));
-      const conditions = [
-        'c.title LIKE :keyword',
-      ];
-      if (courseColumns.has('description')) conditions.push('c.description LIKE :keyword');
-      if (courseColumns.has('teacher')) conditions.push('c.teacher LIKE :keyword');
+      const descriptionColumn = pickColumn(courseColumns, ['description', 'detail', 'intro', 'summary']);
+      const teacherColumn = pickColumn(courseColumns, ['teacher', 'lecturer', 'instructor']);
+      const majorIdColumn = pickColumn(courseColumns, ['major_id', 'majorId', 'major', 'majorID']);
+      const hasMajors = Boolean(majorIdColumn) && (await tableExists('majors'));
+
+      const conditions = [`c.${quoteIdentifier(titleColumn)} LIKE :keyword`];
+      if (descriptionColumn) conditions.push(`c.${quoteIdentifier(descriptionColumn)} LIKE :keyword`);
+      if (teacherColumn) conditions.push(`c.${quoteIdentifier(teacherColumn)} LIKE :keyword`);
 
       const selectFragments = [
         'c.id',
-        'c.title',
-        courseColumns.has('description') ? 'c.description' : 'NULL AS description',
-        courseColumns.has('teacher') ? 'c.teacher' : 'NULL AS teacher',
-        courseColumns.has('major_id') ? 'c.major_id' : 'NULL AS major_id',
+        aliasOrDefault('c', titleColumn, 'title', "'未命名课程'"),
+        aliasOrDefault('c', descriptionColumn, 'description', 'NULL'),
+        aliasOrDefault('c', teacherColumn, 'teacher', 'NULL'),
+        aliasOrDefault('c', majorIdColumn, 'major_id', 'NULL'),
       ];
-      if (hasMajors) {
-        selectFragments.push('m.name AS major_name');
-      }
 
-      const joinClause = hasMajors ? 'LEFT JOIN majors m ON m.id = c.major_id' : '';
+      let joinClause = '';
+      if (hasMajors) {
+        const majorColumns = await getTableColumns('majors');
+        const majorNameColumn = pickColumn(majorColumns, ['name', 'title', 'major_name']);
+        selectFragments.push(aliasOrDefault('m', majorNameColumn, 'major_name', "'未分配专业'"));
+        joinClause = `LEFT JOIN majors m ON m.id = c.${quoteIdentifier(majorIdColumn)}`;
+      }
 
       const rows = await query(
         `SELECT ${selectFragments.join(', ')}
@@ -898,11 +1050,11 @@ router.get('/statistics/search', requireAdmin, async (req, res) => {
 
       return rows.map((row) => ({
         id: Number(row.id),
-        title: row.title,
-        description: row.description || null,
-        teacher: row.teacher || null,
-        majorId: row.major_id !== null ? Number(row.major_id) : null,
-        majorName: row.major_name || null,
+        title: row.title || '未命名课程',
+        description: row.description ?? null,
+        teacher: row.teacher ?? null,
+        majorId: row.major_id !== null && row.major_id !== undefined ? Number(row.major_id) : null,
+        majorName: row.major_name ?? null,
       }));
     })());
 
@@ -911,27 +1063,34 @@ router.get('/statistics/search', requireAdmin, async (req, res) => {
         return [];
       }
       const materialColumns = await getTableColumns('course_materials');
-      if (!materialColumns.has('title')) {
+      const titleColumn = pickColumn(materialColumns, ['title', 'name', 'material_title']);
+      if (!titleColumn) {
         return [];
       }
 
-      const hasCourses = await tableExists('courses');
+      const descriptionColumn = pickColumn(materialColumns, ['description', 'detail', 'intro', 'summary']);
+      const fileUrlColumn = pickColumn(materialColumns, ['file_url', 'url', 'path', 'link']);
+      const courseIdColumn = pickColumn(materialColumns, ['course_id', 'courseId', 'course', 'courseID']);
+
+      const hasCourses = Boolean(courseIdColumn) && (await tableExists('courses'));
       const selectFragments = [
         'm.id',
-        'm.title',
-        materialColumns.has('description') ? 'm.description' : 'NULL AS description',
-        materialColumns.has('file_url') ? 'm.file_url' : 'NULL AS file_url',
-        materialColumns.has('course_id') ? 'm.course_id' : 'NULL AS course_id',
+        aliasOrDefault('m', titleColumn, 'title', "'未命名资料'"),
+        aliasOrDefault('m', descriptionColumn, 'description', 'NULL'),
+        aliasOrDefault('m', fileUrlColumn, 'file_url', 'NULL'),
+        aliasOrDefault('m', courseIdColumn, 'course_id', 'NULL'),
       ];
+      let joinClause = '';
       if (hasCourses) {
-        selectFragments.push('c.title AS course_title');
+        const courseColumns = await getTableColumns('courses');
+        const courseTitleColumn = pickColumn(courseColumns, ['title', 'name', 'course_title', 'courseName']);
+        selectFragments.push(aliasOrDefault('c', courseTitleColumn, 'course_title', "'未命名课程'"));
+        joinClause = `LEFT JOIN courses c ON c.id = m.${quoteIdentifier(courseIdColumn)}`;
       }
 
-      const joinClause = hasCourses ? 'LEFT JOIN courses c ON c.id = m.course_id' : '';
-
-      const conditions = ['m.title LIKE :keyword'];
-      if (materialColumns.has('description')) {
-        conditions.push('m.description LIKE :keyword');
+      const conditions = [`m.${quoteIdentifier(titleColumn)} LIKE :keyword`];
+      if (descriptionColumn) {
+        conditions.push(`m.${quoteIdentifier(descriptionColumn)} LIKE :keyword`);
       }
 
       const rows = await query(
@@ -946,11 +1105,11 @@ router.get('/statistics/search', requireAdmin, async (req, res) => {
 
       return rows.map((row) => ({
         id: Number(row.id),
-        title: row.title,
-        description: row.description || null,
-        fileUrl: row.file_url || null,
-        courseId: row.course_id !== null ? Number(row.course_id) : null,
-        courseTitle: row.course_title || null,
+        title: row.title || '未命名资料',
+        description: row.description ?? null,
+        fileUrl: row.file_url ?? null,
+        courseId: row.course_id !== null && row.course_id !== undefined ? Number(row.course_id) : null,
+        courseTitle: row.course_title ?? null,
       }));
     })());
 
@@ -959,34 +1118,35 @@ router.get('/statistics/search', requireAdmin, async (req, res) => {
         return [];
       }
       const columns = await getTableColumns('forum_topics');
-      if (!columns.has('title')) {
+      const titleColumn = pickColumn(columns, ['title', 'name', 'topic_title']);
+      if (!titleColumn) {
         return [];
       }
-
-      const conditions = ['title LIKE :keyword'];
-      if (columns.has('description')) {
-        conditions.push('description LIKE :keyword');
+      const descriptionColumn = pickColumn(columns, ['description', 'detail', 'content', 'body']);
+      const conditions = [`ft.${quoteIdentifier(titleColumn)} LIKE :keyword`];
+      if (descriptionColumn) {
+        conditions.push(`ft.${quoteIdentifier(descriptionColumn)} LIKE :keyword`);
       }
 
       const selectFragments = [
-        'id',
-        'title',
-        columns.has('description') ? 'description' : 'NULL AS description',
+        'ft.id',
+        aliasOrDefault('ft', titleColumn, 'title', "'未命名话题'"),
+        aliasOrDefault('ft', descriptionColumn, 'description', 'NULL'),
       ];
 
       const rows = await query(
         `SELECT ${selectFragments.join(', ')}
-           FROM forum_topics
+           FROM forum_topics ft
           WHERE ${conditions.join(' OR ')}
-          ORDER BY id DESC
+          ORDER BY ft.id DESC
           LIMIT 20`,
         { keyword: wildcard },
       );
 
       return rows.map((row) => ({
         id: Number(row.id),
-        title: row.title,
-        description: row.description || null,
+        title: row.title || '未命名话题',
+        description: row.description ?? null,
       }));
     })());
 
