@@ -1,7 +1,7 @@
 import httpClient from './httpClient';
 
 export interface PracticeSetSummary {
-  id: number;
+  id: string;
   title: string;
   description: string;
   difficulty: string;
@@ -11,8 +11,16 @@ export interface PracticeSetSummary {
   updatedAt: string | null;
 }
 
+export interface CreatePracticePayload {
+  title: string;
+  description?: string;
+  difficulty?: string;
+  tags?: string[];
+  userId?: string;
+}
+
 export interface PracticeQuestion {
-  id: number;
+  id: string;
   questionText: string;
   answerText: string;
   explanation: string;
@@ -24,22 +32,26 @@ export interface PracticeQuestion {
 
 export const fetchPracticeSets = async (): Promise<PracticeSetSummary[]> => {
   const response = await httpClient.get<{ sets: PracticeSetSummary[] }>('/api/practice/sets');
-  return response.data.sets ?? [];
+  return (response.data.sets ?? []).map((set, index) => ({
+    ...set,
+    id: set.id != null ? String(set.id) : String(index + 1),
+    questionCount: Number(set.questionCount ?? 0),
+  }));
 };
 
-export const createPracticeSet = async (payload: {
-  title: string;
-  description?: string;
-  difficulty?: string;
-  tags?: string[];
-}): Promise<{ id: number }> => {
-  const response = await httpClient.post<{ id: number }>('/api/practice/sets', payload);
-  return response.data;
+export const createPracticeSet = async (payload: CreatePracticePayload): Promise<{ id: string }> => {
+  const { userId: _unused, ...rest } = payload;
+  const response = await httpClient.post<{ id: number | string }>('/api/practice/sets', rest);
+  const id = response.data?.id;
+  return { id: id != null ? String(id) : '' };
 };
 
 export const fetchPracticeQuestions = async (setId: number | string): Promise<PracticeQuestion[]> => {
   const response = await httpClient.get<{ questions: PracticeQuestion[] }>(`/api/practice/sets/${setId}/questions`);
-  return response.data.questions ?? [];
+  return (response.data.questions ?? []).map((question, index) => ({
+    ...question,
+    id: question.id != null ? String(question.id) : String(index + 1),
+  }));
 };
 
 export const createPracticeQuestion = async (
@@ -51,9 +63,10 @@ export const createPracticeQuestion = async (
     tags?: string[];
     difficulty?: string;
   },
-): Promise<{ id: number }> => {
-  const response = await httpClient.post<{ id: number }>(`/api/practice/sets/${setId}/questions`, payload);
-  return response.data;
+): Promise<{ id: string }> => {
+  const response = await httpClient.post<{ id: number | string }>(`/api/practice/sets/${setId}/questions`, payload);
+  const id = response.data?.id;
+  return { id: id != null ? String(id) : '' };
 };
 
 export default {

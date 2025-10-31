@@ -4,6 +4,7 @@ import GroupIcon from '@mui/icons-material/Group';
 import AssessmentIcon from '@mui/icons-material/Assessment';
 import InsightsIcon from '@mui/icons-material/Insights';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
+import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import {
   Alert,
   Avatar,
@@ -37,7 +38,7 @@ import {
   Typography,
 } from '@mui/material';
 import dayjs from 'dayjs';
-import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
 import adminService, {
@@ -50,6 +51,9 @@ import adminService, {
   MaterialRecord,
   StatisticsOverview,
 } from '../services/adminService';
+import uploadService from '../services/uploadService';
+import { readFileAsDataUrl, formatFileSize } from '../utils/fileUtils';
+import { resolveAssetUrl } from '../utils/url';
 
 const numberFormatter = new Intl.NumberFormat('zh-CN');
 
@@ -73,6 +77,9 @@ const AdminDashboard = () => {
   const [majorForm, setMajorForm] = useState({ name: '', description: '' });
   const [courseForm, setCourseForm] = useState({ title: '', description: '', teacher: '', credit: '', majorId: '' });
   const [materialForm, setMaterialForm] = useState({ title: '', description: '', fileUrl: '', courseId: '' });
+  const [materialUploadInfo, setMaterialUploadInfo] = useState<{ name: string; size: number } | null>(null);
+  const [materialUploading, setMaterialUploading] = useState(false);
+  const [materialUploadError, setMaterialUploadError] = useState<string | null>(null);
   const [statisticsSearch, setStatisticsSearch] = useState('');
   const [searchResult, setSearchResult] = useState<{
     users: AdminUser[];
@@ -191,6 +198,35 @@ const AdminDashboard = () => {
     enabled: activeTab === 'forum' && forumTopicId !== null,
   });
 
+  const materialPreviewUrl = materialForm.fileUrl
+    ? resolveAssetUrl(materialForm.fileUrl) ?? materialForm.fileUrl
+    : '';
+
+  const handleMaterialFileSelect = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) {
+      return;
+    }
+
+    try {
+      setMaterialUploadError(null);
+      setMaterialUploading(true);
+      const dataUrl = await readFileAsDataUrl(file);
+      const result = await uploadService.uploadMaterial({ dataUrl, filename: file.name });
+      setMaterialForm((prev) => ({ ...prev, fileUrl: result.url }));
+      setMaterialUploadInfo({ name: result.fileName || file.name, size: result.size });
+    } catch (error) {
+      console.error('上传资料失败', error);
+      setMaterialUploadError('上传失败，请稍后重试。');
+      setMaterialUploadInfo(null);
+    } finally {
+      setMaterialUploading(false);
+      if (event.target) {
+        event.target.value = '';
+      }
+    }
+  };
+
   const updateSettingsMutation = useMutation({
     mutationFn: adminService.updateAdminSettings,
     onSuccess: async () => {
@@ -262,6 +298,8 @@ const AdminDashboard = () => {
     mutationFn: adminService.createMaterial,
     onSuccess: async () => {
       setMaterialForm({ title: '', description: '', fileUrl: '', courseId: '' });
+      setMaterialUploadInfo(null);
+      setMaterialUploadError(null);
       await queryClient.invalidateQueries({ queryKey: ['admin-materials'] });
     },
   });
@@ -976,11 +1014,57 @@ const AdminDashboard = () => {
                   />
                 </Grid>
                 <Grid item xs={12} md={6}>
-                  <TextField
-                    label="文件链接（可选）"
-                    value={materialForm.fileUrl}
-                    onChange={(event) => setMaterialForm((prev) => ({ ...prev, fileUrl: event.target.value }))}
-                  />
+                  <Stack spacing={1}>
+                    <Button
+                      variant="outlined"
+                      startIcon={<CloudUploadIcon />}
+                      component="label"
+                      disabled={materialUploading}
+                    >
+                      {materialUploading ? '上传中…' : '上传资料文件'}
+                      <input type="file" hidden onChange={handleMaterialFileSelect} />
+                    </Button>
+                    {materialUploadInfo ? (
+                      <Stack direction="row" spacing={1} alignItems="center">
+                        <Chip label={materialUploadInfo.name} variant="outlined" />
+                        <Typography variant="caption" color="text.secondary">
+                          {formatFileSize(materialUploadInfo.size)}
+                        </Typography>
+                      </Stack>
+                    ) : (
+                      <Typography variant="caption" color="text.secondary">
+                        支持 PDF/Word/图片等格式，上传后自动生成访问链接。
+                      </Typography>
+                    )}
+                    {materialUploadError && (
+                      <Typography variant="caption" color="error">
+                        {materialUploadError}
+                      </Typography>
+                    )}
+                    <TextField
+                      label="文件链接"
+                      value={materialPreviewUrl}
+                      InputProps={{ readOnly: true }}
+                      helperText={
+                        materialForm.fileUrl
+                          ? '链接将在保存后向学员开放访问'
+                          : '可手动修改为外部链接，或留空仅保存资料说明'
+                      }
+                    />
+                    {materialPreviewUrl ? (
+                      <Button
+                        variant="text"
+                        size="small"
+                        component="a"
+                        href={materialPreviewUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        sx={{ alignSelf: 'flex-start' }}
+                      >
+                        预览资料链接
+                      </Button>
+                    ) : null}
+                  </Stack>
                 </Grid>
                 <Grid item xs={12} md={6}>
                   <FormControl fullWidth>
@@ -999,8 +1083,8 @@ const AdminDashboard = () => {
                   </FormControl>
                 </Grid>
               </Grid>
-              <Button type="submit" variant="contained" disabled={createMaterialMutation.isPending}>
-                {createMaterialMutation.isPending ? '创建中…' : '保存资料'}
+              <Button type="submit" variant="contained" disabled={createMaterialMutation.isPending || materialUploading}>
+                {createMaterialMutation.isPending || materialUploading ? '创建中…' : '保存资料'}
               </Button>
             </Stack>
           </Paper>
@@ -1036,9 +1120,39 @@ const AdminDashboard = () => {
                     <ListItemText
                       primary={material.title}
                       secondary={
-                        material.courseTitle
-                          ? `${material.courseTitle}${material.description ? ` · ${material.description}` : ''}`
-                          : material.description ?? '暂无描述'
+                        <Stack spacing={0.5} alignItems="flex-start">
+                          {material.description ? (
+                            <Typography variant="body2" color="text.secondary">
+                              {material.description}
+                            </Typography>
+                          ) : (
+                            <Typography variant="body2" color="text.secondary">
+                              暂无描述
+                            </Typography>
+                          )}
+                          {material.courseTitle ? (
+                            <Typography variant="caption" color="text.secondary">
+                              关联课程：{material.courseTitle}
+                            </Typography>
+                          ) : null}
+                          {material.fileUrl ? (
+                            <Button
+                              variant="text"
+                              size="small"
+                              component="a"
+                              href={(resolveAssetUrl(material.fileUrl) ?? material.fileUrl) || '#'}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              sx={{ px: 0 }}
+                            >
+                              查看资料
+                            </Button>
+                          ) : (
+                            <Typography variant="caption" color="text.secondary">
+                              尚未上传文件
+                            </Typography>
+                          )}
+                        </Stack>
                       }
                     />
                   </ListItem>

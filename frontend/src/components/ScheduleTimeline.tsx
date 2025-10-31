@@ -14,11 +14,20 @@ import QuizIcon from '@mui/icons-material/Quiz';
 import SupportAgentIcon from '@mui/icons-material/SupportAgent';
 import dayjs from 'dayjs';
 import 'dayjs/locale/zh-cn';
-import type { ScheduleItem } from '../data/dashboard';
-
 dayjs.locale('zh-cn');
 
-const timelineIconMap: Partial<Record<ScheduleItem['type'], JSX.Element>> = {
+type TimelineEntry = {
+  id: string;
+  title: string;
+  type: string;
+  start: string;
+  end: string;
+  focus?: string;
+  location?: string;
+  tags?: string[];
+};
+
+const timelineIconMap: Partial<Record<string, JSX.Element>> = {
   直播课: <EventIcon />,
   自习: <SelfImprovementIcon />,
   模拟考试: <QuizIcon />,
@@ -26,7 +35,7 @@ const timelineIconMap: Partial<Record<ScheduleItem['type'], JSX.Element>> = {
 };
 
 interface ScheduleTimelineProps {
-  items: ScheduleItem[];
+  items: TimelineEntry[];
 }
 
 const ScheduleTimeline = ({ items }: ScheduleTimelineProps) => {
