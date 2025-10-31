@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 const mysql = require('mysql2/promise');
 const dotenv = require('dotenv');
 
@@ -78,6 +79,7 @@ const transactional = async (handler) => {
 };
 
 const tableColumnCache = new Map();
+const tableColumnDetailsCache = new Map();
 
 const getTableColumns = async (table) => {
   if (!table) {
@@ -107,11 +109,64 @@ const getTableColumns = async (table) => {
 
 const clearTableColumnCache = () => {
   tableColumnCache.clear();
+  tableColumnDetailsCache.clear();
 };
 
 const tableExists = async (table) => {
   const columns = await getTableColumns(table);
   return columns.size > 0;
+};
+
+const getTableColumnDetails = async (table) => {
+  if (!table) {
+    return new Map();
+  }
+
+  if (tableColumnDetailsCache.has(table)) {
+    return tableColumnDetailsCache.get(table);
+  }
+
+  try {
+    const rows = await query(
+      `SELECT COLUMN_NAME, DATA_TYPE, CHARACTER_MAXIMUM_LENGTH, COLUMN_DEFAULT, IS_NULLABLE, EXTRA
+         FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_SCHEMA = :schema AND TABLE_NAME = :table`,
+      { schema: DB_NAME, table },
+    );
+
+    const details = new Map();
+
+    rows.forEach((row) => {
+      const name = row.COLUMN_NAME || row.column_name;
+      if (!name) {
+        return;
+      }
+
+      const dataType = row.DATA_TYPE || row.data_type || null;
+      const maxLengthRaw = row.CHARACTER_MAXIMUM_LENGTH ?? row.character_maximum_length;
+      const maxLength = maxLengthRaw != null ? Number(maxLengthRaw) : null;
+
+      const defaultValue = row.COLUMN_DEFAULT ?? row.column_default ?? null;
+      const isNullable = String(row.IS_NULLABLE ?? row.is_nullable ?? '').toUpperCase() === 'YES';
+      const extra = row.EXTRA || row.extra || '';
+
+      details.set(name, {
+        dataType,
+        maxLength: Number.isFinite(maxLength) ? maxLength : null,
+        defaultValue,
+        isNullable,
+        extra,
+      });
+    });
+
+    tableColumnDetailsCache.set(table, details);
+    return details;
+  } catch (error) {
+    console.warn(`读取数据表 ${table} 字段详情失败：${error.message}`);
+    const empty = new Map();
+    tableColumnDetailsCache.set(table, empty);
+    return empty;
+  }
 };
 
 const buildInsertStatement = (table, payload, columns) => {
@@ -147,6 +202,37 @@ const buildInsertStatement = (table, payload, columns) => {
   return { sql, params };
 };
 
+const NUMERIC_TYPE_PREFIXES = ['tinyint', 'smallint', 'mediumint', 'int', 'integer', 'bigint', 'decimal', 'double', 'float', 'real'];
+
+const isNumericColumn = (details = {}) => {
+  const type = (details.dataType || '').toLowerCase();
+  return NUMERIC_TYPE_PREFIXES.some((prefix) => type.startsWith(prefix));
+};
+
+const isAutoIncrement = (details = {}) =>
+  typeof details.extra === 'string' && details.extra.toLowerCase().includes('auto_increment');
+
+const generatePrimaryKey = (table, details = {}) => {
+  if (isNumericColumn(details)) {
+    return undefined;
+  }
+
+  const maxLength = Number.isFinite(details.maxLength) && details.maxLength > 0 ? details.maxLength : 30;
+  const prefix = table
+    .split('_')
+    .filter(Boolean)
+    .map((part) => part[0])
+    .join('')
+    .slice(0, 3)
+    .toLowerCase();
+
+  const randomPart = crypto.randomBytes(8).toString('hex');
+  const timePart = Date.now().toString(36);
+  const candidate = `${prefix ? `${prefix}_` : ''}${timePart}${randomPart}`;
+  const trimmed = candidate.slice(0, maxLength);
+  return trimmed.length > 0 ? trimmed : randomPart.slice(0, Math.max(8, Math.min(16, maxLength)));
+};
+
 const insertRecord = async (table, payload = {}) => {
   const columns = await getTableColumns(table);
 
@@ -154,8 +240,30 @@ const insertRecord = async (table, payload = {}) => {
     throw new Error(`数据表 ${table} 不存在或当前账号无访问权限`);
   }
 
-  const { sql, params } = buildInsertStatement(table, payload, columns);
-  return query(sql, params);
+  const columnDetails = await getTableColumnDetails(table);
+  const finalPayload = { ...payload };
+
+  if (columns.has('id') && finalPayload.id === undefined) {
+    const idDetails = columnDetails.get('id');
+    if (!isAutoIncrement(idDetails)) {
+      const generated = generatePrimaryKey(table, idDetails);
+      if (generated !== undefined) {
+        finalPayload.id = generated;
+      }
+    }
+  }
+
+  const { sql, params } = buildInsertStatement(table, finalPayload, columns);
+  const result = await query(sql, params);
+
+  if (finalPayload.id !== undefined && result && typeof result === 'object') {
+    if (result.insertId === undefined || result.insertId === null || result.insertId === 0) {
+      result.insertId = finalPayload.id;
+    }
+    result.generatedId = finalPayload.id;
+  }
+
+  return result;
 };
 
 const updateRecord = async (table, identifier, payload = {}, options = {}) => {
@@ -212,6 +320,7 @@ module.exports = {
   query,
   transactional,
   getTableColumns,
+  getTableColumnDetails,
   clearTableColumnCache,
   tableExists,
   insertRecord,

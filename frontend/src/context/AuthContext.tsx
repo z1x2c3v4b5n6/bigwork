@@ -14,7 +14,14 @@ export interface AuthUser {
   id: string;
   name: string;
   role: UserRole;
-  email?: string;
+  email?: string | null;
+  phone?: string | null;
+  organization?: string | null;
+  goal?: string | null;
+  majorId?: string | null;
+  majorName?: string | null;
+  avatar?: string | null;
+  bio?: string | null;
 }
 
 export interface LoginPayload {
@@ -36,6 +43,7 @@ interface AuthContextValue {
   register: (payload: RegisterPayload) => Promise<void>;
   logout: () => Promise<void>;
   refresh: () => Promise<void>;
+  refreshUser: (user: AuthUser | null) => void;
 }
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL?.replace(/\/?$/, '') ?? '';
@@ -167,6 +175,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     await fetchSession();
   }, [fetchSession]);
 
+  const refreshUser = useCallback((nextUser: AuthUser | null) => {
+    setUser(nextUser);
+  }, []);
+
   const value = useMemo(
     () => ({
       user,
@@ -175,8 +187,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       register,
       logout,
       refresh,
+      refreshUser,
     }),
-    [user, loading, login, register, logout, refresh],
+    [user, loading, login, register, logout, refresh, refreshUser],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
