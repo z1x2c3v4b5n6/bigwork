@@ -14,6 +14,40 @@ const router = express.Router();
 
 const resolveColumn = (columns, candidates) => candidates.find((column) => columns.has(column)) || null;
 
+const parseDateTimeInput = (value, referenceDate = null) => {
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? null : value;
+  }
+
+  const stringValue = String(value).trim();
+  if (!stringValue) {
+    return null;
+  }
+
+  const timeOnlyMatch = stringValue.match(/^([0-2]?\d):([0-5]\d)$/);
+  if (timeOnlyMatch && referenceDate) {
+    const base = new Date(referenceDate);
+    if (!Number.isNaN(base.getTime())) {
+      const hours = Number.parseInt(timeOnlyMatch[1], 10);
+      const minutes = Number.parseInt(timeOnlyMatch[2], 10);
+      base.setHours(hours, minutes, 0, 0);
+      return base;
+    }
+  }
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(stringValue)) {
+    const date = new Date(`${stringValue}T00:00:00`);
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+
+  const date = new Date(stringValue);
+  return Number.isNaN(date.getTime()) ? null : date;
+};
+
 let cachedDefaultMajorId = null;
 let defaultMajorChecked = false;
 
@@ -91,8 +125,11 @@ const createCoursePayload = (
     payload[config.title] = normalizeValueForColumn(config.columnDetails, config.title, title);
   }
 
-  if (config.majorId && majorId !== undefined) {
-    payload[config.majorId] = normalizeValueForColumn(config.columnDetails, config.majorId, majorId);
+  if (config.majorId && majorId !== undefined && majorId !== null) {
+    const normalizedMajorId = normalizeValueForColumn(config.columnDetails, config.majorId, majorId);
+    if (normalizedMajorId !== null && normalizedMajorId !== undefined) {
+      payload[config.majorId] = normalizedMajorId;
+    }
   }
 
   if (config.teacher) {
@@ -187,6 +224,27 @@ const formatScheduleRow = (row, index = 0) => ({
   tags: parseTags(row.tags),
 });
 
+const ensureMySqlDateTime = (value) => {
+  if (!value) {
+    return null;
+  }
+
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) {
+      return null;
+    }
+
+    if (/^\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}(?::\d{2})?$/.test(trimmed)) {
+      return trimmed.length === 16 ? `${trimmed}:00` : trimmed;
+    }
+
+    return toMySqlDateTime(trimmed);
+  }
+
+  return toMySqlDateTime(value);
+};
+
 const createSchedulePayload = (
   config,
   { title, type, start, end, allDay, userId, location, focus, tags },
@@ -206,11 +264,17 @@ const createSchedulePayload = (
   }
 
   if (config.start) {
-    payload[config.start] = toMySqlDateTime(start);
+    const normalizedStart = ensureMySqlDateTime(start);
+    if (normalizedStart !== null) {
+      payload[config.start] = normalizedStart;
+    }
   }
 
   if (config.end) {
-    payload[config.end] = toMySqlDateTime(end);
+    const normalizedEnd = ensureMySqlDateTime(end);
+    if (normalizedEnd !== null) {
+      payload[config.end] = normalizedEnd;
+    }
   }
 
   if (config.allDay) {
@@ -586,7 +650,7 @@ router.post('/courses', requireAuth, async (req, res) => {
       progress: Math.min(100, Math.max(0, Number(progress))),
       nextTask,
       description,
-      majorId: resolvedMajorId,
+      majorId: resolvedMajorId != null ? resolvedMajorId : undefined,
     });
 
     const result = await insertRecord('courses', payload);
@@ -615,6 +679,27 @@ router.post('/schedule', requireAuth, async (req, res) => {
     return res.status(400).json({ message: '请填写日程标题、开始时间与结束时间' });
   }
 
+  const parsedStart = parseDateTimeInput(start);
+  if (!parsedStart) {
+    return res.status(400).json({ message: '开始时间格式不正确，请重新选择。' });
+  }
+
+  let parsedEnd = parseDateTimeInput(end, parsedStart);
+  if (!parsedEnd) {
+    return res.status(400).json({ message: '结束时间格式不正确，请重新选择。' });
+  }
+
+  if (parsedEnd.getTime() <= parsedStart.getTime()) {
+    parsedEnd = new Date(parsedStart.getTime() + 30 * 60 * 1000);
+  }
+
+  const normalizedStart = ensureMySqlDateTime(parsedStart);
+  const normalizedEnd = ensureMySqlDateTime(parsedEnd);
+
+  if (!normalizedStart || !normalizedEnd) {
+    return res.status(400).json({ message: '无法解析日程时间，请检查填写的开始与结束时间。' });
+  }
+
   try {
     const config = await getScheduleConfig();
 
@@ -627,8 +712,8 @@ router.post('/schedule', requireAuth, async (req, res) => {
     const payload = createSchedulePayload(config, {
       title,
       type,
-      start,
-      end,
+      start: normalizedStart,
+      end: normalizedEnd,
       allDay,
       userId: req.session?.user?.id ? req.session.user.id : null,
       location,
@@ -636,9 +721,13 @@ router.post('/schedule', requireAuth, async (req, res) => {
       tags,
     });
 
+    if (!payload[config.start] || !payload[config.end]) {
+      return res.status(400).json({ message: '日程时间不完整，请重新填写开始与结束时间。' });
+    }
+
     const result = await insertRecord(config.table, payload);
 
-    res.status(201).json({ id: result.insertId });
+    res.status(201).json({ id: result.insertId ?? result.generatedId ?? null });
   } catch (error) {
     console.error('创建日程失败', error);
     res.status(500).json({ message: '创建日程失败，请稍后重试' });

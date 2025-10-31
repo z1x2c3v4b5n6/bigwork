@@ -20,6 +20,34 @@ const LIKE_TABLE_CANDIDATES = ['forum_topic_likes', 'forum_likes'];
 
 const resolveColumn = (columns, candidates) => candidates.find((column) => columns.has(column)) || null;
 
+const getDefaultUserId = async () => {
+  if (!(await tableExists('users'))) {
+    return null;
+  }
+
+  const userColumns = await getTableColumns('users');
+  if (userColumns.size === 0) {
+    return null;
+  }
+
+  const idColumn = resolveColumn(userColumns, ['id', 'user_id']);
+  if (!idColumn) {
+    return null;
+  }
+
+  const orderColumn =
+    resolveColumn(userColumns, ['updated_at', 'update_time']) ||
+    resolveColumn(userColumns, ['created_at', 'create_time']) ||
+    idColumn;
+
+  const rows = await query(
+    `SELECT u.\`${idColumn}\` AS id FROM users u ORDER BY u.\`${orderColumn}\` ASC LIMIT 1`,
+  );
+
+  const identifier = rows[0]?.id;
+  return identifier != null ? normalizeIdentifier(identifier) : null;
+};
+
 const buildInClause = (values = [], prefix = 'p') => {
   if (!Array.isArray(values) || values.length === 0) {
     return { clause: '', params: {} };
@@ -295,8 +323,26 @@ const seedForumTopics = async (topicConfig) => {
       },
     ];
 
+    let defaultAuthorId = null;
+    if (topicConfig.authorId) {
+      defaultAuthorId = await getDefaultUserId();
+      const authorDetails = topicConfig.columnDetails?.get?.(topicConfig.authorId);
+      if (!defaultAuthorId && authorDetails && authorDetails.isNullable === false) {
+        console.warn('跳过圈子示例数据初始化：缺少可用的用户编号以填充作者字段');
+        return;
+      }
+    }
+
     for (const topic of topics) {
-      const payload = createTopicPayload(topicConfig, topic);
+      const payload = createTopicPayload(topicConfig, {
+        ...topic,
+        authorId: defaultAuthorId ?? topic.authorId ?? null,
+      });
+
+      if (topicConfig.authorId && (payload[topicConfig.authorId] === undefined || payload[topicConfig.authorId] === null)) {
+        continue;
+      }
+
       await insertRecord(topicConfig.tableName, payload);
     }
   } catch (error) {
