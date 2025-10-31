@@ -1,7 +1,7 @@
 import httpClient from './httpClient';
 
 export interface ForumTopic {
-  id: number;
+  id: string;
   title: string;
   description: string;
   author: string;
@@ -13,7 +13,7 @@ export interface ForumTopic {
 }
 
 export interface ForumPost {
-  id: number;
+  id: string;
   content: string;
   author: string;
   createdAt: string | null;
@@ -26,6 +26,7 @@ export const fetchForumTopics = async (): Promise<ForumTopic[]> => {
   const response = await httpClient.get<{ topics: ForumTopic[] }>('/api/forum/topics');
   return (response.data.topics ?? []).map((topic) => ({
     ...topic,
+    id: topic.id != null ? String(topic.id) : '',
     replies: Number(topic.replies ?? 0),
     likes: Number(topic.likes ?? 0),
     likedByMe: Boolean(topic.likedByMe),
@@ -33,9 +34,12 @@ export const fetchForumTopics = async (): Promise<ForumTopic[]> => {
 };
 
 export const createForumTopic = async (payload: { title: string; description?: string }): Promise<ForumTopic> => {
-  const response = await httpClient.post<{ id: number; title: string }>('/api/forum/topics', payload);
+  const response = await httpClient.post<{ id: number | string; title: string }>(
+    '/api/forum/topics',
+    payload,
+  );
   return {
-    id: Number(response.data.id),
+    id: response.data.id != null ? String(response.data.id) : '',
     title: response.data.title,
     description: payload.description ?? '',
     author: '',
@@ -51,6 +55,7 @@ export const fetchForumPosts = async (topicId: number | string): Promise<ForumPo
   const response = await httpClient.get<{ posts: ForumPost[] }>(`/api/forum/topics/${topicId}/posts`);
   return (response.data.posts ?? []).map((post) => ({
     ...post,
+    id: post.id != null ? String(post.id) : '',
     canDelete: Boolean(post.canDelete),
     isAuthor: Boolean(post.isAuthor),
   }));
@@ -59,9 +64,10 @@ export const fetchForumPosts = async (topicId: number | string): Promise<ForumPo
 export const createForumPost = async (
   topicId: number | string,
   payload: { content: string },
-): Promise<{ id: number }> => {
-  const response = await httpClient.post<{ id: number }>(`/api/forum/topics/${topicId}/posts`, payload);
-  return response.data;
+): Promise<{ id: string }> => {
+  const response = await httpClient.post<{ id: number | string }>(`/api/forum/topics/${topicId}/posts`, payload);
+  const id = response.data?.id;
+  return { id: id != null ? String(id) : '' };
 };
 
 export const toggleTopicLike = async (
