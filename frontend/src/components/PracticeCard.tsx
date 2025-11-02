@@ -20,15 +20,31 @@ const PracticeCard = ({ practice }: PracticeCardProps) => {
       elevation={0}
       sx={{
         p: 3,
+        borderRadius: 4,
         border: '1px solid',
-        borderColor: 'divider',
+        borderColor: 'rgba(25,118,210,0.14)',
+        background: 'linear-gradient(135deg, rgba(245,245,255,0.95), rgba(232,245,253,0.82))',
         display: 'flex',
         flexDirection: 'column',
         gap: 2,
+        boxShadow: '0 22px 60px rgba(15, 23, 42, 0.08)',
+        transition: 'transform 0.3s ease, box-shadow 0.3s ease',
+        '&:hover': {
+          transform: 'translateY(-6px)',
+          boxShadow: '0 30px 80px rgba(15, 23, 42, 0.12)',
+        },
       }}
     >
       <Stack direction="row" spacing={2} alignItems="center">
-        <Box sx={{ bgcolor: 'secondary.light', color: 'secondary.main', p: 1, borderRadius: 2 }}>
+        <Box
+          sx={{
+            background: 'linear-gradient(145deg, rgba(94,53,177,0.2), rgba(123,31,162,0.25))',
+            color: 'secondary.main',
+            p: 1,
+            borderRadius: 2,
+            border: '1px solid rgba(123,31,162,0.2)',
+          }}
+        >
           <QuizIcon />
         </Box>
         <Box>
@@ -46,7 +62,17 @@ const PracticeCard = ({ practice }: PracticeCardProps) => {
           sx={{ ml: 'auto' }}
         />
       </Stack>
-      <Stack direction="row" spacing={1} alignItems="center">
+      <Stack
+        direction="row"
+        spacing={1}
+        alignItems="center"
+        sx={{
+          p: 1.5,
+          borderRadius: 3,
+          background: 'rgba(255,255,255,0.6)',
+          border: '1px dashed rgba(94,53,177,0.24)',
+        }}
+      >
         <SchoolIcon color="primary" fontSize="small" />
         <Typography variant="body2" color="text.secondary">
           {practice.focus ?? '建议针对错题进行归类整理，强化薄弱环节。'}
