@@ -547,7 +547,7 @@ router.post('/topics', requireAuth, async (req, res) => {
     const payload = createTopicPayload(topicConfig, {
       title: rawTitle,
       description: rawDescription,
-      authorId: req.session?.user ? req.session.user.id : null,
+      authorId: req.session.user ? req.session.user.id : null,
       tags,
     });
 

@@ -23,8 +23,7 @@ import AlarmOnIcon from '@mui/icons-material/AlarmOn';
 import AddCircleIcon from '@mui/icons-material/AddCircle';
 import EventAvailableIcon from '@mui/icons-material/EventAvailable';
 import dayjs from 'dayjs';
-import axios from 'axios';
-import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { FormEvent, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import learningService, { ScheduleEntry } from '../services/learningService';
 import ScheduleTimeline from '../components/ScheduleTimeline';
@@ -93,27 +92,6 @@ const Schedule = () => {
 
   const isCreating = createScheduleMutation.isPending;
 
-  useEffect(() => {
-    if (!start) {
-      return;
-    }
-
-    const startMoment = dayjs(start);
-    if (!startMoment.isValid()) {
-      return;
-    }
-
-    if (!end) {
-      setEnd(startMoment.add(1, 'hour').format('YYYY-MM-DDTHH:mm'));
-      return;
-    }
-
-    const endMoment = dayjs(end);
-    if (!endMoment.isValid() || !endMoment.isAfter(startMoment)) {
-      setEnd(startMoment.add(1, 'hour').format('YYYY-MM-DDTHH:mm'));
-    }
-  }, [start, end]);
-
   const handleCreateSchedule = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setErrorMessage(null);
@@ -149,7 +127,6 @@ const Schedule = () => {
 
   const handleDialogSubmit = async () => {
     setErrorMessage(null);
-    setSuccessMessage(null);
 
     if (!formState.title.trim()) {
       setErrorMessage('请填写事件名称');
@@ -163,19 +140,6 @@ const Schedule = () => {
 
     const startTime = `${formState.date}T${formState.startTime}`;
     const endTime = `${formState.date}T${formState.endTime}`;
-
-    const startMoment = dayjs(startTime);
-    const endMoment = dayjs(endTime);
-
-    if (!startMoment.isValid() || !endMoment.isValid()) {
-      setErrorMessage('时间格式不正确，请重新选择开始和结束时间');
-      return;
-    }
-
-    if (!endMoment.isAfter(startMoment)) {
-      setErrorMessage('结束时间需要晚于开始时间');
-      return;
-    }
 
     const tags = formState.tags
       .split(',')
