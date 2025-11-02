@@ -7,8 +7,17 @@ export interface MajorOption {
   description?: string;
 }
 
-export const fetchUserProfile = async (userId: string): Promise<AuthUser> => {
-  const response = await httpClient.get<AuthUser>(`/api/users/${userId}`);
+export type UserProfile = AuthUser & {
+  phone?: string | null;
+  organization?: string | null;
+  goal?: string | null;
+  majorId?: string | null;
+  majorName?: string | null;
+  bio?: string | null;
+};
+
+export const fetchUserProfile = async (userId: string): Promise<UserProfile> => {
+  const response = await httpClient.get<UserProfile>(`/api/users/${userId}`);
   return response.data;
 };
 
@@ -24,8 +33,8 @@ export const updateUserProfile = async (
     bio: string;
     majorId: string | null;
   }>,
-): Promise<AuthUser> => {
-  const response = await httpClient.patch<AuthUser>(`/api/users/${userId}`, payload);
+): Promise<UserProfile> => {
+  const response = await httpClient.patch<UserProfile>(`/api/users/${userId}`, payload);
   return response.data;
 };
 

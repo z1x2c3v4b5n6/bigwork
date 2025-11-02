@@ -2,7 +2,6 @@ import {
   AppBar,
   Avatar,
   Box,
-  Chip,
   Container,
   Divider,
   Drawer,
@@ -28,7 +27,6 @@ import PersonIcon from '@mui/icons-material/Person';
 import DarkModeIcon from '@mui/icons-material/DarkMode';
 import LightModeIcon from '@mui/icons-material/LightMode';
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
-import ForumIcon from '@mui/icons-material/Forum';
 import { MouseEvent, useMemo, useState } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -38,9 +36,7 @@ const baseNavItems = [
   { label: '课程体系', path: '/courses', icon: <AssignmentIcon /> },
   { label: '刷题训练', path: '/practice', icon: <QuizIcon /> },
   { label: '学习日程', path: '/schedule', icon: <EventIcon /> },
-  { label: '考研圈子', path: '/community', icon: <ForumIcon /> },
   { label: '学习分析', path: '/analytics', icon: <TimelineIcon /> },
-  { label: '考研论坛', path: '/forum', icon: <ForumIcon /> },
   { label: '个人中心', path: '/profile', icon: <PersonIcon /> },
 ];
 
@@ -61,15 +57,7 @@ const AppLayout = ({ mode, onToggleMode }: AppLayoutProps) => {
   const navigate = useNavigate();
   const { user, loading: authLoading, logout } = useAuth();
 
-  const isAdmin = useMemo(() => {
-    if (!user?.role) {
-      return false;
-    }
-
-    const rawRole = user.role;
-    const normalized = typeof rawRole === 'string' ? rawRole.trim().toLowerCase() : String(rawRole).toLowerCase();
-    return normalized === 'admin' || rawRole === '管理员';
-  }, [user?.role]);
+  const isAdmin = useMemo(() => user?.role === 'admin', [user?.role]);
 
   const navigationItems = useMemo(() => {
     if (isAdmin) {
@@ -103,12 +91,20 @@ const AppLayout = ({ mode, onToggleMode }: AppLayoutProps) => {
   };
 
   const userInitial = user?.name?.[0] ?? (authLoading ? '…' : '访');
+  const avatarSrc = user?.avatar ?? undefined;
 
   const drawerContent = useMemo(
     () => (
-      <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-        <Toolbar sx={{ gap: 2 }}>
-          <Avatar sx={{ bgcolor: 'primary.main' }}>研</Avatar>
+      <Box
+        sx={{
+          display: 'flex',
+          flexDirection: 'column',
+          height: '100%',
+          background: 'linear-gradient(180deg, rgba(99, 133, 255, 0.18) 0%, rgba(255, 255, 255, 0.92) 45%, #ffffff 100%)',
+        }}
+      >
+        <Toolbar sx={{ gap: 2, alignItems: 'center' }}>
+          <Avatar sx={{ bgcolor: 'primary.main', boxShadow: 3 }}>研</Avatar>
           <Box>
             <Typography variant="subtitle1" fontWeight={700}>
               研学进阶
@@ -118,27 +114,51 @@ const AppLayout = ({ mode, onToggleMode }: AppLayoutProps) => {
             </Typography>
           </Box>
         </Toolbar>
-        <Divider />
-        <List sx={{ flexGrow: 1 }}>
-          {navigationItems.map((item) => (
-            <ListItemButton
-              key={item.path}
-              selected={location.pathname === item.path}
-              onClick={() => {
-                navigate(item.path);
-                setMobileOpen(false);
-              }}
-              sx={{ borderRadius: 2, mx: 1, my: 0.5 }}
-            >
-              <ListItemIcon>{item.icon}</ListItemIcon>
-              <ListItemText primary={item.label} />
-            </ListItemButton>
-          ))}
+        <Divider sx={{ mx: 3, borderColor: 'rgba(99,133,255,0.2)' }} />
+        <List sx={{ flexGrow: 1, px: 1.5, py: 1 }}>
+          {navigationItems.map((item) => {
+            const selected = location.pathname === item.path;
+            return (
+              <ListItemButton
+                key={item.path}
+                selected={selected}
+                onClick={() => {
+                  navigate(item.path);
+                  setMobileOpen(false);
+                }}
+                sx={{
+                  borderRadius: 2,
+                  mb: 1,
+                  px: 2,
+                  transition: 'all 0.2s ease',
+                  bgcolor: selected ? 'rgba(79,119,227,0.16)' : 'transparent',
+                  boxShadow: selected ? '0 8px 16px rgba(79,119,227,0.18)' : 'none',
+                  color: selected ? 'primary.main' : 'inherit',
+                  '&:hover': {
+                    bgcolor: 'rgba(79,119,227,0.12)',
+                  },
+                }}
+              >
+                <ListItemIcon
+                  sx={{
+                    minWidth: 36,
+                    color: selected ? 'primary.main' : 'text.secondary',
+                  }}
+                >
+                  {item.icon}
+                </ListItemIcon>
+                <ListItemText primary={item.label} primaryTypographyProps={{ fontWeight: selected ? 700 : 500 }} />
+              </ListItemButton>
+            );
+          })}
         </List>
-        <Divider />
-        <Box sx={{ p: 2, textAlign: 'center' }}>
+        <Divider sx={{ mx: 3, borderColor: 'rgba(99,133,255,0.12)' }} />
+        <Box sx={{ p: 3, textAlign: 'left' }}>
+          <Typography variant="subtitle2" fontWeight={600} gutterBottom>
+            今日箴言
+          </Typography>
           <Typography variant="body2" color="text.secondary">
-            一起保持进步，不负考研热忱。
+            每一次刷题、每一次记录，都是向上走的一小步，坚持就能抵达心中的目标院校。
           </Typography>
         </Box>
       </Box>
@@ -148,7 +168,17 @@ const AppLayout = ({ mode, onToggleMode }: AppLayoutProps) => {
 
   return (
     <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: 'background.default' }}>
-      <AppBar position="fixed" color="inherit" sx={{ boxShadow: 'none', borderBottom: 1, borderColor: 'divider' }}>
+      <AppBar
+        position="fixed"
+        color="inherit"
+        sx={{
+          boxShadow: 'none',
+          borderBottom: 1,
+          borderColor: 'divider',
+          backgroundColor: 'rgba(255,255,255,0.86)',
+          backdropFilter: 'blur(12px)',
+        }}
+      >
         <Toolbar>
           {!isDesktop && (
             <IconButton color="primary" edge="start" onClick={() => setMobileOpen(true)} sx={{ mr: 2 }}>
@@ -176,7 +206,9 @@ const AppLayout = ({ mode, onToggleMode }: AppLayoutProps) => {
             }
           >
             <IconButton onClick={handleOpenAccountMenu} size="small" sx={{ ml: 2 }}>
-              <Avatar sx={{ width: 36, height: 36 }}>{userInitial}</Avatar>
+              <Avatar sx={{ width: 36, height: 36 }} src={avatarSrc} alt={user?.name}>
+                {userInitial}
+              </Avatar>
             </IconButton>
           </Tooltip>
         </Toolbar>
@@ -192,6 +224,8 @@ const AppLayout = ({ mode, onToggleMode }: AppLayoutProps) => {
             '& .MuiDrawer-paper': {
               boxSizing: 'border-box',
               width: drawerWidth,
+              borderRight: 'none',
+              boxShadow: isDesktop ? '8px 0 24px rgba(15, 34, 67, 0.08)' : 'none',
             },
           }}
         >
@@ -199,9 +233,21 @@ const AppLayout = ({ mode, onToggleMode }: AppLayoutProps) => {
         </Drawer>
       </Box>
 
-      <Box component="main" sx={{ flexGrow: 1, bgcolor: 'background.default' }}>
+      <Box
+        component="main"
+        sx={{ flexGrow: 1, position: 'relative', overflow: 'hidden', bgcolor: 'background.default' }}
+      >
+        <Box
+          sx={{
+            position: 'absolute',
+            inset: 0,
+            background:
+              'radial-gradient(120% 120% at 0% 0%, rgba(79,119,227,0.12) 0%, transparent 55%), radial-gradient(100% 100% at 100% 0%, rgba(0,171,178,0.12) 0%, transparent 50%)',
+            pointerEvents: 'none',
+          }}
+        />
         <Toolbar />
-        <Container maxWidth="lg" sx={{ py: 4 }}>
+        <Container maxWidth="xl" sx={{ py: { xs: 4, md: 6 }, position: 'relative', zIndex: 1 }}>
           <Outlet />
         </Container>
       </Box>

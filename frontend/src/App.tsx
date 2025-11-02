@@ -15,7 +15,6 @@ import RequireAdmin from './components/RequireAdmin';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import RequireAuth from './components/RequireAuth';
-import Forum from './pages/Forum';
 
 const App = () => {
   const [mode, setMode] = useState<'light' | 'dark'>('light');
@@ -40,7 +39,6 @@ const App = () => {
           <Route path="practice" element={<Practice />} />
           <Route path="schedule" element={<Schedule />} />
           <Route path="analytics" element={<Analytics />} />
-          <Route path="forum" element={<Forum />} />
           <Route path="profile" element={<Profile />} />
           <Route
             path="admin"
