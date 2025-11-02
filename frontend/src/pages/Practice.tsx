@@ -17,7 +17,7 @@ import practiceService, { PracticeQuestion, PracticeSetSummary } from '../servic
 
 const Practice = () => {
   const queryClient = useQueryClient();
-  const [selectedSetId, setSelectedSetId] = useState<number | null>(null);
+  const [selectedSetId, setSelectedSetId] = useState<string | null>(null);
   const [setTitle, setSetTitle] = useState('');
   const [setDescription, setSetDescription] = useState('');
   const [setTags, setSetTags] = useState('');
@@ -55,7 +55,7 @@ const Practice = () => {
     refetch: refetchQuestions,
   } = useQuery<PracticeQuestion[]>({
     queryKey: ['practice-questions', selectedSetId],
-    queryFn: () => practiceService.fetchPracticeQuestions(selectedSetId as number),
+    queryFn: () => practiceService.fetchPracticeQuestions(selectedSetId as string),
     enabled: selectedSetId !== null,
   });
 
@@ -79,7 +79,7 @@ const Practice = () => {
       answerText?: string;
       explanation?: string;
       tags?: string[];
-    }) => practiceService.createPracticeQuestion(selectedSetId as number, payload),
+    }) => practiceService.createPracticeQuestion(selectedSetId as string, payload),
     onSuccess: async () => {
       setQuestionText('');
       setAnswerText('');

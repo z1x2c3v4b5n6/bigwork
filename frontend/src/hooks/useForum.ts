@@ -1,57 +1,29 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { AuthUser } from '../context/AuthContext';
-import {
-  createForumComment,
-  createForumTopic,
-  fetchForumTopics,
-  toggleForumLike,
-  type ForumTopic,
-} from '../services/forumService';
+import forumService, { ForumTopic } from '../services/forumService';
 
 export const FORUM_QUERY_KEY = ['forum-topics'];
 
-const useForum = (user: AuthUser | null) => {
+const useForum = (enabled: boolean) => {
   const queryClient = useQueryClient();
 
   const topicsQuery = useQuery({
-    queryKey: [...FORUM_QUERY_KEY, user?.id],
-    queryFn: () => fetchForumTopics(user?.id),
-    enabled: Boolean(user?.id),
+    queryKey: FORUM_QUERY_KEY,
+    queryFn: forumService.fetchForumTopics,
+    enabled,
     staleTime: 60 * 1000,
   });
 
   const createTopicMutation = useMutation({
-    mutationFn: (payload: { title: string; content: string; tags?: string[] }) =>
-      createForumTopic({ authorId: user!.id, ...payload }),
-    onSuccess: (created) => {
-      queryClient.setQueryData<ForumTopic[] | undefined>([...FORUM_QUERY_KEY, user?.id], (previous) => {
-        if (!previous) {
-          return [created];
-        }
-        return [created, ...previous];
-      });
-    },
-  });
-
-  const createCommentMutation = useMutation({
-    mutationFn: (payload: { topicId: string; content: string }) =>
-      createForumComment({ topicId: payload.topicId, authorId: user!.id, content: payload.content }),
-    onSuccess: (comment, { topicId }) => {
-      queryClient.setQueryData<ForumTopic[] | undefined>([...FORUM_QUERY_KEY, user?.id], (previous) => {
-        if (!previous) {
-          return previous;
-        }
-        return previous.map((topic) =>
-          topic.id === topicId ? { ...topic, comments: [...topic.comments, comment] } : topic,
-        );
-      });
+    mutationFn: forumService.createForumTopic,
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: FORUM_QUERY_KEY });
     },
   });
 
   const toggleLikeMutation = useMutation({
-    mutationFn: (topicId: string) => toggleForumLike({ topicId, userId: user!.id }),
+    mutationFn: (topicId: string) => forumService.toggleTopicLike(topicId),
     onSuccess: ({ topicId, likes, likedByUser }) => {
-      queryClient.setQueryData<ForumTopic[] | undefined>([...FORUM_QUERY_KEY, user?.id], (previous) => {
+      queryClient.setQueryData<ForumTopic[] | undefined>(FORUM_QUERY_KEY, (previous) => {
         if (!previous) {
           return previous;
         }
@@ -62,7 +34,7 @@ const useForum = (user: AuthUser | null) => {
     },
   });
 
-  return { topicsQuery, createTopicMutation, createCommentMutation, toggleLikeMutation };
+  return { topicsQuery, createTopicMutation, toggleLikeMutation };
 };
 
 export default useForum;

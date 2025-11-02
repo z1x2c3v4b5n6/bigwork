@@ -4,13 +4,50 @@ const {
   insertRecord,
   tableExists,
   getTableColumns,
+  getTableColumnDetails,
 } = require('../database');
 const { requireAuth } = require('../middleware/auth');
-const { normalizeDate, toMySqlDateTime } = require('../utils/formatters');
+const { normalizeDate, parseTags, stringifyTags, toMySqlDateTime } = require('../utils/formatters');
+const { normalizeIdentifier, normalizeValueForColumn } = require('../utils/db');
+const { getDefaultMajorId } = require('../utils/majors');
 
 const router = express.Router();
 
 const resolveColumn = (columns, candidates) => candidates.find((column) => columns.has(column)) || null;
+
+const parseDateTimeInput = (value, referenceDate = null) => {
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? null : value;
+  }
+
+  const stringValue = String(value).trim();
+  if (!stringValue) {
+    return null;
+  }
+
+  const timeOnlyMatch = stringValue.match(/^([0-2]?\d):([0-5]\d)$/);
+  if (timeOnlyMatch && referenceDate) {
+    const base = new Date(referenceDate);
+    if (!Number.isNaN(base.getTime())) {
+      const hours = Number.parseInt(timeOnlyMatch[1], 10);
+      const minutes = Number.parseInt(timeOnlyMatch[2], 10);
+      base.setHours(hours, minutes, 0, 0);
+      return base;
+    }
+  }
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(stringValue)) {
+    const date = new Date(`${stringValue}T00:00:00`);
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+
+  const date = new Date(stringValue);
+  return Number.isNaN(date.getTime()) ? null : date;
+};
 
 const getCourseConfig = async () => {
   const columns = await getTableColumns('courses');
@@ -19,15 +56,19 @@ const getCourseConfig = async () => {
     return null;
   }
 
+  const columnDetails = await getTableColumnDetails('courses');
+
   return {
     table: 'courses',
     columns,
+    columnDetails,
     id: resolveColumn(columns, ['id', 'course_id']),
+    majorId: resolveColumn(columns, ['major_id', 'majorid', 'major']),
     title: resolveColumn(columns, ['title', 'name', 'course_name']),
     teacher: resolveColumn(columns, ['teacher', 'teacher_name', 'lecturer']),
     category: resolveColumn(columns, ['category', 'type', 'course_category']),
     progress: resolveColumn(columns, ['progress', 'completion', 'completion_rate']),
-    nextTask: resolveColumn(columns, ['next_task', 'upcoming_task', 'next_step']),
+    nextTask: resolveColumn(columns, ['next_task', 'upcoming_task', 'next_step', 'schedule_info', 'release_window']),
     description: resolveColumn(columns, ['description', 'summary', 'intro']),
     createdAt: resolveColumn(columns, ['created_at', 'create_time']),
     updatedAt: resolveColumn(columns, ['updated_at', 'update_time']),
@@ -43,31 +84,61 @@ const formatCourseRow = (row, index = 0) => ({
   nextTask: row.next_task || '请为课程安排下一次学习任务',
 });
 
-const createCoursePayload = (config, { title, teacher, category, progress, nextTask, description }) => {
+const createCoursePayload = (
+  config,
+  { title, teacher, category, progress, nextTask, description, majorId },
+) => {
   const payload = {};
 
   if (config.title) {
-    payload[config.title] = title;
+    payload[config.title] = normalizeValueForColumn(config.columnDetails, config.title, title);
+  }
+
+  if (config.majorId && majorId !== undefined && majorId !== null) {
+    const normalizedMajorId = normalizeValueForColumn(config.columnDetails, config.majorId, majorId);
+    if (normalizedMajorId !== null && normalizedMajorId !== undefined) {
+      payload[config.majorId] = normalizedMajorId;
+    }
   }
 
   if (config.teacher) {
-    payload[config.teacher] = teacher ?? null;
+    payload[config.teacher] = normalizeValueForColumn(
+      config.columnDetails,
+      config.teacher,
+      teacher ?? '待定讲师',
+    );
   }
 
   if (config.category) {
-    payload[config.category] = category ?? null;
+    payload[config.category] = normalizeValueForColumn(
+      config.columnDetails,
+      config.category,
+      category ?? '公共课',
+    );
   }
 
   if (config.progress) {
-    payload[config.progress] = progress ?? 0;
+    payload[config.progress] = normalizeValueForColumn(
+      config.columnDetails,
+      config.progress,
+      progress ?? 0,
+    );
   }
 
   if (config.nextTask) {
-    payload[config.nextTask] = nextTask ?? null;
+    payload[config.nextTask] = normalizeValueForColumn(
+      config.columnDetails,
+      config.nextTask,
+      nextTask ?? null,
+    );
   }
 
   if (config.description) {
-    payload[config.description] = description ?? null;
+    payload[config.description] = normalizeValueForColumn(
+      config.columnDetails,
+      config.description,
+      description ?? null,
+    );
   }
 
   return payload;
@@ -82,17 +153,22 @@ const getScheduleConfig = async () => {
       continue;
     }
 
+    const columnDetails = await getTableColumnDetails(table);
+
     return {
       table,
       columns,
+      columnDetails,
       id: resolveColumn(columns, ['id', 'event_id', 'task_id']),
       title: resolveColumn(columns, ['title', 'name', 'task_name']),
-      type: resolveColumn(columns, ['type', 'category', 'task_type']),
+      type: resolveColumn(columns, ['type', 'category', 'task_type', 'event_type']),
       start: resolveColumn(columns, ['start_time', 'start_at', 'begin_time']),
       end: resolveColumn(columns, ['end_time', 'end_at', 'finish_time']),
       allDay: resolveColumn(columns, ['all_day', 'is_all_day']),
       location: resolveColumn(columns, ['location', 'place']),
       userId: resolveColumn(columns, ['user_id', 'student_id', 'owner_id']),
+      focus: resolveColumn(columns, ['focus', 'goal', 'notes']),
+      tags: resolveColumn(columns, ['tags', 'tags_json', 'tag_list']),
       createdAt: resolveColumn(columns, ['created_at', 'create_time']),
       updatedAt: resolveColumn(columns, ['updated_at', 'update_time']),
     };
@@ -106,39 +182,109 @@ const formatScheduleRow = (row, index = 0) => ({
   title: row.title || '待办事项',
   type: row.type || '自习',
   start: normalizeDate(row.start_time) || normalizeDate(row.created_at) || new Date().toISOString(),
-  end: normalizeDate(row.end_time) || normalizeDate(row.updated_at) || normalizeDate(row.start_time) || new Date().toISOString(),
+  end:
+    normalizeDate(row.end_time) ||
+    normalizeDate(row.updated_at) ||
+    normalizeDate(row.start_time) ||
+    new Date().toISOString(),
+  allDay: Boolean(row.all_day ?? row.is_all_day ?? 0),
   location: row.location || undefined,
+  focus: row.focus || undefined,
+  tags: parseTags(row.tags),
 });
 
-const createSchedulePayload = (config, { title, type, start, end, allDay, userId, location }) => {
+const ensureMySqlDateTime = (value) => {
+  if (!value) {
+    return null;
+  }
+
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) {
+      return null;
+    }
+
+    if (/^\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}(?::\d{2})?$/.test(trimmed)) {
+      return trimmed.length === 16 ? `${trimmed}:00` : trimmed;
+    }
+
+    return toMySqlDateTime(trimmed);
+  }
+
+  return toMySqlDateTime(value);
+};
+
+const createSchedulePayload = (
+  config,
+  { title, type, start, end, allDay, userId, location, focus, tags },
+) => {
   const payload = {};
 
   if (config.title) {
-    payload[config.title] = title;
+    payload[config.title] = normalizeValueForColumn(config.columnDetails, config.title, title);
   }
 
   if (config.type) {
-    payload[config.type] = type ?? '自习';
+    payload[config.type] = normalizeValueForColumn(
+      config.columnDetails,
+      config.type,
+      type ?? '自习',
+    );
   }
 
   if (config.start) {
-    payload[config.start] = toMySqlDateTime(start);
+    const normalizedStart = ensureMySqlDateTime(start);
+    if (normalizedStart !== null) {
+      payload[config.start] = normalizedStart;
+    }
   }
 
   if (config.end) {
-    payload[config.end] = toMySqlDateTime(end);
+    const normalizedEnd = ensureMySqlDateTime(end);
+    if (normalizedEnd !== null) {
+      payload[config.end] = normalizedEnd;
+    }
   }
 
   if (config.allDay) {
-    payload[config.allDay] = allDay ? 1 : 0;
+    payload[config.allDay] = normalizeValueForColumn(
+      config.columnDetails,
+      config.allDay,
+      allDay ? 1 : 0,
+    );
   }
 
   if (config.location) {
-    payload[config.location] = location ?? null;
+    payload[config.location] = normalizeValueForColumn(
+      config.columnDetails,
+      config.location,
+      location ?? null,
+    );
+  }
+
+  if (config.focus) {
+    payload[config.focus] = normalizeValueForColumn(
+      config.columnDetails,
+      config.focus,
+      focus ?? null,
+    );
+  }
+
+  if (config.tags) {
+    payload[config.tags] = normalizeValueForColumn(
+      config.columnDetails,
+      config.tags,
+      stringifyTags(tags),
+    );
   }
 
   if (config.userId) {
-    payload[config.userId] = userId ?? null;
+    const normalized = normalizeIdentifier(userId);
+    payload[config.userId] = normalizeValueForColumn(
+      config.columnDetails,
+      config.userId,
+      normalized,
+    );
   }
 
   return payload;
@@ -151,8 +297,11 @@ const getPracticeSetConfig = async () => {
     return null;
   }
 
+  const columnDetails = await getTableColumnDetails('practice_sets');
+
   return {
     columns,
+    columnDetails,
     id: resolveColumn(columns, ['id', 'set_id', 'practice_set_id']),
     title: resolveColumn(columns, ['title', 'name', 'set_title']),
     description: resolveColumn(columns, ['description', 'summary', 'intro']),
@@ -170,11 +319,23 @@ const getPracticeQuestionConfig = async () => {
     return null;
   }
 
+  const columnDetails = await getTableColumnDetails('practice_questions');
+
   return {
     columns,
+    columnDetails,
     id: resolveColumn(columns, ['id', 'question_id']),
     setId: resolveColumn(columns, ['practice_set_id', 'set_id', 'collection_id']),
   };
+};
+
+const normalizeLimit = (value, fallback) => {
+  const parsed = Number.parseInt(value, 10);
+  if (Number.isNaN(parsed) || parsed <= 0) {
+    return fallback;
+  }
+
+  return Math.min(parsed, 100);
 };
 
 const loadCourses = async (limit = 12) => {
@@ -204,14 +365,13 @@ const loadCourses = async (limit = 12) => {
     `SELECT ${selectFragments.join(', ')}
        FROM courses c
       ORDER BY ${orderColumn} DESC
-      LIMIT :limit`,
-    { limit },
+      LIMIT ${normalizeLimit(limit, 12)}`,
   );
 
   return rows.map((row, index) => formatCourseRow(row, index));
 };
 
-const loadSchedule = async (userId, limit = 20) => {
+const loadSchedule = async (sessionUser, limit = 20) => {
   const config = await getScheduleConfig();
   if (!config || !config.start || !config.end) {
     return [];
@@ -223,17 +383,31 @@ const loadSchedule = async (userId, limit = 20) => {
     config.type ? `s.\`${config.type}\` AS type` : "'自习' AS type",
     `s.\`${config.start}\` AS start_time`,
     `s.\`${config.end}\` AS end_time`,
+    config.allDay ? `s.\`${config.allDay}\` AS all_day` : 'NULL AS all_day',
     config.location ? `s.\`${config.location}\` AS location` : 'NULL AS location',
+    config.focus ? `s.\`${config.focus}\` AS focus` : 'NULL AS focus',
+    config.tags ? `s.\`${config.tags}\` AS tags` : 'NULL AS tags',
     config.createdAt ? `s.\`${config.createdAt}\` AS created_at` : 'NULL AS created_at',
     config.updatedAt ? `s.\`${config.updatedAt}\` AS updated_at` : 'NULL AS updated_at',
   ];
 
   const whereClauses = [];
-  const params = { limit };
+  const params = {};
 
-  if (config.userId && userId) {
-    whereClauses.push(`s.\`${config.userId}\` = :userId`);
-    params.userId = userId;
+  const isAdmin = sessionUser?.role === 'admin';
+  const rawUserId = sessionUser?.id;
+
+  if (config.userId && rawUserId && !isAdmin) {
+    const normalizedUserId = normalizeValueForColumn(
+      config.columnDetails,
+      config.userId,
+      normalizeIdentifier(rawUserId),
+    );
+
+    if (normalizedUserId !== null && normalizedUserId !== undefined) {
+      whereClauses.push(`s.\`${config.userId}\` = :userId`);
+      params.userId = normalizedUserId;
+    }
   }
 
   const whereSql = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
@@ -244,7 +418,7 @@ const loadSchedule = async (userId, limit = 20) => {
        FROM ${config.table} s
        ${whereSql}
       ORDER BY ${orderColumn} ASC
-      LIMIT :limit`,
+      LIMIT ${normalizeLimit(limit, 20)}`,
     params,
   );
 
@@ -290,8 +464,7 @@ const loadPracticePreview = async (limit = 3) => {
        ${joinClause}
       GROUP BY ps.\`${setConfig.id}\`
       ORDER BY ${orderColumn} DESC
-      LIMIT :limit`,
-    { limit },
+      LIMIT ${normalizeLimit(limit, 3)}`,
   );
 
   return rows.map((row, index) => ({
@@ -368,7 +541,7 @@ router.get('/dashboard', requireAuth, async (req, res) => {
     const [courses, practiceSets, schedule, stats] = await Promise.all([
       loadCourses(6),
       loadPracticePreview(3),
-      loadSchedule(req.session?.user?.id ? Number(req.session.user.id) : null, 6),
+      loadSchedule(req.session?.user || null, 6),
       buildStats(),
     ]);
 
@@ -402,7 +575,7 @@ router.get('/courses', requireAuth, async (req, res) => {
 });
 
 router.post('/courses', requireAuth, async (req, res) => {
-  const { title, teacher, category, progress = 0, nextTask, description } = req.body || {};
+  const { title, teacher, category, progress = 0, nextTask, description, majorId } = req.body || {};
 
   if (!title) {
     return res.status(400).json({ message: '课程标题不能为空' });
@@ -423,6 +596,22 @@ router.post('/courses', requireAuth, async (req, res) => {
         .json({ message: 'courses 表缺少标题字段（title/name），请补充数据表结构。' });
     }
 
+    let resolvedMajorId = normalizeIdentifier(majorId);
+
+    if (!resolvedMajorId && req.session?.user?.majorId) {
+      resolvedMajorId = normalizeIdentifier(req.session.user.majorId);
+    }
+
+    if (!resolvedMajorId && config.majorId) {
+      resolvedMajorId = await getDefaultMajorId();
+    }
+
+    if (config.majorId && !resolvedMajorId) {
+      return res
+        .status(400)
+        .json({ message: '无法确定课程所属专业，请先在个人资料中设置目标专业或在创建时指定 majorId。' });
+    }
+
     const payload = createCoursePayload(config, {
       title,
       teacher,
@@ -430,6 +619,7 @@ router.post('/courses', requireAuth, async (req, res) => {
       progress: Math.min(100, Math.max(0, Number(progress))),
       nextTask,
       description,
+      majorId: resolvedMajorId != null ? resolvedMajorId : undefined,
     });
 
     const result = await insertRecord('courses', payload);
@@ -443,7 +633,7 @@ router.post('/courses', requireAuth, async (req, res) => {
 
 router.get('/schedule', requireAuth, async (req, res) => {
   try {
-    const schedule = await loadSchedule(req.session?.user?.id ? Number(req.session.user.id) : null);
+    const schedule = await loadSchedule(req.session?.user || null);
     res.json({ schedule });
   } catch (error) {
     console.error('获取学习日程失败', error);
@@ -452,10 +642,31 @@ router.get('/schedule', requireAuth, async (req, res) => {
 });
 
 router.post('/schedule', requireAuth, async (req, res) => {
-  const { title, type = '自习', start, end, allDay = false, location } = req.body || {};
+  const { title, type = '自习', start, end, allDay = false, location, focus, tags } = req.body || {};
 
   if (!title || !start || !end) {
     return res.status(400).json({ message: '请填写日程标题、开始时间与结束时间' });
+  }
+
+  const parsedStart = parseDateTimeInput(start);
+  if (!parsedStart) {
+    return res.status(400).json({ message: '开始时间格式不正确，请重新选择。' });
+  }
+
+  let parsedEnd = parseDateTimeInput(end, parsedStart);
+  if (!parsedEnd) {
+    return res.status(400).json({ message: '结束时间格式不正确，请重新选择。' });
+  }
+
+  if (parsedEnd.getTime() <= parsedStart.getTime()) {
+    parsedEnd = new Date(parsedStart.getTime() + 30 * 60 * 1000);
+  }
+
+  const normalizedStart = ensureMySqlDateTime(parsedStart);
+  const normalizedEnd = ensureMySqlDateTime(parsedEnd);
+
+  if (!normalizedStart || !normalizedEnd) {
+    return res.status(400).json({ message: '无法解析日程时间，请检查填写的开始与结束时间。' });
   }
 
   try {
@@ -470,16 +681,22 @@ router.post('/schedule', requireAuth, async (req, res) => {
     const payload = createSchedulePayload(config, {
       title,
       type,
-      start,
-      end,
+      start: normalizedStart,
+      end: normalizedEnd,
       allDay,
-      userId: req.session?.user?.id ? Number(req.session.user.id) : null,
+      userId: req.session?.user?.id ? req.session.user.id : null,
       location,
+      focus,
+      tags,
     });
+
+    if (!payload[config.start] || !payload[config.end]) {
+      return res.status(400).json({ message: '日程时间不完整，请重新填写开始与结束时间。' });
+    }
 
     const result = await insertRecord(config.table, payload);
 
-    res.status(201).json({ id: result.insertId });
+    res.status(201).json({ id: result.insertId ?? result.generatedId ?? null });
   } catch (error) {
     console.error('创建日程失败', error);
     res.status(500).json({ message: '创建日程失败，请稍后重试' });
