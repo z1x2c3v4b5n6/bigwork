@@ -29,6 +29,7 @@ import DarkModeIcon from '@mui/icons-material/DarkMode';
 import LightModeIcon from '@mui/icons-material/LightMode';
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
 import ForumIcon from '@mui/icons-material/Forum';
+import { alpha, useTheme } from '@mui/material/styles';
 import { MouseEvent, useMemo, useState } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -53,6 +54,7 @@ interface AppLayoutProps {
 const drawerWidth = 240;
 
 const AppLayout = ({ mode, onToggleMode }: AppLayoutProps) => {
+  const theme = useTheme();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [accountMenuAnchor, setAccountMenuAnchor] = useState<null | HTMLElement>(null);
   const isDesktop = useMediaQuery('(min-width:1024px)');
@@ -98,20 +100,102 @@ const AppLayout = ({ mode, onToggleMode }: AppLayoutProps) => {
 
   const drawerContent = useMemo(
     () => (
-      <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-        <Toolbar sx={{ gap: 2 }}>
-          <Avatar sx={{ bgcolor: 'primary.main' }}>研</Avatar>
-          <Box>
-            <Typography variant="subtitle1" fontWeight={700}>
-              研学进阶
-            </Typography>
-            <Typography variant="caption" color="text.secondary">
-              Kaoyan Mastery Platform
-            </Typography>
+      <Box
+        sx={{
+          position: 'relative',
+          display: 'flex',
+          flexDirection: 'column',
+          height: '100%',
+          px: 1.5,
+          py: 2,
+          gap: 2,
+          isolation: 'isolate',
+          color: alpha(theme.palette.text.primary, 0.86),
+          '&::before': {
+            content: "''",
+            position: 'absolute',
+            inset: 12,
+            borderRadius: 24,
+            background: `linear-gradient(180deg, ${alpha(theme.palette.primary.main, 0.08)} 0%, ${alpha(
+              theme.palette.primary.main,
+              0.02,
+            )} 100%)`,
+            zIndex: -1,
+          },
+          '&::after': {
+            content: "''",
+            position: 'absolute',
+            inset: 0,
+            borderRadius: 28,
+            background: `radial-gradient(circle at 20% -10%, ${alpha(
+              theme.palette.primary.light,
+              0.18,
+            )} 0%, transparent 55%), radial-gradient(circle at 120% 30%, ${alpha(
+              theme.palette.secondary.main,
+              0.12,
+            )} 0%, transparent 55%)`,
+            zIndex: -2,
+          },
+        }}
+      >
+        <Box
+          sx={{
+            position: 'relative',
+            overflow: 'hidden',
+            borderRadius: 3,
+            px: 2.5,
+            py: 3,
+            background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.95)} 0%, ${alpha(
+              theme.palette.primary.light,
+              0.58,
+            )} 100%)`,
+            color: theme.palette.common.white,
+            boxShadow: `0 16px 32px ${alpha(theme.palette.primary.main, 0.25)}`,
+          }}
+        >
+          <Box
+            sx={{
+              position: 'absolute',
+              top: -24,
+              right: -24,
+              width: 120,
+              height: 120,
+              borderRadius: '50%',
+              background: alpha(theme.palette.common.white, 0.12),
+            }}
+          />
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <Avatar sx={{ bgcolor: alpha(theme.palette.common.white, 0.16), color: 'inherit' }}>研</Avatar>
+            <Box>
+              <Typography variant="subtitle1" fontWeight={700}>
+                研学进阶
+              </Typography>
+              <Typography variant="caption" sx={{ opacity: 0.8 }}>
+                Kaoyan Mastery Platform
+              </Typography>
+            </Box>
           </Box>
-        </Toolbar>
-        <Divider />
-        <List sx={{ flexGrow: 1 }}>
+          <Chip
+            label="持续更新"
+            size="small"
+            sx={{
+              mt: 2,
+              bgcolor: alpha(theme.palette.common.white, 0.22),
+              color: 'inherit',
+              fontWeight: 600,
+              backdropFilter: 'blur(4px)',
+            }}
+          />
+        </Box>
+        <List
+          sx={{
+            flexGrow: 1,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 0.5,
+            pt: 0.5,
+          }}
+        >
           {navigationItems.map((item) => (
             <ListItemButton
               key={item.path}
@@ -120,22 +204,70 @@ const AppLayout = ({ mode, onToggleMode }: AppLayoutProps) => {
                 navigate(item.path);
                 setMobileOpen(false);
               }}
-              sx={{ borderRadius: 2, mx: 1, my: 0.5 }}
+              sx={{
+                borderRadius: 3,
+                px: 2,
+                py: 1.25,
+                mx: 0.5,
+                transition: 'all 0.2s ease',
+                color: alpha(theme.palette.text.primary, 0.85),
+                '& .MuiListItemIcon-root': {
+                  color: 'inherit',
+                  minWidth: 36,
+                },
+                '&:hover': {
+                  transform: 'translateX(6px)',
+                  backgroundColor: alpha(theme.palette.primary.main, 0.12),
+                  boxShadow: `0 12px 24px ${alpha(theme.palette.primary.main, 0.12)}`,
+                },
+                '&.Mui-selected': {
+                  background: `linear-gradient(90deg, ${alpha(theme.palette.primary.main, 0.32)}, ${alpha(
+                    theme.palette.primary.main,
+                    0.12,
+                  )})`,
+                  color: theme.palette.primary.contrastText,
+                  boxShadow: `0 16px 28px ${alpha(theme.palette.primary.main, 0.2)}`,
+                  '& .MuiListItemIcon-root': {
+                    color: theme.palette.primary.contrastText,
+                  },
+                  '&:hover': {
+                    background: `linear-gradient(90deg, ${alpha(theme.palette.primary.main, 0.36)}, ${alpha(
+                      theme.palette.primary.main,
+                      0.18,
+                    )})`,
+                  },
+                },
+              }}
             >
               <ListItemIcon>{item.icon}</ListItemIcon>
               <ListItemText primary={item.label} />
             </ListItemButton>
           ))}
         </List>
-        <Divider />
-        <Box sx={{ p: 2, textAlign: 'center' }}>
-          <Typography variant="body2" color="text.secondary">
+        <Divider sx={{ mx: 1 }} />
+        <Box
+          sx={{
+            px: 2,
+            py: 1.75,
+            borderRadius: 3,
+            textAlign: 'center',
+            background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.1)} 0%, ${alpha(
+              theme.palette.primary.main,
+              0.02,
+            )} 100%)`,
+            color: alpha(theme.palette.text.primary, 0.72),
+          }}
+        >
+          <Typography variant="body2" fontWeight={600}>
             一起保持进步，不负考研热忱。
+          </Typography>
+          <Typography variant="caption" sx={{ display: 'block', mt: 0.5, opacity: 0.8 }}>
+            今日完成一个小目标吧！
           </Typography>
         </Box>
       </Box>
     ),
-    [location.pathname, navigate, navigationItems],
+    [location.pathname, navigate, navigationItems, theme],
   );
 
   return (
@@ -186,6 +318,13 @@ const AppLayout = ({ mode, onToggleMode }: AppLayoutProps) => {
             '& .MuiDrawer-paper': {
               boxSizing: 'border-box',
               width: drawerWidth,
+              borderRight: 'none',
+              background: `linear-gradient(180deg, ${alpha(theme.palette.background.paper, 0.92)} 0%, ${alpha(
+                theme.palette.background.default,
+                0.98,
+              )} 100%)`,
+              backdropFilter: 'blur(18px)',
+              padding: 1,
             },
           }}
         >
