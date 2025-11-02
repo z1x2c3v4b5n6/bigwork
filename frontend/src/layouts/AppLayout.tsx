@@ -38,7 +38,6 @@ const baseNavItems = [
   { label: '课程体系', path: '/courses', icon: <AssignmentIcon /> },
   { label: '刷题训练', path: '/practice', icon: <QuizIcon /> },
   { label: '学习日程', path: '/schedule', icon: <EventIcon /> },
-  { label: '考研圈子', path: '/community', icon: <ForumIcon /> },
   { label: '学习分析', path: '/analytics', icon: <TimelineIcon /> },
   { label: '考研论坛', path: '/forum', icon: <ForumIcon /> },
   { label: '个人中心', path: '/profile', icon: <PersonIcon /> },

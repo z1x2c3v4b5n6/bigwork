@@ -137,7 +137,7 @@ const Home = () => {
             <Grid item xs={12} md={6}>
               <Paper elevation={0} sx={{ p: 4, borderRadius: 3, border: '1px solid', borderColor: 'divider' }}>
                 <Typography variant="h6" fontWeight={600} mb={2}>
-                  待处理圈子反馈
+                  待处理论坛反馈
                 </Typography>
                 <Stack spacing={2}>
                   {reviewQueue.map((item) => (
@@ -152,7 +152,7 @@ const Home = () => {
                   ))}
                   {reviewQueue.length === 0 && (
                     <Typography variant="body2" color="text.secondary">
-                      没有待审核的圈子内容。
+                      没有待审核的论坛内容。
                     </Typography>
                   )}
                 </Stack>
@@ -199,7 +199,7 @@ const Home = () => {
               <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
                 <Chip label={`专业 ${adminFocus.dataQuality.majors}`} />
                 <Chip label={`题库 ${adminFocus.dataQuality.practiceSets}`} />
-                <Chip label={`圈子 ${adminFocus.dataQuality.forumTopics}`} />
+                <Chip label={`论坛 ${adminFocus.dataQuality.forumTopics}`} />
               </Stack>
             </Paper>
           )}

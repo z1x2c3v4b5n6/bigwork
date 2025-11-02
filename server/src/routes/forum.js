@@ -328,7 +328,7 @@ const seedForumTopics = async (topicConfig) => {
       defaultAuthorId = await getDefaultUserId();
       const authorDetails = topicConfig.columnDetails?.get?.(topicConfig.authorId);
       if (!defaultAuthorId && authorDetails && authorDetails.isNullable === false) {
-        console.warn('跳过圈子示例数据初始化：缺少可用的用户编号以填充作者字段');
+        console.warn('跳过论坛示例数据初始化：缺少可用的用户编号以填充作者字段');
         return;
       }
     }
@@ -346,7 +346,7 @@ const seedForumTopics = async (topicConfig) => {
       await insertRecord(topicConfig.tableName, payload);
     }
   } catch (error) {
-    console.warn('初始化考研圈子示例数据失败', error.message);
+    console.warn('初始化考研论坛示例数据失败', error.message);
   }
 };
 
@@ -508,7 +508,7 @@ router.get('/topics', async (req, res) => {
     res.json({ topics });
   } catch (error) {
     console.error('获取话题失败', error);
-    res.status(500).json({ message: '加载考研圈子失败，请稍后重试' });
+    res.status(500).json({ message: '加载考研论坛失败，请稍后重试' });
   }
 });
 
