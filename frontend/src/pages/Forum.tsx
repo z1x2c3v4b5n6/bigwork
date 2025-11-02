@@ -22,7 +22,7 @@ import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutline';
 import ThumbUpAltOutlinedIcon from '@mui/icons-material/ThumbUpAltOutlined';
 import ThumbUpAltIcon from '@mui/icons-material/ThumbUpAlt';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
-import forumService, { ForumPost, ForumTopic } from '../services/forumService';
+import forumService, { ForumComment, ForumTopic } from '../services/forumService';
 
 const formatDateTime = (value: string | null | undefined) => {
   if (!value) {
@@ -39,7 +39,7 @@ const formatDateTime = (value: string | null | undefined) => {
 
 const Forum = () => {
   const queryClient = useQueryClient();
-  const [selectedTopicId, setSelectedTopicId] = useState<number | null>(null);
+  const [selectedTopicId, setSelectedTopicId] = useState<string | null>(null);
   const [topicTitle, setTopicTitle] = useState('');
   const [topicDescription, setTopicDescription] = useState('');
   const [postContent, setPostContent] = useState('');
@@ -65,9 +65,9 @@ const Forum = () => {
     isLoading: postsLoading,
     isError: postsError,
     refetch: refetchPosts,
-  } = useQuery<ForumPost[]>({
+  } = useQuery<ForumComment[]>({
     queryKey: ['forum-posts', selectedTopicId],
-    queryFn: () => forumService.fetchForumPosts(selectedTopicId as number),
+    queryFn: () => forumService.fetchForumPosts(selectedTopicId as string),
     enabled: selectedTopicId !== null,
   });
 
@@ -99,7 +99,7 @@ const Forum = () => {
   });
 
   const createPostMutation = useMutation({
-    mutationFn: (payload: { content: string }) => forumService.createForumPost(selectedTopicId as number, payload),
+    mutationFn: (payload: { content: string }) => forumService.createForumPost(selectedTopicId as string, payload),
     onSuccess: async () => {
       setPostContent('');
       if (selectedTopicId !== null) {
@@ -114,11 +114,11 @@ const Forum = () => {
   });
 
   const toggleLikeMutation = useMutation({
-    mutationFn: (topicId: number) => forumService.toggleTopicLike(topicId),
-    onSuccess: ({ likes, liked }, topicId) => {
+    mutationFn: (topicId: string) => forumService.toggleTopicLike(topicId),
+    onSuccess: ({ topicId: changedTopicId, likes, likedByUser }) => {
       queryClient.setQueryData<ForumTopic[]>(['forum-topics'], (previous = []) =>
         previous.map((topic) =>
-          topic.id === topicId ? { ...topic, likes, likedByMe: liked } : topic,
+          topic.id === changedTopicId ? { ...topic, likes, likedByUser } : topic,
         ),
       );
     },
@@ -129,7 +129,7 @@ const Forum = () => {
   });
 
   const deletePostMutation = useMutation({
-    mutationFn: ({ topicId, postId }: { topicId: number; postId: number }) =>
+    mutationFn: ({ topicId, postId }: { topicId: string; postId: string }) =>
       forumService.deleteForumPost(topicId, postId),
     onSuccess: async (_data, variables) => {
       await queryClient.invalidateQueries({ queryKey: ['forum-posts', variables.topicId] });
@@ -183,7 +183,7 @@ const Forum = () => {
     await toggleLikeMutation.mutateAsync(selectedTopicId);
   };
 
-  const handleDeletePost = async (postId: number) => {
+  const handleDeletePost = async (postId: string) => {
     if (selectedTopicId === null) {
       return;
     }
@@ -257,14 +257,14 @@ const Forum = () => {
                                   icon={<ThumbUpAltOutlinedIcon fontSize="small" />}
                                   label={topic.likes}
                                   size="small"
-                                  color={topic.likedByMe ? 'primary' : 'default'}
+                                  color={topic.likedByUser ? 'primary' : 'default'}
                                 />
                               </Stack>
                             </Stack>
                           }
                           secondary={
                             <Typography variant="body2" color="text.secondary">
-                              {`${topic.author || '匿名用户'} · ${formatDateTime(topic.updatedAt ?? topic.createdAt)}`}
+                              {`${topic.author?.name ?? '匿名用户'} · ${formatDateTime(topic.updatedAt ?? topic.createdAt)}`}
                             </Typography>
                           }
                         />
@@ -313,7 +313,7 @@ const Forum = () => {
                         {selectedTopic.description || '该话题暂无描述。'}
                       </Typography>
                       <Typography variant="caption" color="text.secondary">
-                        {`${selectedTopic.author || '匿名用户'} · ${formatDateTime(selectedTopic.updatedAt ?? selectedTopic.createdAt)}`}
+                        {`${selectedTopic.author?.name ?? '匿名用户'} · ${formatDateTime(selectedTopic.updatedAt ?? selectedTopic.createdAt)}`}
                       </Typography>
                       <Stack
                         direction={{ xs: 'column', sm: 'row' }}
@@ -331,20 +331,20 @@ const Forum = () => {
                             icon={<ThumbUpAltOutlinedIcon fontSize="small" />}
                             label={`点赞 ${selectedTopic.likes}`}
                             size="small"
-                            color={selectedTopic.likedByMe ? 'primary' : 'default'}
+                            color={selectedTopic.likedByUser ? 'primary' : 'default'}
                           />
                         </Stack>
                         <Button
                           type="button"
-                          variant={selectedTopic.likedByMe ? 'contained' : 'outlined'}
-                          color={selectedTopic.likedByMe ? 'primary' : 'inherit'}
-                          startIcon={selectedTopic.likedByMe ? <ThumbUpAltIcon /> : <ThumbUpAltOutlinedIcon />}
+                          variant={selectedTopic.likedByUser ? 'contained' : 'outlined'}
+                          color={selectedTopic.likedByUser ? 'primary' : 'inherit'}
+                          startIcon={selectedTopic.likedByUser ? <ThumbUpAltIcon /> : <ThumbUpAltOutlinedIcon />}
                           onClick={handleToggleLike}
                           disabled={toggleLikeMutation.isPending}
                         >
                           {toggleLikeMutation.isPending
                             ? '更新中…'
-                            : selectedTopic.likedByMe
+                            : selectedTopic.likedByUser
                             ? `已赞 ${selectedTopic.likes}`
                             : `点赞 ${selectedTopic.likes}`}
                         </Button>
@@ -390,7 +390,7 @@ const Forum = () => {
                         ) : null}
                       </Stack>
                       <Typography variant="caption" color="text.secondary">
-                        {`${post.author || '匿名用户'} · ${formatDateTime(post.updatedAt ?? post.createdAt)}`}
+                        {`${post.author?.name ?? '匿名用户'} · ${formatDateTime(post.updatedAt ?? post.createdAt)}`}
                         {post.isAuthor ? '（我的发言）' : ''}
                       </Typography>
                     </Box>

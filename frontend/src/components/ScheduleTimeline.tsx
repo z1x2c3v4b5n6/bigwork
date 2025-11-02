@@ -14,11 +14,20 @@ import QuizIcon from '@mui/icons-material/Quiz';
 import SupportAgentIcon from '@mui/icons-material/SupportAgent';
 import dayjs from 'dayjs';
 import 'dayjs/locale/zh-cn';
-import type { ScheduleItem } from '../data/dashboard';
-
 dayjs.locale('zh-cn');
 
-const timelineIconMap: Partial<Record<ScheduleItem['type'], JSX.Element>> = {
+type TimelineEntry = {
+  id: string;
+  title: string;
+  type: string;
+  start: string;
+  end: string;
+  focus?: string;
+  location?: string;
+  tags?: string[];
+};
+
+const timelineIconMap: Partial<Record<string, JSX.Element>> = {
   直播课: <EventIcon />,
   自习: <SelfImprovementIcon />,
   模拟考试: <QuizIcon />,
@@ -26,18 +35,33 @@ const timelineIconMap: Partial<Record<ScheduleItem['type'], JSX.Element>> = {
 };
 
 interface ScheduleTimelineProps {
-  items: ScheduleItem[];
+  items: TimelineEntry[];
 }
 
 const ScheduleTimeline = ({ items }: ScheduleTimelineProps) => {
+  if (!items || items.length === 0) {
+    return (
+      <Paper elevation={0} sx={{ p: 3, border: '1px solid', borderColor: 'divider' }}>
+        <Typography variant="h6" mb={2}>
+          本周重点安排
+        </Typography>
+        <Typography variant="body2" color="text.secondary">
+          暂无日程安排，添加日程后将自动展示最近的学习任务。
+        </Typography>
+      </Paper>
+    );
+  }
+
   return (
     <Paper elevation={0} sx={{ p: 3, border: '1px solid', borderColor: 'divider' }}>
       <Typography variant="h6" mb={2}>
         本周重点安排
       </Typography>
       <Timeline position="alternate">
-        {items.map((item) => (
-          <TimelineItem key={item.id}>
+        {items.map((item, index) => {
+          const key = item.id || `timeline-${index}-${item.start}-${item.title}`;
+          return (
+            <TimelineItem key={key}>
             <TimelineOppositeContent color="text.secondary">
               {dayjs(item.start).format('MM月DD日 ddd')}
             </TimelineOppositeContent>
@@ -76,7 +100,8 @@ const ScheduleTimeline = ({ items }: ScheduleTimelineProps) => {
               </Stack>
             </TimelineContent>
           </TimelineItem>
-        ))}
+          );
+        })}
       </Timeline>
     </Paper>
   );

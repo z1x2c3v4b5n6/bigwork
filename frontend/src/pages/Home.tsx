@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import {
   Alert,
   Box,
@@ -49,6 +50,33 @@ const Home = () => {
   const courseDrafts = adminFocus?.courseDrafts ?? [];
   const reviewQueue = adminFocus?.reviewQueue ?? [];
   const recentRegistrations = adminFocus?.recentRegistrations ?? [];
+
+  const recommendedMajors = useMemo(
+    () => [
+      { name: '计算机科学与技术', highlights: '算法 + 工程双线进阶，配套竞赛真题与项目复盘。' },
+      { name: '电子信息', highlights: '信号分析、集成电路、自动化控制全链路复习路径。' },
+      { name: '临床医学', highlights: '系统梳理生理病理与临床案例，强化诊断思维。' },
+    ],
+    [],
+  );
+
+  const recommendedUniversities = useMemo(
+    () => [
+      { name: '北京大学', tags: ['信息科学', '新闻传播', '法学发展'] },
+      { name: '上海交通大学', tags: ['人工智能', '生物医学工程', '管理科学'] },
+      { name: '中山大学', tags: ['药学突破', '公共管理', '外国语言'] },
+    ],
+    [],
+  );
+
+  const englishTrainingIdeas = useMemo(
+    () => [
+      { title: '长难句拆解', detail: '每日精读 2 段真题长难句，标注主干与从句结构。' },
+      { title: '口语跟读', detail: '选取听力材料进行 10 分钟跟读，录音对比纠音。' },
+      { title: '词汇巩固', detail: '结合艾宾浩斯曲线复习昨日背诵的 30 个核心词汇。' },
+    ],
+    [],
+  );
 
   return (
     <Stack spacing={4}>
@@ -116,7 +144,11 @@ const Home = () => {
                       {draft.title}
                     </Typography>
                     <Typography variant="body2" color="text.secondary">
-                      讲师：{draft.teacher} · 状态：{draft.status === 'published' ? '已发布' : '待发布'} · {draft.releaseWindow ?? '待排期'}
+                      讲师：{draft.teacher ?? '待补充'} · 专业：{draft.majorName ?? '未指定'} · 学分：
+                      {draft.credit != null ? draft.credit : '待定'}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      {draft.description ?? '课程简介尚未完善，建议补充课程亮点与适合人群。'}
                     </Typography>
                   </Box>
                 ))}
@@ -247,6 +279,108 @@ const Home = () => {
               {recommendation}
             </Typography>
           </Paper>
+
+          <Grid container spacing={3}>
+            <Grid item xs={12} md={6}>
+              <Paper
+                elevation={0}
+                sx={{
+                  p: 4,
+                  borderRadius: 3,
+                  background: 'linear-gradient(135deg, rgba(103,155,255,0.18), rgba(187,222,251,0.35))',
+                  border: '1px solid rgba(79,119,227,0.2)',
+                  height: '100%',
+                }}
+              >
+                <Typography variant="h6" fontWeight={700} mb={2}>
+                  热门专业推荐
+                </Typography>
+                <Stack spacing={2}>
+                  {recommendedMajors.map((major) => (
+                    <Box key={major.name}>
+                      <Typography variant="subtitle1" fontWeight={600}>
+                        {major.name}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        {major.highlights}
+                      </Typography>
+                    </Box>
+                  ))}
+                </Stack>
+              </Paper>
+            </Grid>
+
+            <Grid item xs={12} md={6}>
+              <Paper
+                elevation={0}
+                sx={{
+                  p: 4,
+                  borderRadius: 3,
+                  background: 'linear-gradient(135deg, rgba(0,184,170,0.16), rgba(128,222,234,0.35))',
+                  border: '1px solid rgba(0,171,178,0.2)',
+                  height: '100%',
+                }}
+              >
+                <Typography variant="h6" fontWeight={700} mb={2}>
+                  目标院校灵感
+                </Typography>
+                <Stack spacing={2}>
+                  {recommendedUniversities.map((university) => (
+                    <Box key={university.name}>
+                      <Stack direction="row" justifyContent="space-between" alignItems="center">
+                        <Typography variant="subtitle1" fontWeight={600}>
+                          {university.name}
+                        </Typography>
+                        <Chip label="Hot" color="primary" variant="outlined" size="small" />
+                      </Stack>
+                      <Typography variant="body2" color="text.secondary">
+                        {university.tags.join(' · ')}
+                      </Typography>
+                    </Box>
+                  ))}
+                </Stack>
+              </Paper>
+            </Grid>
+
+            <Grid item xs={12}>
+              <Paper
+                elevation={0}
+                sx={{
+                  p: 4,
+                  borderRadius: 3,
+                  background: 'linear-gradient(135deg, rgba(123,97,255,0.16), rgba(206,147,216,0.3))',
+                  border: '1px solid rgba(123,97,255,0.25)',
+                }}
+              >
+                <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" spacing={3}>
+                  <Box>
+                    <Typography variant="h6" fontWeight={700}>
+                      英语专项提升
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      结合每日计划分解词汇、语法、听说读写练习，打造英语高分闭环。
+                    </Typography>
+                  </Box>
+                  <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+                    {englishTrainingIdeas.map((idea) => (
+                      <Paper
+                        key={idea.title}
+                        elevation={0}
+                        sx={{ p: 3, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.72)', minWidth: 200 }}
+                      >
+                        <Typography variant="subtitle1" fontWeight={600}>
+                          {idea.title}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          {idea.detail}
+                        </Typography>
+                      </Paper>
+                    ))}
+                  </Stack>
+                </Stack>
+              </Paper>
+            </Grid>
+          </Grid>
         </>
       )}
     </Stack>

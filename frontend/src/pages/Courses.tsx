@@ -10,6 +10,7 @@ import {
   ListItem,
   ListItemAvatar,
   ListItemText,
+  MenuItem,
   Paper,
   Stack,
   TextField,
@@ -18,12 +19,15 @@ import {
 import PlayCircleIcon from '@mui/icons-material/PlayCircle';
 import AutoStoriesIcon from '@mui/icons-material/AutoStories';
 import SchoolIcon from '@mui/icons-material/School';
-import { FormEvent, useState } from 'react';
+import { FormEvent, useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import learningService, { CourseItem } from '../services/learningService';
+import { fetchMajors, type MajorOption } from '../services/userService';
+import { useAuth } from '../context/AuthContext';
 
 const Courses = () => {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [title, setTitle] = useState('');
   const [teacher, setTeacher] = useState('');
@@ -31,6 +35,7 @@ const Courses = () => {
   const [progress, setProgress] = useState(0);
   const [nextTask, setNextTask] = useState('');
   const [description, setDescription] = useState('');
+  const [majorId, setMajorId] = useState('');
 
   const {
     data: courses = [],
@@ -42,6 +47,25 @@ const Courses = () => {
     queryFn: learningService.fetchCourses,
   });
 
+  const majorsQuery = useQuery<MajorOption[]>({
+    queryKey: ['learning-majors'],
+    queryFn: fetchMajors,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  useEffect(() => {
+    if (!majorId) {
+      if (user?.majorId) {
+        setMajorId(user.majorId);
+      } else if (majorsQuery.data && majorsQuery.data.length > 0) {
+        setMajorId(majorsQuery.data[0].id);
+      }
+    }
+  }, [majorId, majorsQuery.data, user?.majorId]);
+
+  const majors = majorsQuery.data ?? [];
+  const majorHelperText = majorsQuery.isError ? '无法加载专业列表，请稍后重试。' : '选择课程所属专业方向';
+
   const createCourseMutation = useMutation({
     mutationFn: learningService.createCourse,
     onSuccess: async () => {
@@ -51,6 +75,7 @@ const Courses = () => {
       setProgress(0);
       setNextTask('');
       setDescription('');
+      setMajorId(user?.majorId ?? majorsQuery.data?.[0]?.id ?? '');
       await queryClient.invalidateQueries({ queryKey: ['learning-courses'] });
     },
     onError: (error) => {
@@ -68,6 +93,11 @@ const Courses = () => {
       return;
     }
 
+    if (!majorId) {
+      setErrorMessage('请选择课程所属专业');
+      return;
+    }
+
     await createCourseMutation.mutateAsync({
       title: title.trim(),
       teacher: teacher.trim() || undefined,
@@ -75,6 +105,7 @@ const Courses = () => {
       progress: Number.isNaN(progress) ? 0 : progress,
       nextTask: nextTask.trim() || undefined,
       description: description.trim() || undefined,
+      majorId: majorId || undefined,
     });
   };
 
@@ -187,6 +218,21 @@ const Courses = () => {
               <TextField label="课程名称" value={title} onChange={(event) => setTitle(event.target.value)} required />
               <TextField label="讲师" value={teacher} onChange={(event) => setTeacher(event.target.value)} />
               <TextField label="课程类型" value={category} onChange={(event) => setCategory(event.target.value)} />
+              <TextField
+                label="所属专业"
+                value={majorId}
+                onChange={(event) => setMajorId(event.target.value)}
+                select
+                helperText={majorHelperText}
+                disabled={majorsQuery.isLoading}
+                required
+              >
+                {majors.map((major) => (
+                  <MenuItem key={major.id} value={major.id}>
+                    {major.name}
+                  </MenuItem>
+                ))}
+              </TextField>
               <TextField
                 label="当前进度（0-100）"
                 type="number"
