@@ -717,7 +717,7 @@ app.get('/api/forum/topics', async (req, res) => {
     res.json(payload);
   } catch (error) {
     console.error('Fetch forum topics failed', error);
-    res.status(500).json({ message: '获取圈子动态失败' });
+    res.status(500).json({ message: '获取论坛动态失败' });
   }
 });
 
@@ -904,7 +904,7 @@ app.get('/api/dashboard', async (req, res) => {
         },
         {
           id: 'mockRank',
-          title: '圈子活跃话题',
+          title: '论坛活跃话题',
           value: `${activeTopics} 条`,
           helperText: '实时关注学员反馈',
           accent: statAccents.mockRank,
@@ -918,7 +918,7 @@ app.get('/api/dashboard', async (req, res) => {
         courses: courses.map(mapCourse),
         practiceSets: [],
         schedule: schedule.map(mapScheduleItem),
-        recommendation: '已为你同步教研进度、圈子反馈和课程排期。',
+        recommendation: '已为你同步教研进度、论坛反馈和课程排期。',
         adminFocus: {
           courseDrafts: courseDrafts.map((course) => ({
             id: course.id,
