@@ -280,130 +280,146 @@ const Schedule = () => {
         </Button>
       </Stack>
 
-      <Grid container spacing={3}>
-        <Grid item xs={12} md={4}>
-          <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid', borderColor: 'divider' }}>
-            <Stack spacing={1}>
-              <Typography variant="subtitle2" color="text.secondary">
-                本周规划总时长
-              </Typography>
-              <Typography variant="h4" fontWeight={700}>
-                {totalHours} 小时
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                包含直播课、自习与模拟考，自动同步到番茄钟节奏。
-              </Typography>
-            </Stack>
-          </Paper>
-        </Grid>
-        <Grid item xs={12} md={4}>
-          <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid', borderColor: 'divider' }}>
-            <Stack spacing={1}>
-              <Typography variant="subtitle2" color="text.secondary">
-                自习安排
-              </Typography>
-              <Typography variant="h4" fontWeight={700}>
-                {focusCount} 场
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                系统将自动提醒复盘错题并生成学习日志。
-              </Typography>
-            </Stack>
-          </Paper>
-        </Grid>
-        <Grid item xs={12} md={4}>
-          <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid', borderColor: 'divider' }}>
-            <Stack spacing={1}>
-              <Typography variant="subtitle2" color="text.secondary">
-                直播课程
-              </Typography>
-              <Typography variant="h4" fontWeight={700}>
-                {liveSessions} 节
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                建议课前 15 分钟预习大纲，确保课堂吸收度。
-              </Typography>
-            </Stack>
-          </Paper>
-        </Grid>
-      </Grid>
-
-      <Grid container spacing={3}>
-        <Grid item xs={12} md={6}>
-          <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid', borderColor: 'divider' }}>
-            <Stack spacing={1.5}>
-              <Typography variant="h6" fontWeight={600}>
-                下一场安排
-              </Typography>
-              {upcomingEvent ? (
-                <>
-                  <Typography variant="subtitle1" fontWeight={600}>
-                    {upcomingEvent.title}
+      <Grid container spacing={4} alignItems="stretch">
+        <Grid item xs={12} lg={8}>
+          <Stack spacing={3} height="100%">
+            <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid', borderColor: 'divider' }}>
+              <Stack spacing={2.5}>
+                <Stack spacing={1.5}>
+                  <Typography variant="h6" fontWeight={600}>
+                    近期安排
                   </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    {dayjs(upcomingEvent.start).format('MM月DD日 HH:mm')} · {upcomingEvent.type}
-                  </Typography>
-                  {upcomingEvent.focus && (
+                  {upcomingEvent ? (
+                    <>
+                      <Typography variant="subtitle1" fontWeight={600}>
+                        {upcomingEvent.title}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        {dayjs(upcomingEvent.start).format('MM月DD日 HH:mm')} · {upcomingEvent.type}
+                      </Typography>
+                      {upcomingEvent.focus && (
+                        <Typography variant="body2" color="text.secondary">
+                          重点：{upcomingEvent.focus}
+                        </Typography>
+                      )}
+                      <Stack direction="row" spacing={1} flexWrap="wrap">
+                        {(upcomingEvent.tags ?? []).map((tag) => (
+                          <Chip key={tag} label={tag} size="small" />
+                        ))}
+                      </Stack>
+                    </>
+                  ) : (
                     <Typography variant="body2" color="text.secondary">
-                      重点：{upcomingEvent.focus}
+                      暂无未来 24 小时内的学习安排，可在右上角添加新的日程。
                     </Typography>
                   )}
+                </Stack>
+                <Divider />
+                <ScheduleTimeline items={timelineItems} />
+              </Stack>
+            </Paper>
+
+            <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid', borderColor: 'divider' }}>
+              <Stack spacing={1.5}>
+                <Typography variant="h6" fontWeight={600}>
+                  复习主题热度
+                </Typography>
+                {tagFrequency.length > 0 ? (
                   <Stack direction="row" spacing={1} flexWrap="wrap">
-                    {(upcomingEvent.tags ?? []).map((tag) => (
-                      <Chip key={tag} label={tag} size="small" />
+                    {tagFrequency.map(([tag, count]) => (
+                      <Chip key={tag} label={`${tag} ×${count}`} color="primary" variant="outlined" />
                     ))}
                   </Stack>
-                </>
-              ) : (
-                <Typography variant="body2" color="text.secondary">
-                  暂无未来 24 小时内的学习安排，可在右上角添加新的日程。
-                </Typography>
-              )}
-            </Stack>
-          </Paper>
+                ) : (
+                  <Typography variant="body2" color="text.secondary">
+                    还没有打标签的日程，添加标签可获得更精准的学习建议。
+                  </Typography>
+                )}
+              </Stack>
+            </Paper>
+          </Stack>
         </Grid>
-        <Grid item xs={12} md={6}>
-          <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid', borderColor: 'divider' }}>
-            <Stack spacing={1.5}>
-              <Typography variant="h6" fontWeight={600}>
-                高频标签与复习主题
-              </Typography>
-              {tagFrequency.length > 0 ? (
-                <Stack direction="row" spacing={1} flexWrap="wrap">
-                  {tagFrequency.map(([tag, count]) => (
-                    <Chip key={tag} label={`${tag} ×${count}`} color="primary" variant="outlined" />
-                  ))}
+
+        <Grid item xs={12} lg={4}>
+          <Stack spacing={3}>
+            <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid', borderColor: 'divider' }}>
+              <Stack spacing={2} component="form" onSubmit={handleCreateSchedule}>
+                <Typography variant="h6" fontWeight={600}>
+                  快速添加日程
+                </Typography>
+                <TextField label="日程标题" value={title} onChange={(event) => setTitle(event.target.value)} required />
+                <TextField label="日程类型" value={type} onChange={(event) => setType(event.target.value)} />
+                <TextField
+                  label="开始时间"
+                  type="datetime-local"
+                  value={start}
+                  onChange={(event) => setStart(event.target.value)}
+                  InputLabelProps={{ shrink: true }}
+                  required
+                />
+                <TextField
+                  label="结束时间"
+                  type="datetime-local"
+                  value={end}
+                  onChange={(event) => setEnd(event.target.value)}
+                  InputLabelProps={{ shrink: true }}
+                  required
+                />
+                <TextField label="学习地点（可选）" value={location} onChange={(event) => setLocation(event.target.value)} />
+                <FormControlLabel
+                  control={<Switch checked={allDay} onChange={(event) => setAllDay(event.target.checked)} />}
+                  label="全天任务"
+                />
+                <Button type="submit" variant="contained" disabled={createScheduleMutation.isPending}>
+                  {createScheduleMutation.isPending ? '保存中…' : '保存日程'}
+                </Button>
+              </Stack>
+            </Paper>
+
+            <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid', borderColor: 'divider' }}>
+              <Stack spacing={2}>
+                <Typography variant="h6" fontWeight={600}>
+                  本周学习概览
+                </Typography>
+                <Stack spacing={1.5}>
+                  <Box sx={{ p: 2, borderRadius: 2, bgcolor: 'grey.50' }}>
+                    <Typography variant="subtitle2" color="text.secondary">
+                      本周规划总时长
+                    </Typography>
+                    <Typography variant="h5" fontWeight={700}>
+                      {totalHours} 小时
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      包含直播课、自习与模拟考，自动同步到番茄钟节奏。
+                    </Typography>
+                  </Box>
+                  <Box sx={{ p: 2, borderRadius: 2, bgcolor: 'grey.50' }}>
+                    <Typography variant="subtitle2" color="text.secondary">
+                      自习安排
+                    </Typography>
+                    <Typography variant="h5" fontWeight={700}>
+                      {focusCount} 场
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      系统将自动提醒复盘错题并生成学习日志。
+                    </Typography>
+                  </Box>
+                  <Box sx={{ p: 2, borderRadius: 2, bgcolor: 'grey.50' }}>
+                    <Typography variant="subtitle2" color="text.secondary">
+                      直播课程
+                    </Typography>
+                    <Typography variant="h5" fontWeight={700}>
+                      {liveSessions} 节
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      建议课前 15 分钟预习大纲，确保课堂吸收度。
+                    </Typography>
+                  </Box>
                 </Stack>
-              ) : (
-                <Typography variant="body2" color="text.secondary">
-                  还没有打标签的日程，添加标签可获得更精准的学习建议。
-                </Typography>
-              )}
-            </Stack>
-          </Paper>
-        </Grid>
-      </Grid>
+              </Stack>
+            </Paper>
 
-      <Stack spacing={3}>
-        <Stack direction={{ xs: 'column', md: 'row' }} spacing={3}>
-          <Paper
-            elevation={0}
-            sx={{ p: 3, borderRadius: 3, border: '1px solid', borderColor: 'divider', flex: 1, minWidth: 0 }}
-          >
-            <Typography variant="subtitle1" fontWeight={600}>
-              番茄学习法
-            </Typography>
-            <Typography variant="body2" color="text.secondary" mt={1}>
-              推荐每日 6 组番茄钟（25min 学习 + 5min 休息），系统将自动记录专注时长并生成效率报告。
-            </Typography>
-            <Chip label="今日已完成 4 组" color="success" variant="outlined" sx={{ mt: 2 }} />
-          </Paper>
-
-          <Paper
-            elevation={0}
-            sx={{ p: 3, borderRadius: 3, border: '1px solid', borderColor: 'divider', flex: 1, minWidth: 0 }}
-          >
-            <Stack spacing={2}>
+            <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid', borderColor: 'divider' }}>
               <Typography variant="subtitle1" fontWeight={600}>
                 晚间复盘清单
               </Typography>
@@ -416,68 +432,10 @@ const Schedule = () => {
                 <CheckCircleIcon color="primary" />
                 <Typography variant="body2">总结英语作文素材 5 个</Typography>
               </Stack>
-              <Stack direction="row" spacing={1} alignItems="center">
-                <CheckCircleIcon color="primary" />
-                <Typography variant="body2">规划明日复习重点</Typography>
-              </Stack>
-            </Stack>
-          </Paper>
-
-          <Paper
-            elevation={0}
-            sx={{ p: 3, borderRadius: 3, border: '1px solid', borderColor: 'divider', flex: 1, minWidth: 0 }}
-          >
-            <Stack spacing={2}>
-              <Typography variant="subtitle1" fontWeight={600}>
-                智能提醒
-              </Typography>
-              <Stack direction="row" spacing={1} alignItems="center">
-                <AlarmOnIcon color="secondary" />
-                <Typography variant="body2">直播课前 15 分钟推送通知至手机</Typography>
-              </Stack>
-              <Stack direction="row" spacing={1} alignItems="center">
-                <AlarmOnIcon color="secondary" />
-                <Typography variant="body2">每日 22:30 提醒整理错题</Typography>
-              </Stack>
-            </Stack>
-          </Paper>
-        </Stack>
-
-        <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid', borderColor: 'divider' }}>
-          <Stack spacing={2} component="form" onSubmit={handleCreateSchedule}>
-            <Typography variant="subtitle1" fontWeight={600}>
-              快速添加日程
-            </Typography>
-            <TextField label="日程标题" value={title} onChange={(event) => setTitle(event.target.value)} required />
-            <TextField label="日程类型" value={type} onChange={(event) => setType(event.target.value)} />
-            <TextField
-              label="开始时间"
-              type="datetime-local"
-              value={start}
-              onChange={(event) => setStart(event.target.value)}
-              InputLabelProps={{ shrink: true }}
-              required
-            />
-            <TextField
-              label="结束时间"
-              type="datetime-local"
-              value={end}
-              onChange={(event) => setEnd(event.target.value)}
-              InputLabelProps={{ shrink: true }}
-              required
-            />
-            <TextField label="学习地点（可选）" value={location} onChange={(event) => setLocation(event.target.value)} />
-            <FormControlLabel
-              control={<Switch checked={allDay} onChange={(event) => setAllDay(event.target.checked)} />}
-              label="全天任务"
-            />
-            <Button type="submit" variant="contained" disabled={createScheduleMutation.isPending}>
-              {createScheduleMutation.isPending ? '保存中…' : '保存日程'}
-            </Button>
+            </Paper>
           </Stack>
-        </Paper>
-      </Stack>
-      <ScheduleTimeline items={timelineItems} />
+        </Grid>
+      </Grid>
 
       <Dialog open={isDialogOpen} onClose={() => setDialogOpen(false)} fullWidth maxWidth="sm">
         <DialogTitle>新增学习安排</DialogTitle>

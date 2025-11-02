@@ -373,7 +373,7 @@ const countLikesForTopic = async (likeConfig, topicId) => {
   return Number(rows[0]?.total ?? 0);
 };
 
-router.get('/topics', requireAuth, async (req, res) => {
+router.get('/topics', async (req, res) => {
   try {
     const topicConfig = await getForumTopicConfig();
     const postConfig = await getForumPostConfig();
@@ -476,7 +476,7 @@ router.get('/topics', requireAuth, async (req, res) => {
     }
 
     let likedSet = new Set();
-    const currentUserId = req.session.user?.id != null ? String(req.session.user.id) : null;
+    const currentUserId = req.session?.user?.id != null ? String(req.session.user.id) : null;
     if (likeConfig?.topicId && likeConfig?.userId && currentUserId && topicIds.length > 0) {
       const { clause, params } = buildInClause(topicIds, 'likedTopic');
       if (clause) {
@@ -547,7 +547,7 @@ router.post('/topics', requireAuth, async (req, res) => {
     const payload = createTopicPayload(topicConfig, {
       title: rawTitle,
       description: rawDescription,
-      authorId: req.session.user ? req.session.user.id : null,
+      authorId: req.session?.user ? req.session.user.id : null,
       tags,
     });
 
@@ -560,7 +560,7 @@ router.post('/topics', requireAuth, async (req, res) => {
   }
 });
 
-router.get('/topics/:topicId/posts', requireAuth, async (req, res) => {
+router.get('/topics/:topicId/posts', async (req, res) => {
   const { topicId } = req.params;
 
   try {
@@ -625,8 +625,8 @@ router.get('/topics/:topicId/posts', requireAuth, async (req, res) => {
       { topicId: normalizedTopicId },
     );
 
-    const currentUserId = req.session.user?.id != null ? String(req.session.user.id) : null;
-    const isAdmin = req.session.user ? isAdminRole(req.session.user.role) : false;
+    const currentUserId = req.session?.user?.id != null ? String(req.session.user.id) : null;
+    const isAdmin = req.session?.user ? isAdminRole(req.session.user.role) : false;
 
     const posts = rows.map((row, index) => {
       const base = formatPostRow(row, index);
@@ -672,7 +672,7 @@ router.post('/topics/:topicId/posts', requireAuth, async (req, res) => {
     const payload = createPostPayload(postConfig, {
       topicId,
       content: rawContent,
-      authorId: req.session.user ? req.session.user.id : null,
+      authorId: req.session?.user ? req.session.user.id : null,
     });
 
     const result = await insertRecord(postConfig.tableName, payload);
@@ -735,8 +735,8 @@ router.delete('/topics/:topicId/posts/:postId', requireAuth, async (req, res) =>
       }
     }
 
-    const currentUserId = req.session.user?.id != null ? String(req.session.user.id) : null;
-    const isAdmin = req.session.user ? isAdminRole(req.session.user.role) : false;
+    const currentUserId = req.session?.user?.id != null ? String(req.session.user.id) : null;
+    const isAdmin = req.session?.user ? isAdminRole(req.session.user.role) : false;
     const authorId = record.author_id != null ? String(record.author_id) : null;
 
     if (!isAdmin && (!authorId || !currentUserId || authorId !== currentUserId)) {
@@ -754,7 +754,7 @@ router.delete('/topics/:topicId/posts/:postId', requireAuth, async (req, res) =>
 
 router.post('/topics/:topicId/likes', requireAuth, async (req, res) => {
   const { topicId } = req.params;
-  const currentUserId = req.session.user?.id != null ? String(req.session.user.id) : null;
+  const currentUserId = req.session?.user?.id != null ? String(req.session.user.id) : null;
 
   if (!currentUserId) {
     return res.status(401).json({ message: '未登录或会话失效' });

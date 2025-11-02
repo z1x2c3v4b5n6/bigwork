@@ -9,6 +9,7 @@ const {
 const { requireAuth } = require('../middleware/auth');
 const { normalizeDate, parseTags, stringifyTags, toMySqlDateTime } = require('../utils/formatters');
 const { normalizeIdentifier, normalizeValueForColumn } = require('../utils/db');
+const { getDefaultMajorId } = require('../utils/majors');
 
 const router = express.Router();
 
@@ -46,38 +47,6 @@ const parseDateTimeInput = (value, referenceDate = null) => {
 
   const date = new Date(stringValue);
   return Number.isNaN(date.getTime()) ? null : date;
-};
-
-let cachedDefaultMajorId = null;
-let defaultMajorChecked = false;
-
-const getDefaultMajorId = async () => {
-  if (defaultMajorChecked) {
-    return cachedDefaultMajorId;
-  }
-
-  defaultMajorChecked = true;
-
-  if (!(await tableExists('majors'))) {
-    cachedDefaultMajorId = null;
-    return cachedDefaultMajorId;
-  }
-
-  const majorColumns = await getTableColumns('majors');
-  const idColumn = resolveColumn(majorColumns, ['id', 'major_id']);
-  const nameColumn = resolveColumn(majorColumns, ['name', 'major_name', 'title']);
-
-  if (!idColumn) {
-    cachedDefaultMajorId = null;
-    return cachedDefaultMajorId;
-  }
-
-  const orderColumn = nameColumn || idColumn;
-  const rows = await query(
-    `SELECT m.\`${idColumn}\` AS id FROM majors m ORDER BY m.\`${orderColumn}\` ASC LIMIT 1`,
-  );
-  cachedDefaultMajorId = rows[0]?.id || null;
-  return cachedDefaultMajorId;
 };
 
 const getCourseConfig = async () => {

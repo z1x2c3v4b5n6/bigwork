@@ -7,10 +7,13 @@ const {
   deleteRecord,
   tableExists,
   getTableColumns,
+  getTableColumnDetails,
 } = require('../database');
 const { requireAdmin } = require('../middleware/auth');
 const { normalizeDate } = require('../utils/formatters');
 const { normalizeRole } = require('../utils/auth');
+const { normalizeValueForColumn } = require('../utils/db');
+const { getDefaultMajorId, resetDefaultMajorCache } = require('../utils/majors');
 
 const router = express.Router();
 
@@ -416,6 +419,7 @@ router.post('/majors', requireAdmin, async (req, res) => {
     ]);
 
     await insertRecord('majors', payload);
+    resetDefaultMajorCache();
     await logAdminAction(req, '创建专业', `新增专业 ${name}`);
 
     res.status(201).json({ success: true });
@@ -444,6 +448,7 @@ router.put('/majors/:id', requireAdmin, async (req, res) => {
     }
 
     await updateRecord('majors', id, payload);
+    resetDefaultMajorCache();
 
     await logAdminAction(req, '更新专业', `调整专业 ${id}`);
 
@@ -459,6 +464,7 @@ router.delete('/majors/:id', requireAdmin, async (req, res) => {
 
   try {
     await deleteRecord('majors', id);
+    resetDefaultMajorCache();
     await logAdminAction(req, '删除专业', `移除专业 ${id}`);
 
     res.json({ success: true });
@@ -536,6 +542,7 @@ router.post('/courses', requireAdmin, async (req, res) => {
 
   try {
     const columns = await getTableColumns('courses');
+    const columnDetails = await getTableColumnDetails('courses');
     const titleColumn = pickColumn(columns, ['title', 'name', 'course_title', 'courseName']);
     const descriptionColumn = pickColumn(columns, ['description', 'detail', 'intro', 'summary']);
     const teacherColumn = pickColumn(columns, ['teacher', 'lecturer', 'instructor']);
@@ -546,12 +553,41 @@ router.post('/courses', requireAdmin, async (req, res) => {
       return res.status(500).json({ message: '课程表缺少标题字段，无法创建记录' });
     }
 
+    const normalizedTitle = normalizeValueForColumn(columnDetails, titleColumn, title);
+    const normalizedDescription = descriptionColumn
+      ? normalizeValueForColumn(columnDetails, descriptionColumn, description ?? null)
+      : undefined;
+    const normalizedTeacher = teacherColumn
+      ? normalizeValueForColumn(columnDetails, teacherColumn, teacher ?? null)
+      : undefined;
+    const normalizedCredit = creditColumn
+      ? normalizeValueForColumn(columnDetails, creditColumn, credit ?? null)
+      : undefined;
+
+    let normalizedMajorId;
+    if (majorIdColumn) {
+      const incomingMajorId = normalizeValueForColumn(columnDetails, majorIdColumn, majorId ?? null);
+
+      if (incomingMajorId !== null && incomingMajorId !== undefined) {
+        normalizedMajorId = incomingMajorId;
+      } else {
+        const fallback = await getDefaultMajorId();
+        normalizedMajorId = normalizeValueForColumn(columnDetails, majorIdColumn, fallback);
+      }
+
+      if (normalizedMajorId === null || normalizedMajorId === undefined) {
+        return res
+          .status(400)
+          .json({ message: '课程所属专业不能为空，请先在“专业管理”中添加至少一个专业后再试。' });
+      }
+    }
+
     const payload = buildPayload(columns, [
-      [titleColumn, title],
-      [descriptionColumn, description ? description : null],
-      [teacherColumn, teacher ? teacher : null],
-      [creditColumn, normalizeNumeric(credit)],
-      [majorIdColumn, majorId ? normalizeNumeric(majorId) : null],
+      [titleColumn, normalizedTitle],
+      [descriptionColumn, normalizedDescription],
+      [teacherColumn, normalizedTeacher],
+      [creditColumn, normalizedCredit],
+      [majorIdColumn, normalizedMajorId],
     ]);
 
     await insertRecord('courses', payload);
@@ -571,18 +607,52 @@ router.put('/courses/:id', requireAdmin, async (req, res) => {
 
   try {
     const columns = await getTableColumns('courses');
+    const columnDetails = await getTableColumnDetails('courses');
     const titleColumn = pickColumn(columns, ['title', 'name', 'course_title', 'courseName']);
     const descriptionColumn = pickColumn(columns, ['description', 'detail', 'intro', 'summary']);
     const teacherColumn = pickColumn(columns, ['teacher', 'lecturer', 'instructor']);
     const creditColumn = pickColumn(columns, ['credit', 'credits', 'credit_hours']);
     const majorIdColumn = pickColumn(columns, ['major_id', 'majorId', 'major', 'majorID']);
 
+    const normalizedTitle =
+      title !== undefined && titleColumn
+        ? normalizeValueForColumn(columnDetails, titleColumn, title)
+        : undefined;
+    const normalizedDescription =
+      description !== undefined && descriptionColumn
+        ? normalizeValueForColumn(columnDetails, descriptionColumn, description ?? null)
+        : undefined;
+    const normalizedTeacher =
+      teacher !== undefined && teacherColumn
+        ? normalizeValueForColumn(columnDetails, teacherColumn, teacher ?? null)
+        : undefined;
+    const normalizedCredit =
+      credit !== undefined && creditColumn
+        ? normalizeValueForColumn(columnDetails, creditColumn, credit ?? null)
+        : undefined;
+
+    let normalizedMajorId;
+    if (majorIdColumn && majorId !== undefined) {
+      const incomingMajorId = normalizeValueForColumn(columnDetails, majorIdColumn, majorId ?? null);
+
+      if (incomingMajorId !== null && incomingMajorId !== undefined) {
+        normalizedMajorId = incomingMajorId;
+      } else {
+        const fallback = await getDefaultMajorId();
+        normalizedMajorId = normalizeValueForColumn(columnDetails, majorIdColumn, fallback);
+      }
+
+      if (normalizedMajorId === null || normalizedMajorId === undefined) {
+        return res.status(400).json({ message: '课程所属专业不能为空，请先选择专业后再保存。' });
+      }
+    }
+
     const payload = buildPayload(columns, [
-      [titleColumn, title],
-      [descriptionColumn, description !== undefined ? description || null : undefined],
-      [teacherColumn, teacher !== undefined ? teacher || null : undefined],
-      [creditColumn, credit !== undefined ? normalizeNumeric(credit) : undefined],
-      [majorIdColumn, majorId !== undefined ? normalizeNumeric(majorId) : undefined],
+      [titleColumn, normalizedTitle],
+      [descriptionColumn, normalizedDescription],
+      [teacherColumn, normalizedTeacher],
+      [creditColumn, normalizedCredit],
+      [majorIdColumn, normalizedMajorId],
     ]);
 
     if (Object.keys(payload).length === 0) {
