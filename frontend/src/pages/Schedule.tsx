@@ -421,48 +421,16 @@ const Schedule = () => {
 
             <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid', borderColor: 'divider' }}>
               <Typography variant="subtitle1" fontWeight={600}>
-                番茄学习法
+                晚间复盘清单
               </Typography>
-              <Typography variant="body2" color="text.secondary" mt={1}>
-                推荐每日 6 组番茄钟（25min 学习 + 5min 休息），系统将自动记录专注时长并生成效率报告。
-              </Typography>
-              <Chip label="今日已完成 4 组" color="success" variant="outlined" sx={{ mt: 2 }} />
-            </Paper>
-
-            <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid', borderColor: 'divider' }}>
-              <Stack spacing={2}>
-                <Typography variant="subtitle1" fontWeight={600}>
-                  晚间复盘清单
-                </Typography>
-                <Divider />
-                <Stack direction="row" spacing={1} alignItems="center">
-                  <CheckCircleIcon color="primary" />
-                  <Typography variant="body2">回顾今日错题 15 题</Typography>
-                </Stack>
-                <Stack direction="row" spacing={1} alignItems="center">
-                  <CheckCircleIcon color="primary" />
-                  <Typography variant="body2">总结英语作文素材 5 个</Typography>
-                </Stack>
-                <Stack direction="row" spacing={1} alignItems="center">
-                  <CheckCircleIcon color="primary" />
-                  <Typography variant="body2">规划明日复习重点</Typography>
-                </Stack>
+              <Divider />
+              <Stack direction="row" spacing={1} alignItems="center">
+                <CheckCircleIcon color="primary" />
+                <Typography variant="body2">回顾今日错题 15 题</Typography>
               </Stack>
-            </Paper>
-
-            <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid', borderColor: 'divider' }}>
-              <Stack spacing={2}>
-                <Typography variant="subtitle1" fontWeight={600}>
-                  智能提醒
-                </Typography>
-                <Stack direction="row" spacing={1} alignItems="center">
-                  <AlarmOnIcon color="secondary" />
-                  <Typography variant="body2">直播课前 15 分钟推送通知至手机</Typography>
-                </Stack>
-                <Stack direction="row" spacing={1} alignItems="center">
-                  <AlarmOnIcon color="secondary" />
-                  <Typography variant="body2">每日 22:30 提醒整理错题</Typography>
-                </Stack>
+              <Stack direction="row" spacing={1} alignItems="center">
+                <CheckCircleIcon color="primary" />
+                <Typography variant="body2">总结英语作文素材 5 个</Typography>
               </Stack>
             </Paper>
           </Stack>
