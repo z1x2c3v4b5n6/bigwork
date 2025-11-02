@@ -51,7 +51,7 @@ interface AppLayoutProps {
   onToggleMode: () => void;
 }
 
-const drawerWidth = 240;
+const drawerWidth = 280;
 
 const AppLayout = ({ mode, onToggleMode }: AppLayoutProps) => {
   const theme = useTheme();
