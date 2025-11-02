@@ -11,6 +11,7 @@ import {
   Box,
   Button,
   Chip,
+  Collapse,
   Divider,
   FormControl,
   FormHelperText,
@@ -89,6 +90,35 @@ const AdminDashboard = () => {
     forumTopics: { id: number; title: string; description: string | null }[];
   } | null>(null);
   const [forumTopicId, setForumTopicId] = useState<number | null>(null);
+  const [actionFeedback, setActionFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+
+  const getErrorMessage = (error: unknown, fallback: string) => {
+    if (error && typeof error === 'object') {
+      const maybeMessage = (error as { message?: string }).message;
+      if (maybeMessage && typeof maybeMessage === 'string' && maybeMessage.trim()) {
+        return maybeMessage;
+      }
+
+      const responseData = (error as { response?: { data?: unknown } }).response?.data;
+      if (responseData && typeof responseData === 'object' && 'message' in responseData) {
+        const message = (responseData as { message?: unknown }).message;
+        if (typeof message === 'string' && message.trim()) {
+          return message;
+        }
+      }
+    }
+
+    return fallback;
+  };
+
+  useEffect(() => {
+    if (!actionFeedback) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => setActionFeedback(null), 5000);
+    return () => window.clearTimeout(timer);
+  }, [actionFeedback]);
 
   const dashboardQuery = useQuery<AdminDashboardResponse>({
     queryKey: ['admin-dashboard'],
@@ -230,12 +260,14 @@ const AdminDashboard = () => {
   const updateSettingsMutation = useMutation({
     mutationFn: adminService.updateAdminSettings,
     onSuccess: async () => {
-      setSettingsMessage('设置保存成功');
       await queryClient.invalidateQueries({ queryKey: ['admin-settings'] });
+      setSettingsMessage('设置保存成功');
+      setActionFeedback({ type: 'success', message: '平台设置已保存。' });
     },
     onError: (error) => {
-      const message = error instanceof Error ? error.message : '保存失败，请稍后再试';
+      const message = getErrorMessage(error, '保存失败，请稍后再试');
       setSettingsMessage(message);
+      setActionFeedback({ type: 'error', message });
     },
   });
 
@@ -244,6 +276,10 @@ const AdminDashboard = () => {
     onSuccess: async () => {
       setUserForm({ username: '', password: '', displayName: '', email: '', role: 'student' });
       await queryClient.invalidateQueries({ queryKey: ['admin-users'] });
+      setActionFeedback({ type: 'success', message: '已新增管理员账户。' });
+    },
+    onError: (error) => {
+      setActionFeedback({ type: 'error', message: getErrorMessage(error, '创建管理员失败，请稍后重试。') });
     },
   });
 
@@ -252,6 +288,10 @@ const AdminDashboard = () => {
       adminService.updateAdminUser(id, payload),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['admin-users'] });
+      setActionFeedback({ type: 'success', message: '账户信息已更新。' });
+    },
+    onError: (error) => {
+      setActionFeedback({ type: 'error', message: getErrorMessage(error, '更新管理员信息失败，请稍后重试。') });
     },
   });
 
@@ -259,6 +299,10 @@ const AdminDashboard = () => {
     mutationFn: (id: number) => adminService.deleteAdminUser(id),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['admin-users'] });
+      setActionFeedback({ type: 'success', message: '已删除管理员账户。' });
+    },
+    onError: (error) => {
+      setActionFeedback({ type: 'error', message: getErrorMessage(error, '删除管理员失败，请稍后重试。') });
     },
   });
 
@@ -267,6 +311,10 @@ const AdminDashboard = () => {
     onSuccess: async () => {
       setMajorForm({ name: '', description: '' });
       await queryClient.invalidateQueries({ queryKey: ['admin-majors'] });
+      setActionFeedback({ type: 'success', message: '新增专业成功。' });
+    },
+    onError: (error) => {
+      setActionFeedback({ type: 'error', message: getErrorMessage(error, '创建专业失败，请稍后重试。') });
     },
   });
 
@@ -275,6 +323,10 @@ const AdminDashboard = () => {
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['admin-majors'] });
       await queryClient.invalidateQueries({ queryKey: ['admin-courses'] });
+      setActionFeedback({ type: 'success', message: '已删除专业。' });
+    },
+    onError: (error) => {
+      setActionFeedback({ type: 'error', message: getErrorMessage(error, '删除专业失败，请稍后重试。') });
     },
   });
 
@@ -283,6 +335,10 @@ const AdminDashboard = () => {
     onSuccess: async () => {
       setCourseForm({ title: '', description: '', teacher: '', credit: '', majorId: '' });
       await queryClient.invalidateQueries({ queryKey: ['admin-courses'] });
+      setActionFeedback({ type: 'success', message: '课程已创建。' });
+    },
+    onError: (error) => {
+      setActionFeedback({ type: 'error', message: getErrorMessage(error, '创建课程失败，请稍后重试。') });
     },
   });
 
@@ -291,6 +347,10 @@ const AdminDashboard = () => {
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['admin-courses'] });
       await queryClient.invalidateQueries({ queryKey: ['admin-materials'] });
+      setActionFeedback({ type: 'success', message: '已删除课程。' });
+    },
+    onError: (error) => {
+      setActionFeedback({ type: 'error', message: getErrorMessage(error, '删除课程失败，请稍后重试。') });
     },
   });
 
@@ -301,6 +361,10 @@ const AdminDashboard = () => {
       setMaterialUploadInfo(null);
       setMaterialUploadError(null);
       await queryClient.invalidateQueries({ queryKey: ['admin-materials'] });
+      setActionFeedback({ type: 'success', message: '资料已保存。' });
+    },
+    onError: (error) => {
+      setActionFeedback({ type: 'error', message: getErrorMessage(error, '创建资料失败，请稍后重试。') });
     },
   });
 
@@ -308,6 +372,10 @@ const AdminDashboard = () => {
     mutationFn: (id: number) => adminService.deleteMaterial(id),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['admin-materials'] });
+      setActionFeedback({ type: 'success', message: '已删除资料。' });
+    },
+    onError: (error) => {
+      setActionFeedback({ type: 'error', message: getErrorMessage(error, '删除资料失败，请稍后重试。') });
     },
   });
 
@@ -317,6 +385,10 @@ const AdminDashboard = () => {
       await queryClient.invalidateQueries({ queryKey: ['admin-forum-topics'] });
       await queryClient.invalidateQueries({ queryKey: ['admin-forum-posts'] });
       setForumTopicId(null);
+      setActionFeedback({ type: 'success', message: '已删除论坛话题。' });
+    },
+    onError: (error) => {
+      setActionFeedback({ type: 'error', message: getErrorMessage(error, '删除论坛话题失败，请稍后重试。') });
     },
   });
 
@@ -324,13 +396,21 @@ const AdminDashboard = () => {
     mutationFn: (id: number) => adminService.deleteAdminForumPost(id),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['admin-forum-posts', forumTopicId] });
+      setActionFeedback({ type: 'success', message: '已删除帖子。' });
+    },
+    onError: (error) => {
+      setActionFeedback({ type: 'error', message: getErrorMessage(error, '删除帖子失败，请稍后重试。') });
     },
   });
 
   const handleSettingsSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setSettingsMessage(null);
-    await updateSettingsMutation.mutateAsync(settingsDraft);
+    try {
+      await updateSettingsMutation.mutateAsync(settingsDraft);
+    } catch (error) {
+      console.error('保存平台设置失败', error);
+    }
   };
 
   const handleUserSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -339,13 +419,17 @@ const AdminDashboard = () => {
       return;
     }
 
-    await createUserMutation.mutateAsync({
-      username: userForm.username,
-      password: userForm.password,
-      displayName: userForm.displayName,
-      email: userForm.email || undefined,
-      role: userForm.role,
-    });
+    try {
+      await createUserMutation.mutateAsync({
+        username: userForm.username,
+        password: userForm.password,
+        displayName: userForm.displayName,
+        email: userForm.email || undefined,
+        role: userForm.role,
+      });
+    } catch (error) {
+      console.error('创建管理员失败', error);
+    }
   };
 
   const handleMajorSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -354,7 +438,11 @@ const AdminDashboard = () => {
       return;
     }
 
-    await createMajorMutation.mutateAsync({ name: majorForm.name, description: majorForm.description || undefined });
+    try {
+      await createMajorMutation.mutateAsync({ name: majorForm.name, description: majorForm.description || undefined });
+    } catch (error) {
+      console.error('创建专业失败', error);
+    }
   };
 
   const handleCourseSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -363,13 +451,17 @@ const AdminDashboard = () => {
       return;
     }
 
-    await createCourseMutation.mutateAsync({
-      title: courseForm.title,
-      description: courseForm.description || undefined,
-      teacher: courseForm.teacher || undefined,
-      credit: courseForm.credit ? Number(courseForm.credit) : undefined,
-      majorId: courseForm.majorId ? Number(courseForm.majorId) : undefined,
-    });
+    try {
+      await createCourseMutation.mutateAsync({
+        title: courseForm.title,
+        description: courseForm.description || undefined,
+        teacher: courseForm.teacher || undefined,
+        credit: courseForm.credit ? Number(courseForm.credit) : undefined,
+        majorId: courseForm.majorId ? Number(courseForm.majorId) : undefined,
+      });
+    } catch (error) {
+      console.error('创建课程失败', error);
+    }
   };
 
   const handleMaterialSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -378,12 +470,16 @@ const AdminDashboard = () => {
       return;
     }
 
-    await createMaterialMutation.mutateAsync({
-      title: materialForm.title,
-      description: materialForm.description || undefined,
-      fileUrl: materialForm.fileUrl || undefined,
-      courseId: materialForm.courseId ? Number(materialForm.courseId) : undefined,
-    });
+    try {
+      await createMaterialMutation.mutateAsync({
+        title: materialForm.title,
+        description: materialForm.description || undefined,
+        fileUrl: materialForm.fileUrl || undefined,
+        courseId: materialForm.courseId ? Number(materialForm.courseId) : undefined,
+      });
+    } catch (error) {
+      console.error('创建资料失败', error);
+    }
   };
 
   const handleStatisticsSearch = async (event: FormEvent<HTMLFormElement>) => {
@@ -393,8 +489,13 @@ const AdminDashboard = () => {
       return;
     }
 
-    const result = await adminService.searchAdminData(statisticsSearch.trim());
-    setSearchResult(result);
+    try {
+      const result = await adminService.searchAdminData(statisticsSearch.trim());
+      setSearchResult(result);
+    } catch (error) {
+      console.error('搜索失败', error);
+      setActionFeedback({ type: 'error', message: getErrorMessage(error, '搜索失败，请稍后再试。') });
+    }
   };
 
   if (authLoading || dashboardQuery.isLoading) {
@@ -439,6 +540,17 @@ const AdminDashboard = () => {
 
   return (
     <Stack spacing={3}>
+      <Collapse in={Boolean(actionFeedback)}>
+        {actionFeedback ? (
+          <Alert
+            severity={actionFeedback.type}
+            onClose={() => setActionFeedback(null)}
+            sx={{ borderRadius: 2 }}
+          >
+            {actionFeedback.message}
+          </Alert>
+        ) : null}
+      </Collapse>
       <Stack direction={{ xs: 'column', md: 'row' }} alignItems={{ xs: 'flex-start', md: 'center' }} justifyContent="space-between" spacing={2}>
         <Box>
           <Typography variant="h4" fontWeight={700} gutterBottom>

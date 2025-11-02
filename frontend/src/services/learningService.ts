@@ -1,3 +1,4 @@
+import dayjs from 'dayjs';
 import httpClient from './httpClient';
 
 export interface CourseItem {
@@ -41,24 +42,30 @@ export const createCourse = async (payload: {
 
 export const fetchSchedule = async (): Promise<ScheduleEntry[]> => {
   const response = await httpClient.get<{ schedule: ScheduleEntry[] }>('/api/learning/schedule');
-  return (response.data.schedule ?? []).map((item) => ({
-    ...item,
-    id: item.id != null ? String(item.id) : '',
-    allDay: Boolean((item as { allDay?: boolean }).allDay),
-    tags: (() => {
-      const source = (item as { tags?: unknown }).tags;
-      if (Array.isArray(source)) {
-        return source.map((tag) => String(tag));
-      }
-      if (typeof source === 'string') {
-        return source
-          .split(',')
-          .map((value) => value.trim())
-          .filter(Boolean);
-      }
-      return [];
-    })(),
-  }));
+  return (response.data.schedule ?? []).map((item, index) => {
+    const startValue = (item as { start?: string }).start;
+    const endValue = (item as { end?: string }).end;
+    const fallbackId = `schedule-${index}-${startValue ?? 'unknown'}-${endValue ?? 'unknown'}`;
+
+    return {
+      ...item,
+      id: item.id != null && item.id !== '' ? String(item.id) : fallbackId,
+      allDay: Boolean((item as { allDay?: boolean }).allDay),
+      tags: (() => {
+        const source = (item as { tags?: unknown }).tags;
+        if (Array.isArray(source)) {
+          return source.map((tag) => String(tag));
+        }
+        if (typeof source === 'string') {
+          return source
+            .split(',')
+            .map((value) => value.trim())
+            .filter(Boolean);
+        }
+        return [];
+      })(),
+    } satisfies ScheduleEntry;
+  });
 };
 
 export const createScheduleEntry = async (payload: {
@@ -71,7 +78,18 @@ export const createScheduleEntry = async (payload: {
   focus?: string;
   tags?: string | string[];
 }): Promise<{ id: string }> => {
-  const response = await httpClient.post<{ id: number | string }>('/api/learning/schedule', payload);
+  const formatDateTime = (value: string) => {
+    const parsed = dayjs(value);
+    return parsed.isValid() ? parsed.format('YYYY-MM-DD HH:mm:ss') : value;
+  };
+
+  const requestBody = {
+    ...payload,
+    start: formatDateTime(payload.start),
+    end: formatDateTime(payload.end),
+  };
+
+  const response = await httpClient.post<{ id: number | string }>('/api/learning/schedule', requestBody);
   const id = response.data?.id;
   return { id: id != null ? String(id) : '' };
 };

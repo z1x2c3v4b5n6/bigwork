@@ -20,6 +20,34 @@ const LIKE_TABLE_CANDIDATES = ['forum_topic_likes', 'forum_likes'];
 
 const resolveColumn = (columns, candidates) => candidates.find((column) => columns.has(column)) || null;
 
+const getDefaultUserId = async () => {
+  if (!(await tableExists('users'))) {
+    return null;
+  }
+
+  const userColumns = await getTableColumns('users');
+  if (userColumns.size === 0) {
+    return null;
+  }
+
+  const idColumn = resolveColumn(userColumns, ['id', 'user_id']);
+  if (!idColumn) {
+    return null;
+  }
+
+  const orderColumn =
+    resolveColumn(userColumns, ['updated_at', 'update_time']) ||
+    resolveColumn(userColumns, ['created_at', 'create_time']) ||
+    idColumn;
+
+  const rows = await query(
+    `SELECT u.\`${idColumn}\` AS id FROM users u ORDER BY u.\`${orderColumn}\` ASC LIMIT 1`,
+  );
+
+  const identifier = rows[0]?.id;
+  return identifier != null ? normalizeIdentifier(identifier) : null;
+};
+
 const buildInClause = (values = [], prefix = 'p') => {
   if (!Array.isArray(values) || values.length === 0) {
     return { clause: '', params: {} };
@@ -295,8 +323,26 @@ const seedForumTopics = async (topicConfig) => {
       },
     ];
 
+    let defaultAuthorId = null;
+    if (topicConfig.authorId) {
+      defaultAuthorId = await getDefaultUserId();
+      const authorDetails = topicConfig.columnDetails?.get?.(topicConfig.authorId);
+      if (!defaultAuthorId && authorDetails && authorDetails.isNullable === false) {
+        console.warn('跳过圈子示例数据初始化：缺少可用的用户编号以填充作者字段');
+        return;
+      }
+    }
+
     for (const topic of topics) {
-      const payload = createTopicPayload(topicConfig, topic);
+      const payload = createTopicPayload(topicConfig, {
+        ...topic,
+        authorId: defaultAuthorId ?? topic.authorId ?? null,
+      });
+
+      if (topicConfig.authorId && (payload[topicConfig.authorId] === undefined || payload[topicConfig.authorId] === null)) {
+        continue;
+      }
+
       await insertRecord(topicConfig.tableName, payload);
     }
   } catch (error) {
@@ -327,7 +373,7 @@ const countLikesForTopic = async (likeConfig, topicId) => {
   return Number(rows[0]?.total ?? 0);
 };
 
-router.get('/topics', requireAuth, async (req, res) => {
+router.get('/topics', async (req, res) => {
   try {
     const topicConfig = await getForumTopicConfig();
     const postConfig = await getForumPostConfig();
@@ -430,7 +476,7 @@ router.get('/topics', requireAuth, async (req, res) => {
     }
 
     let likedSet = new Set();
-    const currentUserId = req.session.user?.id != null ? String(req.session.user.id) : null;
+    const currentUserId = req.session?.user?.id != null ? String(req.session.user.id) : null;
     if (likeConfig?.topicId && likeConfig?.userId && currentUserId && topicIds.length > 0) {
       const { clause, params } = buildInClause(topicIds, 'likedTopic');
       if (clause) {
@@ -514,7 +560,7 @@ router.post('/topics', requireAuth, async (req, res) => {
   }
 });
 
-router.get('/topics/:topicId/posts', requireAuth, async (req, res) => {
+router.get('/topics/:topicId/posts', async (req, res) => {
   const { topicId } = req.params;
 
   try {
@@ -579,8 +625,8 @@ router.get('/topics/:topicId/posts', requireAuth, async (req, res) => {
       { topicId: normalizedTopicId },
     );
 
-    const currentUserId = req.session.user?.id != null ? String(req.session.user.id) : null;
-    const isAdmin = req.session.user ? isAdminRole(req.session.user.role) : false;
+    const currentUserId = req.session?.user?.id != null ? String(req.session.user.id) : null;
+    const isAdmin = req.session?.user ? isAdminRole(req.session.user.role) : false;
 
     const posts = rows.map((row, index) => {
       const base = formatPostRow(row, index);
@@ -626,7 +672,7 @@ router.post('/topics/:topicId/posts', requireAuth, async (req, res) => {
     const payload = createPostPayload(postConfig, {
       topicId,
       content: rawContent,
-      authorId: req.session.user ? req.session.user.id : null,
+      authorId: req.session?.user ? req.session.user.id : null,
     });
 
     const result = await insertRecord(postConfig.tableName, payload);
@@ -689,8 +735,8 @@ router.delete('/topics/:topicId/posts/:postId', requireAuth, async (req, res) =>
       }
     }
 
-    const currentUserId = req.session.user?.id != null ? String(req.session.user.id) : null;
-    const isAdmin = req.session.user ? isAdminRole(req.session.user.role) : false;
+    const currentUserId = req.session?.user?.id != null ? String(req.session.user.id) : null;
+    const isAdmin = req.session?.user ? isAdminRole(req.session.user.role) : false;
     const authorId = record.author_id != null ? String(record.author_id) : null;
 
     if (!isAdmin && (!authorId || !currentUserId || authorId !== currentUserId)) {
@@ -708,7 +754,7 @@ router.delete('/topics/:topicId/posts/:postId', requireAuth, async (req, res) =>
 
 router.post('/topics/:topicId/likes', requireAuth, async (req, res) => {
   const { topicId } = req.params;
-  const currentUserId = req.session.user?.id != null ? String(req.session.user.id) : null;
+  const currentUserId = req.session?.user?.id != null ? String(req.session.user.id) : null;
 
   if (!currentUserId) {
     return res.status(401).json({ message: '未登录或会话失效' });
