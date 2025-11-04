@@ -6,6 +6,7 @@ import {
   Container,
   Grid,
   LinearProgress,
+  Paper,
   Stack,
   Typography,
 } from '@mui/material';
@@ -17,6 +18,10 @@ import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import GroupIcon from '@mui/icons-material/Group';
 import UpdateIcon from '@mui/icons-material/Update';
 import TipsAndUpdatesIcon from '@mui/icons-material/TipsAndUpdates';
+import TextSnippetIcon from '@mui/icons-material/TextSnippet';
+import LibraryBooksIcon from '@mui/icons-material/LibraryBooks';
+import RecordVoiceOverIcon from '@mui/icons-material/RecordVoiceOver';
+import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import HeroBanner from '../components/HeroBanner';
 import StatCard from '../components/StatCard';
 import CourseCard from '../components/CourseCard';
@@ -27,6 +32,7 @@ import UniversityAdvisorPanel from '../components/UniversityAdvisorPanel';
 import useGreeting from '../hooks/useGreeting';
 import useDashboardData from '../hooks/useDashboardData';
 import { useAuth } from '../context/AuthContext';
+import { Link as RouterLink } from 'react-router-dom';
 
 const statIconMap: Record<string, JSX.Element> = {
   studyTime: <AccessTimeIcon fontSize="inherit" />,
@@ -34,6 +40,27 @@ const statIconMap: Record<string, JSX.Element> = {
   courseFocus: <SchoolIcon fontSize="inherit" />,
   mockRank: <EmojiEventsIcon fontSize="inherit" />,
 };
+
+const retakeResources = [
+  {
+    title: '复试自我介绍模板',
+    description: '分数段策略 + 中英双语段落模板，60 秒内定制专属稿件。',
+    icon: <TextSnippetIcon color="primary" fontSize="large" />, 
+    to: '/retake-intro',
+  },
+  {
+    title: '专业课高频题整理表',
+    description: '20 个热门专业高频考点、追问角度与练习任务一图掌握。',
+    icon: <LibraryBooksIcon color="secondary" fontSize="large" />, 
+    to: '/retake-subjects',
+  },
+  {
+    title: '英语口语快速复盘',
+    description: '7 天快冲计划 + 突发问答模板，强化口语纠错与输出。',
+    icon: <RecordVoiceOverIcon color="success" fontSize="large" />, 
+    to: '/retake-english',
+  },
+];
 
 const Home = () => {
   const greeting = useGreeting();
@@ -282,6 +309,53 @@ const Home = () => {
                     暂无推荐的练习集，完成诊断后将生成专属训练。
                   </Typography>
                 )}
+              </SectionCard>
+
+              <SectionCard
+                title="复试冲刺资料区"
+                subtitle="按分数段挑选自我介绍、专业课与英语复盘三大工具，快速进入复试状态。"
+              >
+                <Grid container spacing={3}>
+                  {retakeResources.map((resource) => (
+                    <Grid item xs={12} md={4} key={resource.title}>
+                      <Paper
+                        elevation={0}
+                        sx={{
+                          p: 3,
+                          borderRadius: 3,
+                          height: '100%',
+                          border: '1px solid',
+                          borderColor: 'divider',
+                          background: 'rgba(255,255,255,0.8)',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: 2,
+                        }}
+                      >
+                        <Box sx={{ width: 56, height: 56, borderRadius: 3, display: 'grid', placeItems: 'center', bgcolor: 'background.default' }}>
+                          {resource.icon}
+                        </Box>
+                        <Stack spacing={1} sx={{ flexGrow: 1 }}>
+                          <Typography variant="subtitle1" fontWeight={600}>
+                            {resource.title}
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            {resource.description}
+                          </Typography>
+                        </Stack>
+                        <Button
+                          variant="contained"
+                          endIcon={<ArrowForwardIcon />}
+                          component={RouterLink}
+                          to={resource.to}
+                          sx={{ alignSelf: 'flex-start', borderRadius: 999 }}
+                        >
+                          查看详情
+                        </Button>
+                      </Paper>
+                    </Grid>
+                  ))}
+                </Grid>
               </SectionCard>
 
               <SectionCard title="学习日程" subtitle="按照计划推进，提高执行效率。">
