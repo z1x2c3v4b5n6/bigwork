@@ -20,11 +20,13 @@ import Forum from './pages/Forum';
 import PostgraduateIntroTemplates from './pages/PostgraduateIntroTemplates';
 import PostgraduateSubjectTopics from './pages/PostgraduateSubjectTopics';
 import PostgraduateEnglishReview from './pages/PostgraduateEnglishReview';
-import RequireStudent from './components/RequireStudent';
+import { useAuth } from './context/AuthContext';
 
 const App = () => {
   const [mode, setMode] = useState<'light' | 'dark'>('light');
+  const { user } = useAuth();
   const theme = useMemo(() => createTheme(mode), [mode]);
+  const hideRetakeToolkit = user?.role === 'admin';
 
   return (
     <ThemeProvider theme={theme}>
@@ -47,30 +49,13 @@ const App = () => {
           <Route path="advisor" element={<Advisor />} />
           <Route path="analytics" element={<Analytics />} />
           <Route path="forum" element={<Forum />} />
-          <Route
-            path="retake-intro"
-            element={(
-              <RequireStudent>
-                <PostgraduateIntroTemplates />
-              </RequireStudent>
-            )}
-          />
-          <Route
-            path="retake-subjects"
-            element={(
-              <RequireStudent>
-                <PostgraduateSubjectTopics />
-              </RequireStudent>
-            )}
-          />
-          <Route
-            path="retake-english"
-            element={(
-              <RequireStudent>
-                <PostgraduateEnglishReview />
-              </RequireStudent>
-            )}
-          />
+          {!hideRetakeToolkit && (
+            <>
+              <Route path="retake-intro" element={<PostgraduateIntroTemplates />} />
+              <Route path="retake-subjects" element={<PostgraduateSubjectTopics />} />
+              <Route path="retake-english" element={<PostgraduateEnglishReview />} />
+            </>
+          )}
           <Route path="profile" element={<Profile />} />
           <Route
             path="admin"
