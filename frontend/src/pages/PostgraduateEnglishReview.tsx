@@ -108,8 +108,8 @@ const PostgraduateEnglishReview = () => {
                   <Stack spacing={1.5}>
                     <Chip
                       label={guide.title}
-                      color={guide.key === 'low' ? 'default' : 'primary'}
-                      variant={guide.key === 'low' ? 'filled' : 'outlined'}
+                      color={guide.key === 'low' ? 'warning' : 'primary'}
+                      variant="outlined"
                       sx={{ alignSelf: 'flex-start' }}
                     />
                     <Typography variant="body2" color="text.secondary">
@@ -120,7 +120,7 @@ const PostgraduateEnglishReview = () => {
                       {guide.actionSteps.map((step) => (
                         <ListItem key={step} sx={{ alignItems: 'flex-start', px: 0 }}>
                           <ListItemIcon sx={{ minWidth: 32 }}>
-                            <PsychologyIcon color={guide.key === 'low' ? 'action' : 'secondary'} fontSize="small" />
+                            <PsychologyIcon color={guide.key === 'low' ? 'warning' : 'secondary'} fontSize="small" />
                           </ListItemIcon>
                           <ListItemText primaryTypographyProps={{ variant: 'body2' }} primary={step} />
                         </ListItem>

@@ -2,7 +2,11 @@ import {
   Box,
   Chip,
   Divider,
+  FormControl,
+  InputLabel,
+  MenuItem,
   Paper,
+  Select,
   Stack,
   Table,
   TableBody,
@@ -12,12 +16,34 @@ import {
   TableRow,
   Typography,
 } from '@mui/material';
+import type { SelectChangeEvent } from '@mui/material';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import InsightsIcon from '@mui/icons-material/Insights';
 import SchoolIcon from '@mui/icons-material/School';
+import { useMemo, useState } from 'react';
 import { majorRecommendations, scoreBandGuides } from '../data/postgraduateResources';
 
+const lowBandMessage = '建议暂停复试，先梳理错题与经历，积累实习或科研后再战。';
+
 const PostgraduateSubjectTopics = () => {
+  const [selectedMajor, setSelectedMajor] = useState<string>('all');
+
+  const filteredRecommendations = useMemo(() => {
+    if (selectedMajor === 'all') {
+      return majorRecommendations;
+    }
+    return majorRecommendations.filter((item) => item.major === selectedMajor);
+  }, [selectedMajor]);
+
+  const focusedMajor = useMemo(
+    () => (selectedMajor === 'all' ? undefined : majorRecommendations.find((item) => item.major === selectedMajor)),
+    [selectedMajor],
+  );
+
+  const handleMajorChange = (event: SelectChangeEvent<string>) => {
+    setSelectedMajor(event.target.value);
+  };
+
   return (
     <Stack spacing={4}>
       <Stack spacing={1}>
@@ -31,16 +57,39 @@ const PostgraduateSubjectTopics = () => {
 
       <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid', borderColor: 'divider' }}>
         <Stack spacing={2.5}>
-          <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} alignItems={{ md: 'center' }}>
-            <TrendingUpIcon color="primary" fontSize="large" />
-            <Box>
-              <Typography variant="h6" fontWeight={600} gutterBottom>
-                分数段策略与院校推荐
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                仅对 360 分以上与国家线-360 分提供目标院校组合，国家线以下不建议继续参加复试，可把时间投入复盘与实践。
-              </Typography>
-            </Box>
+          <Stack
+            direction={{ xs: 'column', md: 'row' }}
+            spacing={2}
+            alignItems={{ xs: 'flex-start', md: 'center' }}
+            justifyContent="space-between"
+          >
+            <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} alignItems={{ md: 'center' }}>
+              <TrendingUpIcon color="primary" fontSize="large" />
+              <Box>
+                <Typography variant="h6" fontWeight={600} gutterBottom>
+                  分数段策略与院校推荐
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  仅对 360 分以上与国家线-360 分提供目标院校组合，国家线以下提供“暂停冲刺”提醒，避免盲目投入复试。
+                </Typography>
+              </Box>
+            </Stack>
+            <FormControl size="small" sx={{ minWidth: { xs: '100%', md: 240 } }}>
+              <InputLabel id="major-filter-label">筛选热门专业</InputLabel>
+              <Select
+                labelId="major-filter-label"
+                value={selectedMajor}
+                label="筛选热门专业"
+                onChange={handleMajorChange}
+              >
+                <MenuItem value="all">全部热门专业</MenuItem>
+                {majorRecommendations.map((item) => (
+                  <MenuItem key={item.major} value={item.major}>
+                    {item.major}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
           </Stack>
           <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
             {scoreBandGuides.map((guide) => (
@@ -60,7 +109,7 @@ const PostgraduateSubjectTopics = () => {
                   <Chip
                     label={guide.title}
                     color={guide.key === 'low' ? 'warning' : 'primary'}
-                    variant={guide.key === 'low' ? 'filled' : 'outlined'}
+                    variant="outlined"
                     sx={{ alignSelf: 'flex-start' }}
                   />
                   <Typography variant="body2" color="text.secondary">
@@ -85,14 +134,15 @@ const PostgraduateSubjectTopics = () => {
             <TableRow>
               <TableCell width="12%">热门专业</TableCell>
               <TableCell width="20%">高频考点</TableCell>
-              <TableCell width="18%">追问角度</TableCell>
-              <TableCell width="20%">冲刺练习任务</TableCell>
-              <TableCell width="15%">360 分以上推荐院校</TableCell>
-              <TableCell width="15%">国家线-360 分推荐院校</TableCell>
+              <TableCell width="16%">追问角度</TableCell>
+              <TableCell width="18%">冲刺练习任务</TableCell>
+              <TableCell width="14%">360 分以上推荐院校</TableCell>
+              <TableCell width="14%">国家线-360 分推荐院校</TableCell>
+              <TableCell width="12%">国家线以下提醒</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
-            {majorRecommendations.map((item) => (
+            {filteredRecommendations.map((item) => (
               <TableRow key={item.major} hover>
                 <TableCell>
                   <Stack spacing={1}>
@@ -149,11 +199,66 @@ const PostgraduateSubjectTopics = () => {
                     ))}
                   </Stack>
                 </TableCell>
+                <TableCell>
+                  <Typography variant="body2" color="text.secondary">
+                    {lowBandMessage}
+                  </Typography>
+                </TableCell>
               </TableRow>
             ))}
           </TableBody>
         </Table>
       </TableContainer>
+
+      {focusedMajor && (
+        <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px dashed', borderColor: 'primary.light' }}>
+          <Stack spacing={2}>
+            <Typography variant="h6" fontWeight={600}>
+              {focusedMajor.major} · 快速聚焦清单
+            </Typography>
+            <Stack direction={{ xs: 'column', md: 'row' }} spacing={3}>
+              <Box sx={{ flex: 1 }}>
+                <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                  高频考点
+                </Typography>
+                <Stack spacing={0.75}>
+                  {focusedMajor.coreTopics.map((topic) => (
+                    <Typography key={topic} variant="body2">
+                      • {topic}
+                    </Typography>
+                  ))}
+                </Stack>
+              </Box>
+              <Divider flexItem orientation="vertical" sx={{ display: { xs: 'none', md: 'block' } }} />
+              <Box sx={{ flex: 1 }}>
+                <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                  常见追问
+                </Typography>
+                <Stack spacing={0.75}>
+                  {focusedMajor.questionAngles.map((angle) => (
+                    <Typography key={angle} variant="body2">
+                      • {angle}
+                    </Typography>
+                  ))}
+                </Stack>
+              </Box>
+              <Divider flexItem orientation="vertical" sx={{ display: { xs: 'none', md: 'block' } }} />
+              <Box sx={{ flex: 1 }}>
+                <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                  冲刺任务
+                </Typography>
+                <Stack spacing={0.75}>
+                  {focusedMajor.practiceTasks.map((task) => (
+                    <Typography key={task} variant="body2">
+                      • {task}
+                    </Typography>
+                  ))}
+                </Stack>
+              </Box>
+            </Stack>
+          </Stack>
+        </Paper>
+      )}
 
       <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid', borderColor: 'divider' }}>
         <Stack spacing={2}>

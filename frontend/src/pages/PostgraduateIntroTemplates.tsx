@@ -81,16 +81,21 @@ const PostgraduateIntroTemplates = () => {
       </Stack>
 
       <Grid container spacing={3}>
-        {scoreBandGuides.map((guide) => (
-          <Grid item xs={12} md={4} key={guide.key}>
-            <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid', borderColor: 'divider', height: '100%' }}>
-              <Stack spacing={2}>
-                <Box>
-                  <Chip label={guide.title} color={guide.key === 'low' ? 'default' : 'primary'} variant="outlined" sx={{ mb: 1 }} />
-                  <Typography variant="body2" color="text.secondary">
-                    {guide.subtitle}
-                  </Typography>
-                </Box>
+                {scoreBandGuides.map((guide) => (
+                  <Grid item xs={12} md={4} key={guide.key}>
+                    <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid', borderColor: 'divider', height: '100%' }}>
+                      <Stack spacing={2}>
+                        <Box>
+                          <Chip
+                            label={guide.title}
+                            color={guide.key === 'low' ? 'warning' : 'primary'}
+                            variant="outlined"
+                            sx={{ mb: 1 }}
+                          />
+                          <Typography variant="body2" color="text.secondary">
+                            {guide.subtitle}
+                          </Typography>
+                        </Box>
                 <Divider sx={{ borderStyle: 'dashed' }} />
                 <List dense>
                   {guide.actionSteps.map((step) => (
