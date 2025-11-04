@@ -23,6 +23,7 @@ import CourseCard from '../components/CourseCard';
 import PracticeCard from '../components/PracticeCard';
 import ScheduleTimeline from '../components/ScheduleTimeline';
 import SectionCard from '../components/SectionCard';
+import UniversityAdvisorPanel from '../components/UniversityAdvisorPanel';
 import useGreeting from '../hooks/useGreeting';
 import useDashboardData from '../hooks/useDashboardData';
 import { useAuth } from '../context/AuthContext';
@@ -285,6 +286,13 @@ const Home = () => {
 
               <SectionCard title="学习日程" subtitle="按照计划推进，提高执行效率。">
                 <ScheduleTimeline items={schedule} variant="plain" />
+              </SectionCard>
+
+              <SectionCard
+                title="智能院校推荐"
+                subtitle="输入初试总分，系统将结合院校分数线生成冲刺、稳妥、保底组合，并给出复试准备路线。"
+              >
+                <UniversityAdvisorPanel />
               </SectionCard>
 
               <SectionCard title="今日学习建议" subtitle="根据你的刷题记录与日程生成。">
