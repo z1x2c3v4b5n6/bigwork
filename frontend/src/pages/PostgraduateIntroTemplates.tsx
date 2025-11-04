@@ -17,6 +17,7 @@ import ChecklistIcon from '@mui/icons-material/Checklist';
 import BoltIcon from '@mui/icons-material/Bolt';
 import BookmarkAddedIcon from '@mui/icons-material/BookmarkAdded';
 import { scoreBandGuides } from '../data/postgraduateResources';
+import MiniProgramGuide from '../components/MiniProgramGuide';
 
 const bilingualTemplate = [
   {
@@ -201,6 +202,8 @@ const PostgraduateIntroTemplates = () => {
           </Grid>
         </Stack>
       </Paper>
+
+      <MiniProgramGuide />
     </Stack>
   );
 };

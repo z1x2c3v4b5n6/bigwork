@@ -18,6 +18,7 @@ import ReplayIcon from '@mui/icons-material/Replay';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import PsychologyIcon from '@mui/icons-material/Psychology';
 import { scoreBandGuides } from '../data/postgraduateResources';
+import MiniProgramGuide from '../components/MiniProgramGuide';
 
 const weeklyPlan = [
   {
@@ -235,6 +236,8 @@ const PostgraduateEnglishReview = () => {
           </Grid>
         </Stack>
       </Paper>
+
+      <MiniProgramGuide />
     </Stack>
   );
 };
