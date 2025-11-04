@@ -1,5 +1,12 @@
 import httpClient from './httpClient';
 
+export interface ExamSubjectRequirement {
+  math?: string;
+  english?: string;
+  politics?: string;
+  professional?: string;
+}
+
 export interface UniversityRecommendationItem {
   id: string;
   name: string;
@@ -12,6 +19,9 @@ export interface UniversityRecommendationItem {
   matchLevel: '稳妥' | '冲刺' | '保底' | '高风险';
   matchReason: string;
   interviewFocus: string[];
+  examSubjects: ExamSubjectRequirement;
+  subjectMatch: boolean;
+  subjectAdvice: string;
 }
 
 export interface InterviewTimelineStep {
@@ -41,10 +51,18 @@ export interface UniversityRecommendationResponse {
   interviewPreparation: InterviewPreparationPayload;
 }
 
-export const recommendUniversities = async (payload: {
+export interface RecommendationRequest {
   totalScore: number;
   targetMajor?: string;
-}): Promise<UniversityRecommendationResponse> => {
+  examSubjects?: {
+    math?: string;
+    english?: string;
+  };
+}
+
+export const recommendUniversities = async (
+  payload: RecommendationRequest,
+): Promise<UniversityRecommendationResponse> => {
   const { data } = await httpClient.post<UniversityRecommendationResponse>(
     '/api/learning/recommendations/universities',
     payload,

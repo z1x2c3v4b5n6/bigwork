@@ -7,6 +7,12 @@ module.exports = [
     category: '工科 - 计算机类',
     tags: ['人工智能', '高水平实验室', '科研导向'],
     majors: ['计算机', '软件工程', '人工智能'],
+    examSubjects: {
+      politics: '思想政治理论',
+      math: '数学一',
+      english: '英语一',
+      professional: '计算机统考（408）',
+    },
     score: {
       recommended: 415,
       floor: 400,
@@ -23,6 +29,12 @@ module.exports = [
     category: '工科 - 软件工程',
     tags: ['软件工程', '产学研结合', '导师制'],
     majors: ['软件工程', '大数据', '信息安全'],
+    examSubjects: {
+      politics: '思想政治理论',
+      math: '数学一',
+      english: '英语一',
+      professional: '计算机统考（408）',
+    },
     score: {
       recommended: 408,
       floor: 395,
@@ -39,6 +51,12 @@ module.exports = [
     category: '经管 - 金融学',
     tags: ['金融科技', '数理基础', '双语复试'],
     majors: ['金融学', '应用经济', '数量经济'],
+    examSubjects: {
+      politics: '思想政治理论',
+      math: '数学三',
+      english: '英语一',
+      professional: '431 金融学综合',
+    },
     score: {
       recommended: 402,
       floor: 388,
@@ -55,6 +73,12 @@ module.exports = [
     category: '工科 - 机械工程',
     tags: ['交叉学科', '实践基地', '创新设计'],
     majors: ['机械工程', '动力工程', '智能制造'],
+    examSubjects: {
+      politics: '思想政治理论',
+      math: '数学一',
+      english: '英语一',
+      professional: '机械设计基础',
+    },
     score: {
       recommended: 395,
       floor: 380,
@@ -71,6 +95,12 @@ module.exports = [
     category: '经管 - 管理科学',
     tags: ['大数据管理', '信息系统', '综合面试'],
     majors: ['管理科学', '信息管理', '工商管理'],
+    examSubjects: {
+      politics: '思想政治理论',
+      math: '数学三',
+      english: '英语二',
+      professional: '396 经济类综合能力',
+    },
     score: {
       recommended: 388,
       floor: 372,
@@ -87,6 +117,12 @@ module.exports = [
     category: '工科 - 电子信息',
     tags: ['集成电路', '通信技术', '工程背景'],
     majors: ['电子信息', '通信工程', '集成电路'],
+    examSubjects: {
+      politics: '思想政治理论',
+      math: '数学一',
+      english: '英语一',
+      professional: '电路与信号',
+    },
     score: {
       recommended: 382,
       floor: 368,
@@ -103,6 +139,12 @@ module.exports = [
     category: '经管 - 会计硕士',
     tags: ['注册会计师衔接', '案例教学', '职业化面试'],
     majors: ['会计', '财务管理', '审计'],
+    examSubjects: {
+      politics: '思想政治理论',
+      math: '数学三',
+      english: '英语二',
+      professional: '综合素质与财务会计',
+    },
     score: {
       recommended: 376,
       floor: 360,
@@ -119,6 +161,12 @@ module.exports = [
     category: '理工 - 生物医学',
     tags: ['交叉学科', '实验技术', '科研潜力'],
     majors: ['生物医学工程', '生物信息', '医学工程'],
+    examSubjects: {
+      politics: '思想政治理论',
+      math: '数学二',
+      english: '英语二',
+      professional: '生命科学综合',
+    },
     score: {
       recommended: 370,
       floor: 355,
@@ -135,6 +183,12 @@ module.exports = [
     category: '经管 - 金融学',
     tags: ['金融案例', '应用型培养', '口语表达'],
     majors: ['金融学', '金融工程', '保险精算'],
+    examSubjects: {
+      politics: '思想政治理论',
+      math: '数学三',
+      english: '英语二',
+      professional: '431 金融学综合',
+    },
     score: {
       recommended: 365,
       floor: 350,
@@ -151,6 +205,12 @@ module.exports = [
     category: '工科 - 土木工程',
     tags: ['工程管理', '结构设计', '实践能力'],
     majors: ['土木工程', '工程管理', '桥梁工程'],
+    examSubjects: {
+      politics: '思想政治理论',
+      math: '数学一',
+      english: '英语一',
+      professional: '结构力学与材料力学',
+    },
     score: {
       recommended: 360,
       floor: 345,

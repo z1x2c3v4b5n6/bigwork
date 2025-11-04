@@ -6,6 +6,7 @@ import {
   Divider,
   Grid,
   LinearProgress,
+  MenuItem,
   List,
   ListItem,
   ListItemIcon,
@@ -23,7 +24,7 @@ import InsightsIcon from '@mui/icons-material/Insights';
 import TaskAltIcon from '@mui/icons-material/TaskAlt';
 import InfoIcon from '@mui/icons-material/Info';
 import LaunchIcon from '@mui/icons-material/Launch';
-import type { UniversityRecommendationResponse } from '../services/recommendationService';
+import type { RecommendationRequest, UniversityRecommendationResponse } from '../services/recommendationService';
 import { recommendUniversities } from '../services/recommendationService';
 
 const matchLevelColor: Record<
@@ -39,6 +40,8 @@ const matchLevelColor: Record<
 const UniversityAdvisorPanel = () => {
   const [score, setScore] = useState('');
   const [major, setMajor] = useState('');
+  const [mathSubject, setMathSubject] = useState('');
+  const [englishSubject, setEnglishSubject] = useState('');
   const [inputError, setInputError] = useState<string | null>(null);
 
   const mutation = useMutation({
@@ -58,10 +61,21 @@ const UniversityAdvisorPanel = () => {
     if (mutation.isError) {
       mutation.reset();
     }
-    mutation.mutate({
+    const payload: RecommendationRequest = {
       totalScore: parsed,
       targetMajor: major.trim() ? major.trim() : undefined,
-    });
+    };
+
+    const mathValue = mathSubject.trim();
+    const englishValue = englishSubject.trim();
+    if (mathValue || englishValue) {
+      payload.examSubjects = {
+        math: mathValue || undefined,
+        english: englishValue || undefined,
+      };
+    }
+
+    mutation.mutate(payload);
   };
 
   const recommendation = mutation.data;
@@ -97,6 +111,36 @@ const UniversityAdvisorPanel = () => {
               placeholder="如 计算机、金融等"
               helperText="填写后可优先推荐对口优势专业"
             />
+          </Grid>
+          <Grid item xs={12} md={2}>
+            <TextField
+              fullWidth
+              select
+              label="数学科目"
+              value={mathSubject}
+              onChange={(event) => setMathSubject(event.target.value)}
+              helperText="选择报考的数学类别"
+            >
+              <MenuItem value="">不限</MenuItem>
+              <MenuItem value="数学一">数学一</MenuItem>
+              <MenuItem value="数学二">数学二</MenuItem>
+              <MenuItem value="数学三">数学三</MenuItem>
+              <MenuItem value="不考数学">不考数学</MenuItem>
+            </TextField>
+          </Grid>
+          <Grid item xs={12} md={2}>
+            <TextField
+              fullWidth
+              select
+              label="英语科目"
+              value={englishSubject}
+              onChange={(event) => setEnglishSubject(event.target.value)}
+              helperText="选择报考的英语类别"
+            >
+              <MenuItem value="">不限</MenuItem>
+              <MenuItem value="英语一">英语一</MenuItem>
+              <MenuItem value="英语二">英语二</MenuItem>
+            </TextField>
           </Grid>
           <Grid
             item
@@ -210,12 +254,46 @@ const UniversityAdvisorPanel = () => {
                         <Chip key={tag} label={tag} size="small" variant="outlined" />
                       ))}
                     </Stack>
+                    {(item.examSubjects.math ||
+                      item.examSubjects.english ||
+                      item.examSubjects.politics ||
+                      item.examSubjects.professional) && (
+                      <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                        {item.examSubjects.math && (
+                          <Chip label={`数学：${item.examSubjects.math}`} size="small" color="secondary" variant="outlined" />
+                        )}
+                        {item.examSubjects.english && (
+                          <Chip label={`英语：${item.examSubjects.english}`} size="small" color="secondary" variant="outlined" />
+                        )}
+                        {item.examSubjects.politics && (
+                          <Chip
+                            label={`政治：${item.examSubjects.politics}`}
+                            size="small"
+                            color="secondary"
+                            variant="outlined"
+                          />
+                        )}
+                        {item.examSubjects.professional && (
+                          <Chip
+                            label={`专业课：${item.examSubjects.professional}`}
+                            size="small"
+                            color="secondary"
+                            variant="outlined"
+                          />
+                        )}
+                      </Stack>
+                    )}
                     <Typography variant="body2" color="text.secondary">
                       {item.highlights}
                     </Typography>
-                    <Alert severity="info" icon={<InfoIcon fontSize="small" />} sx={{ borderRadius: 2 }}>
-                      {item.matchReason}
-                    </Alert>
+                    <Stack spacing={1}>
+                      <Alert severity="info" icon={<InfoIcon fontSize="small" />} sx={{ borderRadius: 2 }}>
+                        {item.matchReason}
+                      </Alert>
+                      <Alert severity={item.subjectMatch ? 'success' : 'warning'} sx={{ borderRadius: 2 }}>
+                        {item.subjectAdvice}
+                      </Alert>
+                    </Stack>
                     {item.interviewFocus.length > 0 && (
                       <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
                         {item.interviewFocus.map((topic) => (

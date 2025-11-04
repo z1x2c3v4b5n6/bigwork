@@ -705,17 +705,30 @@ router.post('/schedule', requireAuth, async (req, res) => {
 });
 
 router.post('/recommendations/universities', requireAuth, (req, res) => {
-  const { totalScore, targetMajor } = req.body || {};
+  const { totalScore, targetMajor, examSubjects } = req.body || {};
 
   const parsedScore = Number(totalScore);
   if (!Number.isFinite(parsedScore) || parsedScore <= 0) {
     return res.status(400).json({ message: '请填写有效的初试总分（需为正数）。' });
   }
 
+  const mathPreference =
+    examSubjects && typeof examSubjects.math === 'string' && examSubjects.math.trim()
+      ? examSubjects.math.trim()
+      : undefined;
+  const englishPreference =
+    examSubjects && typeof examSubjects.english === 'string' && examSubjects.english.trim()
+      ? examSubjects.english.trim()
+      : undefined;
+
   try {
     const payload = buildRecommendationResponse({
       totalScore: Math.min(500, parsedScore),
       major: targetMajor,
+      examPreferences: {
+        math: mathPreference,
+        english: englishPreference,
+      },
     });
 
     res.json(payload);

@@ -14,6 +14,91 @@ const normalizeMajor = (major) => {
   return String(major).trim().toLowerCase();
 };
 
+const normalizeMathSubject = (value) => {
+  if (!value) {
+    return '';
+  }
+  const normalized = String(value).replace(/\s+/g, '').toLowerCase();
+  if (/(数学|数)[一1]/.test(normalized)) {
+    return 'math1';
+  }
+  if (/(数学|数)[二2]/.test(normalized)) {
+    return 'math2';
+  }
+  if (/(数学|数)[三3]/.test(normalized)) {
+    return 'math3';
+  }
+  if (/不考|无数学|免数学/.test(normalized)) {
+    return 'mathNone';
+  }
+  return normalized;
+};
+
+const normalizeEnglishSubject = (value) => {
+  if (!value) {
+    return '';
+  }
+  const normalized = String(value).replace(/\s+/g, '').toLowerCase();
+  if (/(英语|英)[一1]/.test(normalized)) {
+    return 'eng1';
+  }
+  if (/(英语|英)[二2]/.test(normalized)) {
+    return 'eng2';
+  }
+  return normalized;
+};
+
+const formatExamSubjects = (subjects = {}) => {
+  const items = [];
+  if (subjects.math) {
+    items.push(`数学：${subjects.math}`);
+  }
+  if (subjects.english) {
+    items.push(`英语：${subjects.english}`);
+  }
+  if (subjects.professional) {
+    items.push(`专业课：${subjects.professional}`);
+  }
+  if (subjects.politics) {
+    items.push(`政治：${subjects.politics}`);
+  }
+  return items.join(' · ');
+};
+
+const buildSubjectAdvice = (subjects, preferences = {}, matches) => {
+  const preferenceValues = [];
+  if (preferences.math) {
+    preferenceValues.push(preferences.math);
+  }
+  if (preferences.english) {
+    preferenceValues.push(preferences.english);
+  }
+  const preferenceText = preferenceValues.length > 0 ? preferenceValues.join(' / ') : '';
+  const baseRequirement = formatExamSubjects(subjects);
+
+  if (!preferenceText) {
+    return baseRequirement ? `初试科目要求：${baseRequirement}。` : '初试科目以院校最新简章为准。';
+  }
+
+  const requirementText = baseRequirement ? `初试科目要求：${baseRequirement}。` : '';
+
+  if (matches.math && matches.english) {
+    return `${requirementText}与你选择的科目（${preferenceText}）完全匹配，可直接参考该院校的备考规划。`.trim();
+  }
+
+  const mismatchReasons = [];
+  if (!matches.math && preferences.math) {
+    mismatchReasons.push(`数学科目要求为 ${subjects.math || '院校自定'}`);
+  }
+  if (!matches.english && preferences.english) {
+    mismatchReasons.push(`英语科目要求为 ${subjects.english || '院校自定'}`);
+  }
+
+  const mismatchText = mismatchReasons.join('，');
+  const message = `${requirementText}与你选择的科目（${preferenceText}）存在差异，${mismatchText}，请评估是否补充备考或调整志愿。`;
+  return message.trim();
+};
+
 const getScoreBand = (score) => {
   if (score >= 420) {
     return '420+ 卓越冲刺档：具备冲击顶尖院校的硬实力';
@@ -65,8 +150,12 @@ const evaluateMatchLevel = (score, university) => {
   return '高风险';
 };
 
-const buildRecommendations = (totalScore, major) => {
+const buildRecommendations = (totalScore, major, examPreferences = {}) => {
   const normalizedMajor = normalizeMajor(major);
+  const normalizedPreferences = {
+    math: normalizeMathSubject(examPreferences.math),
+    english: normalizeEnglishSubject(examPreferences.english),
+  };
   const results = universities
     .map((university) => {
       const matchLevel = evaluateMatchLevel(totalScore, university);
@@ -78,7 +167,21 @@ const buildRecommendations = (totalScore, major) => {
       const majorBoost = majorMatched ? 8 : 0;
       const diffScore = diff >= 0 ? diff : diff * 0.6;
       const levelScore = (3 - matchLevelOrder[matchLevel]) * 12;
-      const compositeScore = levelScore * 2 + diffScore + majorBoost;
+      const examSubjects = university.examSubjects || {};
+      const mathRequirement = normalizeMathSubject(examSubjects.math);
+      const englishRequirement = normalizeEnglishSubject(examSubjects.english);
+      const mathMatches = !normalizedPreferences.math || !mathRequirement
+        ? true
+        : normalizedPreferences.math === mathRequirement;
+      const englishMatches = !normalizedPreferences.english || !englishRequirement
+        ? true
+        : normalizedPreferences.english === englishRequirement;
+
+      const subjectScore =
+        (normalizedPreferences.math ? (mathMatches ? 8 : -12) : 0) +
+        (normalizedPreferences.english ? (englishMatches ? 6 : -10) : 0);
+
+      const compositeScore = levelScore * 2 + diffScore + majorBoost + subjectScore;
 
       return {
         id: university.id,
@@ -92,6 +195,13 @@ const buildRecommendations = (totalScore, major) => {
         matchLevel,
         matchReason: buildMatchReason(totalScore, university),
         interviewFocus: university.interviewFocus,
+        examSubjects,
+        subjectMatch: mathMatches && englishMatches,
+        subjectAdvice: buildSubjectAdvice(
+          examSubjects,
+          examPreferences,
+          { math: mathMatches, english: englishMatches },
+        ),
         scoreDelta: diff,
         compositeScore,
         majorMatched,
@@ -217,8 +327,12 @@ const buildStrategy = (totalScore, recommended) => {
   return strategy;
 };
 
-const buildRecommendationResponse = ({ totalScore, major }) => {
-  const { recommendedUniversities, focusTopics } = buildRecommendations(totalScore, major);
+const buildRecommendationResponse = ({ totalScore, major, examPreferences }) => {
+  const { recommendedUniversities, focusTopics } = buildRecommendations(
+    totalScore,
+    major,
+    examPreferences,
+  );
   const interviewPreparation = buildInterviewPreparation(focusTopics);
   const strategy = buildStrategy(totalScore, recommendedUniversities);
 
