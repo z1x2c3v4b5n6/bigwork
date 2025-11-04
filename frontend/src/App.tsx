@@ -17,6 +17,10 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import RequireAuth from './components/RequireAuth';
 import Forum from './pages/Forum';
+import PostgraduateIntroTemplates from './pages/PostgraduateIntroTemplates';
+import PostgraduateSubjectTopics from './pages/PostgraduateSubjectTopics';
+import PostgraduateEnglishReview from './pages/PostgraduateEnglishReview';
+import RequireStudent from './components/RequireStudent';
 
 const App = () => {
   const [mode, setMode] = useState<'light' | 'dark'>('light');
@@ -43,6 +47,30 @@ const App = () => {
           <Route path="advisor" element={<Advisor />} />
           <Route path="analytics" element={<Analytics />} />
           <Route path="forum" element={<Forum />} />
+          <Route
+            path="retake-intro"
+            element={(
+              <RequireStudent>
+                <PostgraduateIntroTemplates />
+              </RequireStudent>
+            )}
+          />
+          <Route
+            path="retake-subjects"
+            element={(
+              <RequireStudent>
+                <PostgraduateSubjectTopics />
+              </RequireStudent>
+            )}
+          />
+          <Route
+            path="retake-english"
+            element={(
+              <RequireStudent>
+                <PostgraduateEnglishReview />
+              </RequireStudent>
+            )}
+          />
           <Route path="profile" element={<Profile />} />
           <Route
             path="admin"
