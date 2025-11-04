@@ -1,0 +1,16 @@
+{
+  "miniprogramRoot": "./",
+  "projectname": "postgraduate-interview-toolkit",
+  "description": "研招复试冲刺工具箱微信小程序",
+  "appid": "touristappid",
+  "setting": {
+    "urlCheck": false,
+    "es6": true,
+    "postcss": true,
+    "minified": true,
+    "enhance": true
+  },
+  "compileType": "miniprogram",
+  "libVersion": "2.31.0",
+  "condition": {}
+}

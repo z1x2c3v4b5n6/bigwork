@@ -156,7 +156,7 @@ const buildRecommendations = (totalScore, major, examPreferences = {}) => {
     math: normalizeMathSubject(examPreferences.math),
     english: normalizeEnglishSubject(examPreferences.english),
   };
-  const results = universities
+  const mappedResults = universities
     .map((university) => {
       const matchLevel = evaluateMatchLevel(totalScore, university);
       const diff = totalScore - university.score.recommended;
@@ -206,20 +206,27 @@ const buildRecommendations = (totalScore, major, examPreferences = {}) => {
         compositeScore,
         majorMatched,
       };
-    })
-    .filter((item) => item.scoreDelta >= -25 || item.matchLevel !== '高风险')
-    .sort((a, b) => {
-      const levelDiff = matchLevelOrder[a.matchLevel] - matchLevelOrder[b.matchLevel];
-      if (levelDiff !== 0) {
-        return levelDiff;
-      }
-      if (b.compositeScore !== a.compositeScore) {
-        return b.compositeScore - a.compositeScore;
-      }
-      return b.scoreDelta - a.scoreDelta;
     });
 
-  const recommendedUniversities = results.slice(0, 6);
+  const sortedResults = [...mappedResults].sort((a, b) => {
+    const levelDiff = matchLevelOrder[a.matchLevel] - matchLevelOrder[b.matchLevel];
+    if (levelDiff !== 0) {
+      return levelDiff;
+    }
+    if (b.compositeScore !== a.compositeScore) {
+      return b.compositeScore - a.compositeScore;
+    }
+    return b.scoreDelta - a.scoreDelta;
+  });
+
+  const filteredResults = sortedResults.filter(
+    (item) => item.scoreDelta >= -25 || item.matchLevel !== '高风险',
+  );
+
+  const recommendedUniversities = (filteredResults.length >= 3
+    ? filteredResults
+    : sortedResults
+  ).slice(0, 6);
 
   const focusTopics = Array.from(
     new Set(

@@ -1,0 +1,14 @@
+{
+  "pages": [
+    "pages/index/index",
+    "pages/intro/index",
+    "pages/subjects/index",
+    "pages/english/index"
+  ],
+  "window": {
+    "backgroundTextStyle": "dark",
+    "navigationBarBackgroundColor": "#1a73e8",
+    "navigationBarTitleText": "复试冲刺工具箱",
+    "navigationBarTextStyle": "white"
+  }
+}

@@ -1,0 +1,60 @@
+<view class="section-card">
+  <view class="section-title">复试自我介绍模板（中英双语）</view>
+  <view class="section-subtitle">
+    先确认分数段策略，再按模板替换关键词。建议中文稿先写，英文稿再对照补充，确保逻辑一致且便于临场切换。
+  </view>
+</view>
+
+<view class="section-card">
+  <view class="section-title">分数段策略</view>
+  <view class="card-grid">
+    <block wx:for="{{scoreBandGuides}}" wx:key="key" wx:for-item="guide">
+      <view class="card">
+        <view class="tag {{guide.key === 'low' ? 'tag-warning' : ''}}">{{guide.title}}</view>
+        <view class="card-body">{{guide.subtitle}}</view>
+        <view class="list">
+          <block wx:for="{{guide.actionSteps}}" wx:key="*this" wx:for-item="step">
+            <view class="list-item">
+              <view class="list-dot {{guide.key === 'low' ? 'warning' : ''}}"></view>
+              <view>{{step}}</view>
+            </view>
+          </block>
+        </view>
+      </view>
+    </block>
+  </view>
+</view>
+
+<view class="section-card">
+  <view class="section-title">双语段落模板</view>
+  <view class="card-grid">
+    <block wx:for="{{bilingualTemplate}}" wx:key="title" wx:for-item="section">
+      <view class="card">
+        <view class="card-title">{{section.title}}</view>
+        <view class="card-body">
+          <view class="tag" style="margin-bottom: 12rpx;">中文</view>
+          <view>{{section.chinese}}</view>
+          <view class="tag" style="margin: 20rpx 0 12rpx;">English</view>
+          <view>{{section.english}}</view>
+        </view>
+      </view>
+    </block>
+  </view>
+</view>
+
+<view class="section-card">
+  <view class="section-title">临场彩蛋素材清单</view>
+  <view class="card">
+    <view class="card-body">
+      <block wx:for="{{rehearsalChecklist}}" wx:key="*this" wx:for-item="item">
+        <view class="list-item">
+          <view class="list-dot"></view>
+          <view>{{item}}</view>
+        </view>
+      </block>
+      <blockquote>
+        快速切换技巧：先用中文回答核心观点，再补一句英文总结亮点，例如“核心经验是…… In short, it proves my capability in …”。
+      </blockquote>
+    </view>
+  </view>
+</view>
