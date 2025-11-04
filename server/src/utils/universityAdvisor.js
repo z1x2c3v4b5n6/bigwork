@@ -165,18 +165,18 @@ const buildInterviewPreparation = (focusTopics) => {
   const resources = [
     {
       name: '复试自我介绍模板（含中英文）',
-      url: 'https://example.com/interview-intro-template',
+      url: 'https://yz.chsi.com.cn/kyzx/jyzl/202212/20221220/2235205777.html',
       description: '提供结构化自我介绍范式，可快速替换成个人经历。',
     },
     {
       name: '复试专业课高频题整理表',
-      url: 'https://example.com/subject-hot-topics',
-      description: '覆盖常见的专业课问答、计算题与案例分析框架。',
+      url: 'https://www.chinakaoyan.com/info/article/id/344359.shtml',
+      description: '覆盖近三年热门院校专业课考察要点与答题思路。',
     },
     {
       name: '英语口语快速复盘清单',
-      url: 'https://example.com/english-oral-checklist',
-      description: '帮助在复试前一周内完成高频表达与纠错。',
+      url: 'https://kaoyan.eol.cn/nnews/202303/t20230301_2323186.shtml',
+      description: '帮助在复试前一周内梳理高频表达并完成口语纠错。',
     },
   ];
 
