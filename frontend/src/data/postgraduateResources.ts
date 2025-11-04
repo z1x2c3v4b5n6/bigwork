@@ -13,6 +13,7 @@ export interface MajorRecommendation {
   recommendedSchools: {
     high: string[];
     mid: string[];
+    low: string[];
   };
 }
 
@@ -40,9 +41,9 @@ export const scoreBandGuides: ScoreBandGuide[] = [
   {
     key: 'low',
     title: '国家线以下：暂停冲刺，重新规划',
-    subtitle: '建议评估自身状态，积累实践或准备下次备考。',
+    subtitle: '评估自身状态，结合调剂窗口或准备下次备考。',
     actionSteps: [
-      '回顾初试失分原因，形成完整的错题档案并结合导师反馈制定长期计划。',
+      '结合下方院校推荐，筛选调剂机会或锁定下一轮冲刺的目标梯队。',
       '寻找实习、科研助理或公开课学习机会，保持学习节奏，为下一轮备考积累素材。',
       '保持身体与心理健康，避免盲目报名复试，腾出时间充电与调整。',
     ],
@@ -58,6 +59,7 @@ export const majorRecommendations: MajorRecommendation[] = [
     recommendedSchools: {
       high: ['清华大学计算机系', '北京大学信息科学技术学院', '上海交通大学计算机科学与工程系'],
       mid: ['华中科技大学计算机学院', '东南大学计算机科学与工程学院', '西安电子科技大学计算机学院'],
+      low: ['北京信息科技大学计算机学院', '南京信息工程大学计算机科学与技术学院', '广东工业大学计算机学院'],
     },
   },
   {
@@ -68,6 +70,7 @@ export const majorRecommendations: MajorRecommendation[] = [
     recommendedSchools: {
       high: ['北京航空航天大学软件学院', '南京大学软件学院', '浙江大学软件学院'],
       mid: ['四川大学软件学院', '大连理工大学软件学院', '华东师范大学软件工程学院'],
+      low: ['深圳大学计算机与软件学院', '浙江工业大学软件学院', '中国地质大学（武汉）信息工程学院'],
     },
   },
   {
@@ -78,6 +81,7 @@ export const majorRecommendations: MajorRecommendation[] = [
     recommendedSchools: {
       high: ['中国科学院大学人工智能学院', '上海交通大学人工智能研究院', '中国科学技术大学信息科学技术学院'],
       mid: ['北京理工大学人工智能学院', '哈尔滨工业大学（深圳）人工智能学院', '天津大学智能与计算学部'],
+      low: ['南昌大学人工智能学院', '合肥工业大学智能科学与工程学院', '北京联合大学智能制造学院'],
     },
   },
   {
@@ -88,6 +92,7 @@ export const majorRecommendations: MajorRecommendation[] = [
     recommendedSchools: {
       high: ['复旦大学大数据学院', '北京大学信息工程学院', '浙江大学数据科学研究中心'],
       mid: ['中南大学大数据研究院', '重庆大学大数据与软件学院', '北京交通大学计算机与信息技术学院'],
+      low: ['广东财经大学数据科学学院', '河南工业大学大数据学院', '云南大学信息学院'],
     },
   },
   {
@@ -98,6 +103,7 @@ export const majorRecommendations: MajorRecommendation[] = [
     recommendedSchools: {
       high: ['北京邮电大学信息与通信工程学院', '电子科技大学信息与通信工程学院', '东南大学信息科学与工程学院'],
       mid: ['北京工业大学电子信息学部', '西南交通大学信息科学与技术学院', '燕山大学信息科学与工程学院'],
+      low: ['福州大学电子信息与电气工程学院', '桂林电子科技大学信息与通信学院', '河北工业大学电子信息工程学院'],
     },
   },
   {
@@ -108,6 +114,7 @@ export const majorRecommendations: MajorRecommendation[] = [
     recommendedSchools: {
       high: ['清华大学电子工程系', '上海交通大学电子信息与电气工程学院', '华中科技大学光学与电子信息学院'],
       mid: ['南京邮电大学通信工程学院', '西安电子科技大学通信工程学院', '杭州电子科技大学通信工程学院'],
+      low: ['南京信息工程大学通信工程学院', '长沙理工大学信息工程学院', '河北大学电子信息工程学院'],
     },
   },
   {
@@ -118,6 +125,7 @@ export const majorRecommendations: MajorRecommendation[] = [
     recommendedSchools: {
       high: ['上海交通大学自动化系', '浙江大学控制科学与工程学院', '哈尔滨工业大学控制科学与工程学院'],
       mid: ['北京化工大学信息科学与技术学院', '华南理工大学自动化科学与工程学院', '天津大学电气与自动化工程学院'],
+      low: ['华北电力大学自动化系', '郑州大学控制科学与工程学院', '沈阳工业大学信息科学与工程学院'],
     },
   },
   {
@@ -128,6 +136,7 @@ export const majorRecommendations: MajorRecommendation[] = [
     recommendedSchools: {
       high: ['清华大学机械工程系', '上海交通大学机械与动力工程学院', '华中科技大学机械科学与工程学院'],
       mid: ['大连理工大学机械工程学院', '重庆大学机械工程学院', '燕山大学机械工程学院'],
+      low: ['河北工业大学机械工程学院', '重庆理工大学机械工程学院', '兰州理工大学机电工程学院'],
     },
   },
   {
@@ -138,6 +147,7 @@ export const majorRecommendations: MajorRecommendation[] = [
     recommendedSchools: {
       high: ['北京航空航天大学材料学院', '上海交通大学材料科学与工程学院', '北京理工大学材料学院'],
       mid: ['东北大学材料科学与工程学院', '天津大学材料科学与工程学院', '华南理工大学材料科学与工程学院'],
+      low: ['福州大学材料科学与工程学院', '昆明理工大学材料科学与工程学院', '广西大学材料科学与工程学院'],
     },
   },
   {
@@ -148,6 +158,7 @@ export const majorRecommendations: MajorRecommendation[] = [
     recommendedSchools: {
       high: ['同济大学土木工程学院', '东南大学土木工程学院', '哈尔滨工业大学土木工程学院'],
       mid: ['重庆大学土木工程学院', '长沙理工大学土木工程学院', '福州大学土木工程学院'],
+      low: ['青岛理工大学土木工程学院', '河北工程大学土木与水利工程学院', '内蒙古工业大学土木工程学院'],
     },
   },
   {
@@ -158,6 +169,7 @@ export const majorRecommendations: MajorRecommendation[] = [
     recommendedSchools: {
       high: ['清华大学建筑学院', '东南大学建筑学院', '同济大学建筑与城市规划学院'],
       mid: ['华南理工大学建筑学院', '天津大学建筑学院', '重庆大学建筑城规学院'],
+      low: ['北京建筑大学建筑与城市规划学院', '昆明理工大学建筑与城市规划学院', '长沙理工大学建筑学院'],
     },
   },
   {
@@ -168,6 +180,7 @@ export const majorRecommendations: MajorRecommendation[] = [
     recommendedSchools: {
       high: ['复旦大学生物工程系', '浙江大学生物工程系', '天津大学生命科学学院'],
       mid: ['江南大学生物工程学院', '华中农业大学生命科学技术学院', '南京工业大学生物工程与技术学院'],
+      low: ['青岛科技大学生物工程学院', '贵州大学生物工程学院', '宁夏大学生命科学学院'],
     },
   },
   {
@@ -178,6 +191,7 @@ export const majorRecommendations: MajorRecommendation[] = [
     recommendedSchools: {
       high: ['中国药科大学药学院', '北京大学药学院', '浙江大学药学院'],
       mid: ['沈阳药科大学药学院', '华中科技大学同济医学院药学院', '湖南大学药学院'],
+      low: ['安徽医科大学药学院', '浙江中医药大学药学院', '广东药科大学药学院'],
     },
   },
   {
@@ -188,6 +202,7 @@ export const majorRecommendations: MajorRecommendation[] = [
     recommendedSchools: {
       high: ['复旦大学上海医学院', '中山大学中山医学院', '四川大学华西临床医学院'],
       mid: ['南京医科大学第一临床医学院', '哈尔滨医科大学临床医学院', '首都医科大学临床医学院'],
+      low: ['大连医科大学临床医学院', '蚌埠医学院临床医学院', '新疆医科大学临床医学院'],
     },
   },
   {
@@ -198,6 +213,7 @@ export const majorRecommendations: MajorRecommendation[] = [
     recommendedSchools: {
       high: ['中山大学护理学院', '四川大学华西护理学院', '北京协和医学院护理学院'],
       mid: ['重庆医科大学护理学院', '福建医科大学护理学院', '南方医科大学护理学院'],
+      low: ['河北医科大学护理学院', '长沙医学院护理学院', '江西中医药大学护理学院'],
     },
   },
   {
@@ -208,6 +224,7 @@ export const majorRecommendations: MajorRecommendation[] = [
     recommendedSchools: {
       high: ['北京大学光华管理学院', '清华大学五道口金融学院', '复旦大学经济学院'],
       mid: ['上海财经大学金融学院', '对外经济贸易大学金融学院', '中央财经大学金融学院'],
+      low: ['上海立信会计金融学院金融学院', '江西财经大学现代经济管理学院', '重庆工商大学经济学部'],
     },
   },
   {
@@ -218,6 +235,7 @@ export const majorRecommendations: MajorRecommendation[] = [
     recommendedSchools: {
       high: ['厦门大学管理学院', '上海财经大学会计学院', '中山大学管理学院'],
       mid: ['东北财经大学会计学院', '江西财经大学会计学院', '西南财经大学会计学院'],
+      low: ['广东财经大学会计学院', '河北经贸大学会计学院', '浙江工商大学会计学院'],
     },
   },
   {
@@ -228,6 +246,7 @@ export const majorRecommendations: MajorRecommendation[] = [
     recommendedSchools: {
       high: ['清华大学经济管理学院', '上海交通大学安泰经济与管理学院', '中欧国际工商学院（非全日制参考）'],
       mid: ['对外经济贸易大学国际商学院', '华南理工大学工商管理学院', '湖南大学工商管理学院'],
+      low: ['南京财经大学工商管理学院', '哈尔滨商业大学管理学院', '江西财经大学工商管理学院'],
     },
   },
   {
@@ -238,6 +257,7 @@ export const majorRecommendations: MajorRecommendation[] = [
     recommendedSchools: {
       high: ['对外经济贸易大学国际经济贸易学院', '上海外国语大学国际工商管理学院', '北京大学汇丰商学院'],
       mid: ['广东外语外贸大学国际商学院', '上海对外经贸大学国际经贸学院', '浙江工商大学国际商学院'],
+      low: ['天津财经大学国际工商学院', '湖北经济学院国际商务学院', '广东技术师范大学经济与管理学院'],
     },
   },
   {
@@ -248,6 +268,7 @@ export const majorRecommendations: MajorRecommendation[] = [
     recommendedSchools: {
       high: ['中国人民大学新闻学院', '复旦大学新闻学院', '北京大学新闻与传播学院'],
       mid: ['华中科技大学新闻与信息传播学院', '暨南大学新闻与传播学院', '湖南大学新闻与传播学院'],
+      low: ['上海大学新闻传播学院', '中国传媒大学南广学院新闻传播学院', '浙江传媒学院新闻与传播学院'],
     },
   },
   {
@@ -258,6 +279,7 @@ export const majorRecommendations: MajorRecommendation[] = [
     recommendedSchools: {
       high: ['北京师范大学心理学部', '华东师范大学心理与认知科学学院', '中山大学心理学系'],
       mid: ['首都师范大学心理学院', '西南大学心理学部', '南京师范大学心理学院'],
+      low: ['陕西师范大学心理学院', '吉林师范大学心理学院', '成都医学院心理学院'],
     },
   },
 ];

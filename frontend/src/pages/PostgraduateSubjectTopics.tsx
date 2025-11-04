@@ -23,8 +23,6 @@ import SchoolIcon from '@mui/icons-material/School';
 import { useMemo, useState } from 'react';
 import { majorRecommendations, scoreBandGuides } from '../data/postgraduateResources';
 
-const lowBandMessage = '建议暂停复试，先梳理错题与经历，积累实习或科研后再战。';
-
 const PostgraduateSubjectTopics = () => {
   const [selectedMajor, setSelectedMajor] = useState<string>('all');
 
@@ -51,7 +49,7 @@ const PostgraduateSubjectTopics = () => {
           复试专业课高频题整理表
         </Typography>
         <Typography variant="body1" color="text.secondary">
-          基于近三年热门院校的复试要求，将 20 个热门专业的核心考点、追问角度与练习任务整合成一张“复盘表”。按照分数段选择备考策略，360 分以上聚焦深度与创新，国家线至 360 分强调全面覆盖，国家线以下建议暂停冲刺，补齐知识与经历再战。
+          基于近三年热门院校的复试要求，将 20 个热门专业的核心考点、追问角度与练习任务整合成一张“复盘表”。按照分数段选择备考策略：360 分以上聚焦深度与创新，国家线至 360 分强调全面覆盖，国家线以下聚焦调剂机会与下一轮冲刺准备。
         </Typography>
       </Stack>
 
@@ -70,7 +68,7 @@ const PostgraduateSubjectTopics = () => {
                   分数段策略与院校推荐
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  仅对 360 分以上与国家线-360 分提供目标院校组合，国家线以下提供“暂停冲刺”提醒，避免盲目投入复试。
+                  针对 360 分以上、国家线-360 分与国家线以下分别给出目标院校组合和行动建议，帮助快速明确下一步投入方向。
                 </Typography>
               </Box>
             </Stack>
@@ -118,7 +116,7 @@ const PostgraduateSubjectTopics = () => {
                   <Divider sx={{ borderStyle: 'dotted' }} />
                   <Typography variant="body2" color="text.secondary">
                     {guide.key === 'low'
-                      ? '建议暂缓复试，梳理错题与经历，积累实习或科研，再以更扎实的底气回归。'
+                      ? '建议评估自身节奏，结合下方院校列表规划调剂与下一轮备考节奏，稳步补齐短板。'
                       : '建议从下方表格中锁定与你专业匹配的院校组合，提前研究导师方向。'}
                   </Typography>
                 </Stack>
@@ -133,12 +131,12 @@ const PostgraduateSubjectTopics = () => {
           <TableHead>
             <TableRow>
               <TableCell width="12%">热门专业</TableCell>
-              <TableCell width="20%">高频考点</TableCell>
+              <TableCell width="19%">高频考点</TableCell>
               <TableCell width="16%">追问角度</TableCell>
               <TableCell width="18%">冲刺练习任务</TableCell>
-              <TableCell width="14%">360 分以上推荐院校</TableCell>
-              <TableCell width="14%">国家线-360 分推荐院校</TableCell>
-              <TableCell width="12%">国家线以下提醒</TableCell>
+              <TableCell width="13%">360 分以上推荐院校</TableCell>
+              <TableCell width="13%">国家线-360 分推荐院校</TableCell>
+              <TableCell width="17%">国家线以下推荐院校</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -200,9 +198,14 @@ const PostgraduateSubjectTopics = () => {
                   </Stack>
                 </TableCell>
                 <TableCell>
-                  <Typography variant="body2" color="text.secondary">
-                    {lowBandMessage}
-                  </Typography>
+                  <Stack spacing={0.5}>
+                    {item.recommendedSchools.low.map((school) => (
+                      <Typography key={school} variant="body2" color="text.secondary">
+                        <SchoolIcon fontSize="inherit" color="warning" sx={{ mr: 0.5 }} />
+                        {school}
+                      </Typography>
+                    ))}
+                  </Stack>
                 </TableCell>
               </TableRow>
             ))}
