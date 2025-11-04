@@ -10,6 +10,7 @@ const { requireAuth } = require('../middleware/auth');
 const { normalizeDate, parseTags, stringifyTags, toMySqlDateTime } = require('../utils/formatters');
 const { normalizeIdentifier, normalizeValueForColumn } = require('../utils/db');
 const { getDefaultMajorId } = require('../utils/majors');
+const { buildRecommendationResponse } = require('../utils/universityAdvisor');
 
 const router = express.Router();
 
@@ -700,6 +701,27 @@ router.post('/schedule', requireAuth, async (req, res) => {
   } catch (error) {
     console.error('创建日程失败', error);
     res.status(500).json({ message: '创建日程失败，请稍后重试' });
+  }
+});
+
+router.post('/recommendations/universities', requireAuth, (req, res) => {
+  const { totalScore, targetMajor } = req.body || {};
+
+  const parsedScore = Number(totalScore);
+  if (!Number.isFinite(parsedScore) || parsedScore <= 0) {
+    return res.status(400).json({ message: '请填写有效的初试总分（需为正数）。' });
+  }
+
+  try {
+    const payload = buildRecommendationResponse({
+      totalScore: Math.min(500, parsedScore),
+      major: targetMajor,
+    });
+
+    res.json(payload);
+  } catch (error) {
+    console.error('生成院校推荐失败', error);
+    res.status(500).json({ message: '暂时无法生成院校推荐，请稍后重试。' });
   }
 });
 
