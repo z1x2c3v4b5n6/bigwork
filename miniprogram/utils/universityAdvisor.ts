@@ -1,20 +1,82 @@
-const universities = require('../../data/universityProfiles');
+import { universityProfiles, type UniversityProfile } from '../data/universityProfiles';
 
-const matchLevelOrder = {
+export type MatchLevel = '稳妥' | '冲刺' | '保底' | '高风险';
+
+export interface ExamSubjectRequirement {
+  politics?: string;
+  math?: string;
+  english?: string;
+  professional?: string;
+}
+
+export interface UniversityRecommendationItem {
+  id: string;
+  name: string;
+  province: string;
+  level: string;
+  category: string;
+  tags: string[];
+  scoreWindow: string;
+  highlights: string;
+  matchLevel: MatchLevel;
+  matchReason: string;
+  interviewFocus: string[];
+  examSubjects: ExamSubjectRequirement;
+  subjectMatch: boolean;
+  subjectAdvice: string;
+}
+
+export interface InterviewTimelineStep {
+  stage: string;
+  items: string[];
+}
+
+export interface InterviewResourceItem {
+  name: string;
+  url: string;
+  description: string;
+}
+
+export interface InterviewPreparationPayload {
+  timeline: InterviewTimelineStep[];
+  suggestions: string[];
+  focusTopics: string[];
+  resources: InterviewResourceItem[];
+}
+
+export interface UniversityRecommendationResponse {
+  totalScore: number;
+  scoreBand: string;
+  summary: string;
+  strategy: string[];
+  recommendedUniversities: UniversityRecommendationItem[];
+  interviewPreparation: InterviewPreparationPayload;
+}
+
+export interface RecommendationPayload {
+  totalScore: number;
+  targetMajor?: string;
+  examPreferences?: {
+    math?: string;
+    english?: string;
+  };
+}
+
+const matchLevelOrder: Record<MatchLevel, number> = {
   稳妥: 0,
   冲刺: 1,
   保底: 2,
   高风险: 3,
 };
 
-const normalizeMajor = (major) => {
+const normalizeMajor = (major?: string): string => {
   if (!major) {
     return '';
   }
   return String(major).trim().toLowerCase();
 };
 
-const normalizeMathSubject = (value) => {
+const normalizeMathSubject = (value?: string): string => {
   if (!value) {
     return '';
   }
@@ -34,7 +96,7 @@ const normalizeMathSubject = (value) => {
   return normalized;
 };
 
-const normalizeEnglishSubject = (value) => {
+const normalizeEnglishSubject = (value?: string): string => {
   if (!value) {
     return '';
   }
@@ -48,8 +110,8 @@ const normalizeEnglishSubject = (value) => {
   return normalized;
 };
 
-const formatExamSubjects = (subjects = {}) => {
-  const items = [];
+const formatExamSubjects = (subjects: ExamSubjectRequirement = {}): string => {
+  const items: string[] = [];
   if (subjects.math) {
     items.push(`数学：${subjects.math}`);
   }
@@ -65,12 +127,16 @@ const formatExamSubjects = (subjects = {}) => {
   return items.join(' · ');
 };
 
-const buildSubjectAdvice = (subjects, preferences = {}, matches) => {
-  const preferenceValues = [];
-  if (preferences.math) {
+const buildSubjectAdvice = (
+  subjects: ExamSubjectRequirement,
+  preferences: RecommendationPayload['examPreferences'] = {},
+  matches: { math: boolean; english: boolean },
+): string => {
+  const preferenceValues: string[] = [];
+  if (preferences?.math) {
     preferenceValues.push(preferences.math);
   }
-  if (preferences.english) {
+  if (preferences?.english) {
     preferenceValues.push(preferences.english);
   }
   const preferenceText = preferenceValues.length > 0 ? preferenceValues.join(' / ') : '';
@@ -86,11 +152,11 @@ const buildSubjectAdvice = (subjects, preferences = {}, matches) => {
     return `${requirementText}与你选择的科目（${preferenceText}）完全匹配，可直接参考该院校的备考规划。`.trim();
   }
 
-  const mismatchReasons = [];
-  if (!matches.math && preferences.math) {
+  const mismatchReasons: string[] = [];
+  if (!matches.math && preferences?.math) {
     mismatchReasons.push(`数学科目要求为 ${subjects.math || '院校自定'}`);
   }
-  if (!matches.english && preferences.english) {
+  if (!matches.english && preferences?.english) {
     mismatchReasons.push(`英语科目要求为 ${subjects.english || '院校自定'}`);
   }
 
@@ -99,7 +165,7 @@ const buildSubjectAdvice = (subjects, preferences = {}, matches) => {
   return message.trim();
 };
 
-const getScoreBand = (score) => {
+const getScoreBand = (score: number): string => {
   if (score >= 420) {
     return '420+ 卓越冲刺档：具备冲击顶尖院校的硬实力';
   }
@@ -115,7 +181,7 @@ const getScoreBand = (score) => {
   return '360 以下夯实基础档：建议选择稳妥与保底院校组合，同时提升复试竞争力';
 };
 
-const buildMatchReason = (score, university) => {
+const buildMatchReason = (score: number, university: UniversityProfile): string => {
   const diff = score - university.score.recommended;
   const diffAbs = Math.abs(diff);
 
@@ -136,7 +202,7 @@ const buildMatchReason = (score, university) => {
   return `${base}，当前分差 ${diffAbs} 分，建议突出科研/实践亮点或准备调剂方案。`;
 };
 
-const evaluateMatchLevel = (score, university) => {
+const evaluateMatchLevel = (score: number, university: UniversityProfile): MatchLevel => {
   const diff = score - university.score.recommended;
   if (diff >= 15) {
     return '保底';
@@ -150,13 +216,18 @@ const evaluateMatchLevel = (score, university) => {
   return '高风险';
 };
 
-const buildRecommendations = (totalScore, major, examPreferences = {}) => {
+const buildRecommendations = (
+  totalScore: number,
+  major?: string,
+  examPreferences: RecommendationPayload['examPreferences'] = {},
+): { recommendedUniversities: UniversityRecommendationItem[]; focusTopics: string[] } => {
   const normalizedMajor = normalizeMajor(major);
   const normalizedPreferences = {
-    math: normalizeMathSubject(examPreferences.math),
-    english: normalizeEnglishSubject(examPreferences.english),
+    math: normalizeMathSubject(examPreferences?.math),
+    english: normalizeEnglishSubject(examPreferences?.english),
   };
-  const results = universities
+
+  const results = universityProfiles
     .map((university) => {
       const matchLevel = evaluateMatchLevel(totalScore, university);
       const diff = totalScore - university.score.recommended;
@@ -195,16 +266,15 @@ const buildRecommendations = (totalScore, major, examPreferences = {}) => {
         matchLevel,
         matchReason: buildMatchReason(totalScore, university),
         interviewFocus: university.interviewFocus,
-        examSubjects,
+        examSubjects: university.examSubjects,
         subjectMatch: mathMatches && englishMatches,
         subjectAdvice: buildSubjectAdvice(
-          examSubjects,
+          university.examSubjects,
           examPreferences,
           { math: mathMatches, english: englishMatches },
         ),
         scoreDelta: diff,
         compositeScore,
-        majorMatched,
       };
     })
     .filter((item) => item.scoreDelta >= -25 || item.matchLevel !== '高风险')
@@ -219,7 +289,10 @@ const buildRecommendations = (totalScore, major, examPreferences = {}) => {
       return b.scoreDelta - a.scoreDelta;
     });
 
-  const recommendedUniversities = results.slice(0, 6);
+  const recommendedUniversities = results.slice(0, 6).map((item) => {
+    const { scoreDelta, compositeScore, ...rest } = item;
+    return rest;
+  });
 
   const focusTopics = Array.from(
     new Set(
@@ -235,8 +308,8 @@ const buildRecommendations = (totalScore, major, examPreferences = {}) => {
   };
 };
 
-const buildInterviewPreparation = (focusTopics) => {
-  const timeline = [
+const buildInterviewPreparation = (focusTopics: string[]): InterviewPreparationPayload => {
+  const timeline: InterviewTimelineStep[] = [
     {
       stage: '出分当周',
       items: [
@@ -262,7 +335,7 @@ const buildInterviewPreparation = (focusTopics) => {
     },
   ];
 
-  const suggestions = [
+  const suggestions: string[] = [
     '构建“冲刺 + 稳妥 + 保底”三层院校池，避免复试节点临时被动调剂。',
     '将科研/实践经历按照背景-任务-行动-结果（STAR）结构输出，突出个人贡献。',
     '准备一段 1.5 分钟左右的中文与英文自我介绍，呼应报考动机与未来规划。',
@@ -272,7 +345,7 @@ const buildInterviewPreparation = (focusTopics) => {
     suggestions.push(`重点关注 ${focusTopics.slice(0, 3).join('、')} 等高频复试主题，准备差异化亮点。`);
   }
 
-  const resources = [
+  const resources: InterviewResourceItem[] = [
     {
       name: '复试自我介绍模板（含中英文）',
       url: 'https://yz.chsi.com.cn/kyzx/jyzl/202212/20221220/2235205777.html',
@@ -293,20 +366,17 @@ const buildInterviewPreparation = (focusTopics) => {
   };
 };
 
-const buildStrategy = (totalScore, recommended) => {
+const buildStrategy = (totalScore: number, recommended: UniversityRecommendationItem[]): string[] => {
   const topMatch = recommended[0];
   const hasStable = recommended.some((item) => item.matchLevel === '稳妥');
   const hasSprint = recommended.some((item) => item.matchLevel === '冲刺');
   const hasSafe = recommended.some((item) => item.matchLevel === '保底');
 
-  const strategy = [];
+  const strategy: string[] = [];
 
   if (topMatch) {
-    strategy.push(
-      `优先锁定 ${topMatch.name} 等 ${topMatch.matchLevel} 院校，围绕其复试侧重点（${
-        (topMatch.interviewFocus || []).slice(0, 2).join('、') || '综合素质'
-      }）制定专项准备。`,
-    );
+    const focusPreview = (topMatch.interviewFocus || []).slice(0, 2).join('、') || '综合素质';
+    strategy.push(`优先锁定 ${topMatch.name} 等 ${topMatch.matchLevel} 院校，围绕其复试侧重点（${focusPreview}）制定专项准备。`);
   }
 
   if (!hasStable || !hasSprint) {
@@ -322,10 +392,14 @@ const buildStrategy = (totalScore, recommended) => {
   return strategy;
 };
 
-const buildRecommendationResponse = ({ totalScore, major, examPreferences }) => {
+export const buildRecommendationResponse = (
+  payload: RecommendationPayload,
+): UniversityRecommendationResponse => {
+  const { totalScore, targetMajor, examPreferences } = payload;
+
   const { recommendedUniversities, focusTopics } = buildRecommendations(
     totalScore,
-    major,
+    targetMajor,
     examPreferences,
   );
   const interviewPreparation = buildInterviewPreparation(focusTopics);
@@ -348,6 +422,3 @@ const buildRecommendationResponse = ({ totalScore, major, examPreferences }) => 
   };
 };
 
-module.exports = {
-  buildRecommendationResponse,
-};

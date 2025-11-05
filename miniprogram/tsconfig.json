@@ -1,0 +1,14 @@
+{
+  "compilerOptions": {
+    "target": "ES5",
+    "module": "commonjs",
+    "baseUrl": "./",
+    "rootDir": "./",
+    "types": ["miniprogram-api-typings"],
+    "lib": ["DOM", "ES5", "ES2015"],
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true
+  },
+  "include": ["**/*.ts"],
+  "exclude": ["node_modules", "typings"]
+}

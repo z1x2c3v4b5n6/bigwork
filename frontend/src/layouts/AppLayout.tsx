@@ -46,7 +46,7 @@ const baseNavItems = [
   { label: '专业课热点', path: '/retake-subjects', icon: <LibraryBooksIcon /> },
   { label: '英语复盘', path: '/retake-english', icon: <RecordVoiceOverIcon /> },
   { label: '学习日程', path: '/schedule', icon: <EventIcon /> },
-  { label: '院校智选', path: '/advisor', icon: <InsightsIcon /> },
+  { label: '院校推荐', path: '/advisor', icon: <InsightsIcon /> },
   { label: '学习分析', path: '/analytics', icon: <TimelineIcon /> },
   { label: '考研论坛', path: '/forum', icon: <ForumIcon /> },
   { label: '个人中心', path: '/profile', icon: <PersonIcon /> },
