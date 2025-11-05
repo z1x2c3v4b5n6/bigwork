@@ -26,7 +26,6 @@ import InfoIcon from '@mui/icons-material/Info';
 import LaunchIcon from '@mui/icons-material/Launch';
 import type { RecommendationRequest, UniversityRecommendationResponse } from '../services/recommendationService';
 import { recommendUniversities } from '../services/recommendationService';
-import { majorRecommendations } from '../data/postgraduateResources';
 
 const matchLevelColor: Record<
   UniversityRecommendationResponse['recommendedUniversities'][number]['matchLevel'],
@@ -48,8 +47,6 @@ const UniversityAdvisorPanel = () => {
   const mutation = useMutation({
     mutationFn: recommendUniversities,
   });
-
-  const majorOptions = useMemo(() => majorRecommendations.map((item) => item.major), []);
 
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -108,19 +105,12 @@ const UniversityAdvisorPanel = () => {
           <Grid item xs={12} md={4}>
             <TextField
               fullWidth
-              select
               label="目标专业（可选）"
               value={major}
               onChange={(event) => setMajor(event.target.value)}
-              helperText="选择后可优先匹配对应专业的院校组合"
-            >
-              <MenuItem value="">不限专业（系统自动匹配）</MenuItem>
-              {majorOptions.map((option) => (
-                <MenuItem key={option} value={option}>
-                  {option}
-                </MenuItem>
-              ))}
-            </TextField>
+              placeholder="如 计算机、金融等"
+              helperText="填写后可优先推荐对口优势专业"
+            />
           </Grid>
           <Grid item xs={12} md={2}>
             <TextField

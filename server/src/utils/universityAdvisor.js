@@ -156,7 +156,7 @@ const buildRecommendations = (totalScore, major, examPreferences = {}) => {
     math: normalizeMathSubject(examPreferences.math),
     english: normalizeEnglishSubject(examPreferences.english),
   };
-  const mappedResults = universities
+  const results = universities
     .map((university) => {
       const matchLevel = evaluateMatchLevel(totalScore, university);
       const diff = totalScore - university.score.recommended;
@@ -206,27 +206,20 @@ const buildRecommendations = (totalScore, major, examPreferences = {}) => {
         compositeScore,
         majorMatched,
       };
+    })
+    .filter((item) => item.scoreDelta >= -25 || item.matchLevel !== '高风险')
+    .sort((a, b) => {
+      const levelDiff = matchLevelOrder[a.matchLevel] - matchLevelOrder[b.matchLevel];
+      if (levelDiff !== 0) {
+        return levelDiff;
+      }
+      if (b.compositeScore !== a.compositeScore) {
+        return b.compositeScore - a.compositeScore;
+      }
+      return b.scoreDelta - a.scoreDelta;
     });
 
-  const sortedResults = [...mappedResults].sort((a, b) => {
-    const levelDiff = matchLevelOrder[a.matchLevel] - matchLevelOrder[b.matchLevel];
-    if (levelDiff !== 0) {
-      return levelDiff;
-    }
-    if (b.compositeScore !== a.compositeScore) {
-      return b.compositeScore - a.compositeScore;
-    }
-    return b.scoreDelta - a.scoreDelta;
-  });
-
-  const filteredResults = sortedResults.filter(
-    (item) => item.scoreDelta >= -25 || item.matchLevel !== '高风险',
-  );
-
-  const recommendedUniversities = (filteredResults.length >= 3
-    ? filteredResults
-    : sortedResults
-  ).slice(0, 6);
+  const recommendedUniversities = results.slice(0, 6);
 
   const focusTopics = Array.from(
     new Set(
@@ -289,11 +282,6 @@ const buildInterviewPreparation = (focusTopics) => {
       name: '复试专业课高频题整理表',
       url: 'https://www.chinakaoyan.com/info/article/id/344359.shtml',
       description: '覆盖近三年热门院校专业课考察要点与答题思路。',
-    },
-    {
-      name: '英语口语快速复盘清单',
-      url: 'https://kaoyan.eol.cn/nnews/202303/t20230301_2323186.shtml',
-      description: '帮助在复试前一周内梳理高频表达并完成口语纠错。',
     },
   ];
 

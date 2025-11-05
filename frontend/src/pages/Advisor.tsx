@@ -15,7 +15,7 @@ const Advisor = () => (
       <Stack spacing={4}>
         <Stack spacing={1}>
           <Typography variant="h4" fontWeight={700}>
-            院校智选
+            院校推荐
           </Typography>
           <Typography variant="body1" color="text.secondary">
             根据初试总分与目标专业，智能匹配冲刺、稳妥、保底院校组合，并生成复试准备路线图与资料清单，帮助你快速明确下一步行动。
