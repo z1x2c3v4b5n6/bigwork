@@ -1,5 +1,6 @@
 {
   "pages": [
+    "pages/advisor/index",
     "pages/intro/index",
     "pages/professional/index",
     "pages/english/index"
@@ -16,6 +17,10 @@
     "backgroundColor": "#FFFFFF",
     "borderStyle": "black",
     "list": [
+      {
+        "pagePath": "pages/advisor/index",
+        "text": "院校推荐"
+      },
       {
         "pagePath": "pages/intro/index",
         "text": "自我介绍"

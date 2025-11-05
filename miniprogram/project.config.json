@@ -3,6 +3,7 @@
   "projectname": "postgraduate-review-miniapp",
   "compileType": "miniprogram",
   "miniprogramRoot": "./",
+  "libVersion": "2.33.0",
   "setting": {
     "urlCheck": false,
     "es6": true,
