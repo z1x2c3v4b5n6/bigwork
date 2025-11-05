@@ -5,6 +5,8 @@ import AssessmentIcon from '@mui/icons-material/Assessment';
 import InsightsIcon from '@mui/icons-material/Insights';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
+import LanguageIcon from '@mui/icons-material/Language';
+import LaunchIcon from '@mui/icons-material/Launch';
 import {
   Alert,
   Avatar,
@@ -22,6 +24,7 @@ import {
   List,
   ListItem,
   ListItemAvatar,
+  ListItemButton,
   ListItemText,
   MenuItem,
   Paper,
@@ -57,6 +60,29 @@ import { readFileAsDataUrl, formatFileSize } from '../utils/fileUtils';
 import { resolveAssetUrl } from '../utils/url';
 
 const numberFormatter = new Intl.NumberFormat('zh-CN');
+
+const adminReferenceSites = [
+  {
+    name: '研招网复试与调剂公告',
+    url: 'https://yz.chsi.com.cn/kyzx/zt/kyzt2024fs/',
+    description: '官方发布复试安排、调剂系统开放时间等权威通知。',
+  },
+  {
+    name: '研招网调剂服务系统',
+    url: 'https://yz.chsi.com.cn/yztj/',
+    description: '国家线发布后填写调剂志愿的唯一官方入口。',
+  },
+  {
+    name: '中国教育在线考研频道',
+    url: 'https://kaoyan.eol.cn/',
+    description: '汇总政策解析、院校访谈与复试经验，便于及时转发给学员。',
+  },
+  {
+    name: '中公考研院校库',
+    url: 'https://souky.eoffcn.com/',
+    description: '按地区/专业快速检索院校信息与历年分数线数据。',
+  },
+];
 
 type AdminTab =
   | 'overview'
@@ -675,54 +701,97 @@ const AdminDashboard = () => {
               </Paper>
             </Grid>
             <Grid item xs={12} lg={4}>
-              <Paper
-                elevation={0}
-                sx={{ p: 3, borderRadius: 3, border: '1px solid', borderColor: 'divider', height: '100%' }}
-              >
-                <Stack spacing={2} sx={{ height: '100%' }}>
-                  <Typography variant="h6" fontWeight={600}>
-                    最新操作日志
-                  </Typography>
-                  {auditLogs.length === 0 ? (
-                    <Box sx={{ py: 8, textAlign: 'center' }}>
-                      <Typography variant="body2" color="text.secondary">
-                        暂无日志记录，执行操作后日志将展示在此处。
-                      </Typography>
-                    </Box>
-                  ) : (
-                    <List disablePadding sx={{ flexGrow: 1 }}>
-                      {auditLogs.map((item) => (
-                        <ListItem key={item.id ?? item.title} disableGutters sx={{ alignItems: 'flex-start', py: 1.5 }}>
-                          <ListItemAvatar>
-                            <Avatar variant="rounded" sx={{ bgcolor: 'grey.100', color: 'text.primary' }}>
-                              <SecurityIcon fontSize="small" />
-                            </Avatar>
-                          </ListItemAvatar>
-                          <ListItemText
-                            primary={
-                              <Typography variant="subtitle2" fontWeight={600}>
-                                {item.title}
-                              </Typography>
-                            }
-                            secondary={
-                              <Stack spacing={0.5}>
-                                {item.description ? (
-                                  <Typography variant="body2" color="text.secondary">
-                                    {item.description}
-                                  </Typography>
-                                ) : null}
-                                <Typography variant="caption" color="text.secondary">
-                                  {`${item.actor ? `${item.actor} · ` : ''}${dayjs(item.createdAt).format('YYYY-MM-DD HH:mm')}`}
+              <Stack spacing={3} sx={{ height: '100%' }}>
+                <Paper
+                  elevation={0}
+                  sx={{ p: 3, borderRadius: 3, border: '1px solid', borderColor: 'divider', flexGrow: 1 }}
+                >
+                  <Stack spacing={2} sx={{ height: '100%' }}>
+                    <Typography variant="h6" fontWeight={600}>
+                      最新操作日志
+                    </Typography>
+                    {auditLogs.length === 0 ? (
+                      <Box sx={{ py: 8, textAlign: 'center' }}>
+                        <Typography variant="body2" color="text.secondary">
+                          暂无日志记录，执行操作后日志将展示在此处。
+                        </Typography>
+                      </Box>
+                    ) : (
+                      <List disablePadding sx={{ flexGrow: 1 }}>
+                        {auditLogs.map((item) => (
+                          <ListItem key={item.id ?? item.title} disableGutters sx={{ alignItems: 'flex-start', py: 1.5 }}>
+                            <ListItemAvatar>
+                              <Avatar variant="rounded" sx={{ bgcolor: 'grey.100', color: 'text.primary' }}>
+                                <SecurityIcon fontSize="small" />
+                              </Avatar>
+                            </ListItemAvatar>
+                            <ListItemText
+                              primary={
+                                <Typography variant="subtitle2" fontWeight={600}>
+                                  {item.title}
                                 </Typography>
-                              </Stack>
-                            }
-                          />
+                              }
+                              secondary={
+                                <Stack spacing={0.5}>
+                                  {item.description ? (
+                                    <Typography variant="body2" color="text.secondary">
+                                      {item.description}
+                                    </Typography>
+                                  ) : null}
+                                  <Typography variant="caption" color="text.secondary">
+                                    {`${item.actor ? `${item.actor} · ` : ''}${dayjs(item.createdAt).format('YYYY-MM-DD HH:mm')}`}
+                                  </Typography>
+                                </Stack>
+                              }
+                            />
+                          </ListItem>
+                        ))}
+                      </List>
+                    )}
+                  </Stack>
+                </Paper>
+                <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid', borderColor: 'divider' }}>
+                  <Stack spacing={2}>
+                    <Typography variant="h6" fontWeight={600}>
+                      常用院校资讯网站
+                    </Typography>
+                    <List disablePadding>
+                      {adminReferenceSites.map((site) => (
+                        <ListItem key={site.url} disablePadding sx={{ mb: 1, borderRadius: 2 }}>
+                          <ListItemButton
+                            component="a"
+                            href={site.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            sx={{ borderRadius: 2, alignItems: 'flex-start', py: 1.5, px: 1.5 }}
+                          >
+                            <ListItemAvatar>
+                              <Avatar variant="rounded" sx={{ bgcolor: 'primary.light', color: 'primary.contrastText' }}>
+                                <LanguageIcon fontSize="small" />
+                              </Avatar>
+                            </ListItemAvatar>
+                            <ListItemText
+                              primary={
+                                <Stack direction="row" spacing={1} alignItems="center">
+                                  <Typography variant="subtitle2" fontWeight={600}>
+                                    {site.name}
+                                  </Typography>
+                                  <LaunchIcon fontSize="small" />
+                                </Stack>
+                              }
+                              secondary={
+                                <Typography variant="body2" color="text.secondary">
+                                  {site.description}
+                                </Typography>
+                              }
+                            />
+                          </ListItemButton>
                         </ListItem>
                       ))}
                     </List>
-                  )}
-                </Stack>
-              </Paper>
+                  </Stack>
+                </Paper>
+              </Stack>
             </Grid>
           </Grid>
 
