@@ -26,7 +26,8 @@ const App = () => {
   const [mode, setMode] = useState<'light' | 'dark'>('light');
   const { user } = useAuth();
   const theme = useMemo(() => createTheme(mode), [mode]);
-  const hideRetakeToolkit = user?.role === 'admin';
+  const normalizedRole = user?.role?.toLowerCase() ?? '';
+  const hideRetakeToolkit = normalizedRole === 'admin';
 
   return (
     <ThemeProvider theme={theme}>

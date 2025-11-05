@@ -66,7 +66,7 @@ const Home = () => {
   const greeting = useGreeting();
   const { user } = useAuth();
   const { data, isFetching, isError, refetch } = useDashboardData(user);
-  const isAdmin = user?.role === 'admin';
+  const isAdmin = user?.role?.toLowerCase() === 'admin';
 
   const stats = data?.stats ?? [];
   const courses = data?.courses ?? [];

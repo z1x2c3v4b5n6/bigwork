@@ -70,7 +70,7 @@ const AppLayout = ({ mode, onToggleMode }: AppLayoutProps) => {
   const navigate = useNavigate();
   const { user, loading: authLoading, logout } = useAuth();
 
-  const isAdmin = useMemo(() => user?.role === 'admin', [user?.role]);
+  const isAdmin = useMemo(() => user?.role?.toLowerCase() === 'admin', [user?.role]);
 
   const navigationItems = useMemo(() => {
     if (isAdmin) {
