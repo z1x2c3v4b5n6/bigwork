@@ -8,6 +8,7 @@ import Courses from './pages/Courses';
 import Practice from './pages/Practice';
 import Schedule from './pages/Schedule';
 import Analytics from './pages/Analytics';
+import Advisor from './pages/Advisor';
 import Profile from './pages/Profile';
 import NotFound from './pages/NotFound';
 import AdminDashboard from './pages/AdminDashboard';
@@ -39,6 +40,7 @@ const App = () => {
           <Route path="courses" element={<Courses />} />
           <Route path="practice" element={<Practice />} />
           <Route path="schedule" element={<Schedule />} />
+          <Route path="advisor" element={<Advisor />} />
           <Route path="analytics" element={<Analytics />} />
           <Route path="forum" element={<Forum />} />
           <Route path="profile" element={<Profile />} />

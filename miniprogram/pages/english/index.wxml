@@ -1,0 +1,24 @@
+<view class="page">
+  <scroll-view class="scroll" scroll-y>
+    <view class="card" wx:for="{{guides}}" wx:key="id" wx:for-item="guide">
+      <view class="card-title">{{guide.title}}</view>
+      <view class="card-desc">{{guide.scenario}}</view>
+
+      <view class="section-title">热身环节</view>
+      <view class="bullet" wx:for="{{guide.warmup}}" wx:key="index" wx:for-item="warm">
+        {{warm}}
+      </view>
+
+      <view class="section-title">训练建议</view>
+      <view class="bullet" wx:for="{{guide.drills}}" wx:key="index" wx:for-item="drill">
+        {{drill}}
+      </view>
+
+      <view class="section-title">推荐资源</view>
+      <view class="bullet" wx:for="{{guide.resources}}" wx:key="name" wx:for-item="resource">
+        <text>{{resource.name}}：</text>
+        <text class="link">{{resource.url}}</text>
+      </view>
+    </view>
+  </scroll-view>
+</view>

@@ -1,0 +1,38 @@
+{
+  "pages": [
+    "pages/advisor/index",
+    "pages/intro/index",
+    "pages/professional/index",
+    "pages/english/index"
+  ],
+  "window": {
+    "navigationBarTitleText": "复试资料库",
+    "navigationBarBackgroundColor": "#0B6BCB",
+    "navigationBarTextStyle": "white",
+    "backgroundColor": "#F5F7FA"
+  },
+  "tabBar": {
+    "color": "#7A7E83",
+    "selectedColor": "#0B6BCB",
+    "backgroundColor": "#FFFFFF",
+    "borderStyle": "black",
+    "list": [
+      {
+        "pagePath": "pages/advisor/index",
+        "text": "院校推荐"
+      },
+      {
+        "pagePath": "pages/intro/index",
+        "text": "自我介绍"
+      },
+      {
+        "pagePath": "pages/professional/index",
+        "text": "专业课"
+      },
+      {
+        "pagePath": "pages/english/index",
+        "text": "英语复盘"
+      }
+    ]
+  }
+}
