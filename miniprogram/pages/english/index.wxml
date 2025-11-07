@@ -1,88 +1,24 @@
-<view class="section-card">
-  <view class="section-title">英语口语快速复盘清单</view>
-  <view class="section-subtitle">
-    结合分数段策略，在 7 天内完成表达梳理、语音纠错与全真模拟，确保复试口语又快又稳。
-  </view>
-</view>
+<view class="page">
+  <scroll-view class="scroll" scroll-y>
+    <view class="card" wx:for="{{guides}}" wx:key="id" wx:for-item="guide">
+      <view class="card-title">{{guide.title}}</view>
+      <view class="card-desc">{{guide.scenario}}</view>
 
-<view class="section-card">
-  <view class="section-title">分数段应对策略</view>
-  <view class="card-grid">
-    <block wx:for="{{scoreBandGuides}}" wx:key="key" wx:for-item="guide">
-      <view class="card">
-        <view class="tag {{guide.key === 'low' ? 'tag-warning' : ''}}">{{guide.title}}</view>
-        <view class="card-body">{{guide.subtitle}}</view>
-        <view class="list">
-          <block wx:for="{{guide.actionSteps}}" wx:key="*this" wx:for-item="step">
-            <view class="list-item">
-              <view class="list-dot {{guide.key === 'low' ? 'warning' : ''}}"></view>
-              <view>{{step}}</view>
-            </view>
-          </block>
-        </view>
+      <view class="section-title">热身环节</view>
+      <view class="bullet" wx:for="{{guide.warmup}}" wx:key="index" wx:for-item="warm">
+        {{warm}}
       </view>
-    </block>
-  </view>
-</view>
 
-<view class="section-card">
-  <view class="section-title">7 天快冲计划</view>
-  <view class="card-grid">
-    <block wx:for="{{weeklyPlan}}" wx:key="day" wx:for-item="plan">
-      <view class="card">
-        <view class="card-title">{{plan.day}} · {{plan.focus}}</view>
-        <view class="list">
-          <block wx:for="{{plan.tasks}}" wx:key="*this" wx:for-item="task">
-            <view class="list-item">
-              <view class="list-dot"></view>
-              <view>{{task}}</view>
-            </view>
-          </block>
-        </view>
+      <view class="section-title">训练建议</view>
+      <view class="bullet" wx:for="{{guide.drills}}" wx:key="index" wx:for-item="drill">
+        {{drill}}
       </view>
-    </block>
-  </view>
-</view>
 
-<view class="section-card">
-  <view class="section-title">纠错与强化流程</view>
-  <view class="card-grid">
-    <view class="card">
-      <view class="card-title">错误标注四步法</view>
-      <view class="list">
-        <block wx:for="{{errorMarkingSteps}}" wx:key="*this" wx:for-item="step">
-          <view class="list-item">
-            <view class="list-dot"></view>
-            <view>{{step}}</view>
-          </view>
-        </block>
+      <view class="section-title">推荐资源</view>
+      <view class="bullet" wx:for="{{guide.resources}}" wx:key="name" wx:for-item="resource">
+        <text>{{resource.name}}：</text>
+        <text class="link">{{resource.url}}</text>
       </view>
     </view>
-    <view class="card">
-      <view class="card-title">紧急应对模板</view>
-      <block wx:for="{{emergencyResponses}}" wx:key="scenario" wx:for-item="item">
-        <view class="card-body" style="margin-bottom: 20rpx;">
-          <view class="card-title" style="font-size: 28rpx;">{{item.scenario}}</view>
-          <view>{{item.answer}}</view>
-        </view>
-      </block>
-    </view>
-  </view>
-</view>
-
-<view class="section-card">
-  <view class="section-title">保持状态的小贴士</view>
-  <view class="card">
-    <view class="card-body">
-      <block wx:for="{{confidenceReminders}}" wx:key="*this" wx:for-item="tip">
-        <view class="list-item">
-          <view class="list-dot"></view>
-          <view>{{tip}}</view>
-        </view>
-      </block>
-      <blockquote>
-        临场出现卡壳时，可先复述问题并请求 5 秒整理思路：“May I take a few seconds to double-check the figures before answering?”
-      </blockquote>
-    </view>
-  </view>
+  </scroll-view>
 </view>

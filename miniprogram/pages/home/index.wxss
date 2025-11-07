@@ -1,0 +1,192 @@
+.page {
+  padding: 24rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 32rpx;
+  background: #f5f7fa;
+  min-height: 100vh;
+  box-sizing: border-box;
+}
+
+.hero {
+  padding: 32rpx;
+  background: linear-gradient(135deg, #0b6bcb, #4098ff);
+  color: #ffffff;
+  border-radius: 24rpx;
+  box-shadow: 0 24rpx 48rpx rgba(11, 107, 203, 0.18);
+  display: flex;
+  flex-direction: column;
+  gap: 16rpx;
+}
+
+.hero__title {
+  font-size: 36rpx;
+  font-weight: 700;
+}
+
+.hero__subtitle {
+  font-size: 26rpx;
+  opacity: 0.88;
+}
+
+.hero__quick-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16rpx;
+}
+
+.hero__btn {
+  border-radius: 999rpx;
+  background: rgba(255, 255, 255, 0.16);
+  color: #ffffff;
+}
+
+.section {
+  background: #ffffff;
+  border-radius: 24rpx;
+  padding: 28rpx;
+  box-shadow: 0 16rpx 36rpx rgba(15, 23, 42, 0.06);
+}
+
+.section__title {
+  font-size: 30rpx;
+  font-weight: 600;
+  margin-bottom: 24rpx;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240rpx, 1fr));
+  gap: 24rpx;
+}
+
+.stat-card {
+  background: linear-gradient(160deg, #eff5ff, #f8fbff);
+  border-radius: 20rpx;
+  padding: 24rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 12rpx;
+  color: #0b1f33;
+}
+
+.stat-card__value {
+  font-size: 34rpx;
+  font-weight: 700;
+}
+
+.stat-card__title {
+  font-size: 26rpx;
+  opacity: 0.8;
+}
+
+.stat-card__helper {
+  font-size: 24rpx;
+  color: #4d5b73;
+}
+
+.card-list {
+  display: flex;
+  flex-direction: column;
+  gap: 20rpx;
+}
+
+.course-card,
+.practice-card {
+  border: 1rpx solid #e1e8f5;
+  border-radius: 20rpx;
+  padding: 24rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 12rpx;
+}
+
+.course-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12rpx;
+}
+
+.course-card__title {
+  font-size: 28rpx;
+  font-weight: 600;
+}
+
+.course-card__category {
+  font-size: 22rpx;
+  padding: 6rpx 16rpx;
+  border-radius: 999rpx;
+  background: rgba(11, 107, 203, 0.08);
+  color: #0b6bcb;
+}
+
+.course-card__teacher,
+.course-card__progress,
+.course-card__task,
+.practice-card__meta,
+.practice-card__focus {
+  font-size: 24rpx;
+  color: #4d5b73;
+}
+
+.practice-card__title {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #0b1f33;
+}
+
+.schedule-list {
+  display: flex;
+  flex-direction: column;
+  gap: 20rpx;
+}
+
+.schedule-item {
+  padding: 22rpx;
+  border-radius: 20rpx;
+  border: 1rpx solid #dbe3f2;
+  background: #fafcff;
+  display: flex;
+  flex-direction: column;
+  gap: 12rpx;
+}
+
+.schedule-item__title {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #0b1f33;
+}
+
+.schedule-item__meta {
+  font-size: 24rpx;
+  color: #4d5b73;
+}
+
+.schedule-item__tags {
+  display: flex;
+  gap: 12rpx;
+  flex-wrap: wrap;
+}
+
+.tag {
+  font-size: 22rpx;
+  padding: 4rpx 16rpx;
+  background: rgba(11, 107, 203, 0.12);
+  color: #0b6bcb;
+  border-radius: 999rpx;
+}
+
+.recommendation {
+  font-size: 26rpx;
+  line-height: 1.6;
+  color: #334155;
+}
+
+.empty {
+  font-size: 24rpx;
+  color: #94a3b8;
+  background: #f8fafc;
+  padding: 20rpx;
+  border-radius: 16rpx;
+}

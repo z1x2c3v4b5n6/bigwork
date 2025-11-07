@@ -1,0 +1,27 @@
+<view class="page">
+  <view class="section">
+    <view class="section__title">个人中心</view>
+    <view class="section__subtitle">完善个人资料，获取更精准的学习推荐。</view>
+    <view class="role-chip" bindtap="toggleRole">当前身份：{{profile.role === 'admin' ? '管理员' : '学员'}}（点击切换）</view>
+  </view>
+
+  <view class="section">
+    <view class="form">
+      <input class="input" placeholder="姓名" value="{{profile.name}}" data-field="name" bindinput="handleInput" />
+      <input class="input" placeholder="邮箱" value="{{profile.email}}" data-field="email" bindinput="handleInput" />
+      <input class="input" placeholder="电话" value="{{profile.phone}}" data-field="phone" bindinput="handleInput" />
+      <input class="input" placeholder="目标院校 / 团队" value="{{profile.organization}}" data-field="organization" bindinput="handleInput" />
+      <input class="input" placeholder="备考目标 / 教研重点" value="{{profile.goal}}" data-field="goal" bindinput="handleInput" />
+
+      <picker mode="selector" range="{{majors}}" range-key="name" bindchange="handleMajorChange">
+        <view class="picker">负责/目标专业：{{selectedMajorName}}</view>
+      </picker>
+
+      <textarea class="textarea" placeholder="个人简介 / 学习自述" value="{{profile.bio}}" data-field="bio" bindinput="handleInput"></textarea>
+
+      <button class="submit" bindtap="saveProfile">保存资料</button>
+      <view class="message message--error" wx:if="{{errorMessage}}">{{errorMessage}}</view>
+      <view class="message message--success" wx:if="{{successMessage}}">{{successMessage}}</view>
+    </view>
+  </view>
+</view>

@@ -1,0 +1,44 @@
+<view class="page">
+  <view class="section">
+    <view class="section__title">学习分析</view>
+    <view class="section__subtitle">汇总各科掌握度、模考趋势与错题知识点。</view>
+  </view>
+
+  <view class="section">
+    <view class="section__title">学习亮点</view>
+    <view class="highlight-list">
+      <block wx:for="{{highlights}}" wx:key="id">
+        <view class="highlight-card">
+          <view class="highlight-card__title">{{item.title}}</view>
+          <view class="highlight-card__description">{{item.description}}</view>
+        </view>
+      </block>
+    </view>
+  </view>
+
+  <view class="section">
+    <view class="section__title">科目掌握度</view>
+    <view class="subject-list">
+      <block wx:for="{{subjects}}" wx:key="name">
+        <view class="subject-card">
+          <view class="subject-card__title">{{item.name}}</view>
+          <view class="subject-card__mastery">掌握度 {{item.masteryText}} · 环比 {{item.trend}}</view>
+          <view class="subject-card__focus">本周重点：{{item.focus}}</view>
+        </view>
+      </block>
+    </view>
+  </view>
+
+  <view class="section">
+    <view class="section__title">错题知识图谱（Top 5）</view>
+    <view class="knowledge-list">
+      <block wx:for="{{knowledgeGraph}}" wx:key="id">
+        <view class="knowledge-card">
+          <view class="knowledge-card__topic">{{item.topic}}</view>
+          <view class="knowledge-card__meta">错误率 {{item.errorRate}}</view>
+          <view class="knowledge-card__action">建议：{{item.action}}</view>
+        </view>
+      </block>
+    </view>
+  </view>
+</view>

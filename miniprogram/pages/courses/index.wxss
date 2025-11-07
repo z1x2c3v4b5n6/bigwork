@@ -1,0 +1,133 @@
+.page {
+  padding: 24rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 28rpx;
+  background: #f5f7fa;
+  min-height: 100vh;
+  box-sizing: border-box;
+}
+
+.section {
+  background: #ffffff;
+  border-radius: 24rpx;
+  padding: 28rpx;
+  box-shadow: 0 16rpx 36rpx rgba(15, 23, 42, 0.06);
+  display: flex;
+  flex-direction: column;
+  gap: 24rpx;
+}
+
+.section__title {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: #0b1f33;
+}
+
+.section__subtitle {
+  font-size: 26rpx;
+  color: #4d5b73;
+}
+
+.course-list,
+.workshop-list,
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 20rpx;
+}
+
+.course-card {
+  border: 1rpx solid #d8e2f2;
+  border-radius: 20rpx;
+  padding: 24rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 12rpx;
+  background: #f8fbff;
+}
+
+.course-card__title {
+  font-size: 28rpx;
+  font-weight: 600;
+}
+
+.course-card__meta,
+.course-card__progress,
+.course-card__task {
+  font-size: 24rpx;
+  color: #4d5b73;
+}
+
+.workshop-card {
+  border-radius: 20rpx;
+  padding: 24rpx;
+  background: linear-gradient(135deg, #e0edff, #f1f5ff);
+  display: flex;
+  flex-direction: column;
+  gap: 12rpx;
+}
+
+.workshop-card__title {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #0b1f33;
+}
+
+.workshop-card__description {
+  font-size: 24rpx;
+  color: #4d5b73;
+}
+
+.workshop-card__highlight {
+  font-size: 24rpx;
+  color: #0b6bcb;
+  font-weight: 600;
+}
+
+.input,
+.textarea,
+.picker {
+  width: 100%;
+  padding: 22rpx;
+  border-radius: 16rpx;
+  border: 1rpx solid #d8e2f2;
+  box-sizing: border-box;
+  font-size: 26rpx;
+  background: #f8fbff;
+}
+
+.textarea {
+  min-height: 160rpx;
+}
+
+.submit {
+  margin-top: 12rpx;
+  background: linear-gradient(135deg, #0b6bcb, #3f8cff);
+  color: #ffffff;
+  border-radius: 20rpx;
+}
+
+.message {
+  font-size: 24rpx;
+  padding: 16rpx;
+  border-radius: 16rpx;
+}
+
+.message--error {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.message--success {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.empty {
+  font-size: 24rpx;
+  color: #94a3b8;
+  padding: 20rpx;
+  border-radius: 16rpx;
+  background: #f8fafc;
+}

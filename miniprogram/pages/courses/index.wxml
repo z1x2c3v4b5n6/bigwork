@@ -1,0 +1,57 @@
+<view class="page">
+  <view class="section">
+    <view class="section__title">课程体系</view>
+    <view class="section__subtitle">管理公共课与专业课的学习计划，随时补充下一步任务。</view>
+
+    <block wx:if="{{courses.length}}">
+      <view class="course-list">
+        <block wx:for="{{courses}}" wx:key="id">
+          <view class="course-card">
+            <view class="course-card__title">{{item.title}}</view>
+            <view class="course-card__meta">{{item.category}} · 讲师：{{item.teacher}}</view>
+            <view class="course-card__progress">当前进度：{{item.progress}}%</view>
+            <view class="course-card__task">下一步：{{item.nextTask}}</view>
+          </view>
+        </block>
+      </view>
+    </block>
+    <block wx:else>
+      <view class="empty">暂无课程，请先通过下方表单新增。</view>
+    </block>
+  </view>
+
+  <view class="section">
+    <view class="section__title">精品小班（下周开班）</view>
+    <view class="workshop-list">
+      <block wx:for="{{workshops}}" wx:key="id">
+        <view class="workshop-card">
+          <view class="workshop-card__title">{{item.title}}</view>
+          <view class="workshop-card__description">{{item.description}}</view>
+          <view class="workshop-card__highlight">{{item.highlight}}</view>
+        </view>
+      </block>
+    </view>
+  </view>
+
+  <view class="section">
+    <view class="section__title">新增课程</view>
+    <view class="form">
+      <input class="input" placeholder="课程名称" value="{{form.title}}" data-field="title" bindinput="handleInput" />
+      <input class="input" placeholder="讲师" value="{{form.teacher}}" data-field="teacher" bindinput="handleInput" />
+      <input class="input" placeholder="课程类型（公共课/专业课）" value="{{form.category}}" data-field="category" bindinput="handleInput" />
+
+      <picker mode="selector" range="{{majors}}" range-key="name" bindchange="handleMajorChange">
+        <view class="picker">所属专业：{{selectedMajorName}}</view>
+      </picker>
+
+      <input class="input" type="number" placeholder="当前进度（0-100）" value="{{form.progress}}" data-field="progress" bindinput="handleInput" />
+      <input class="input" placeholder="下一步任务" value="{{form.nextTask}}" data-field="nextTask" bindinput="handleInput" />
+      <textarea class="textarea" placeholder="备注（可选）" value="{{form.description}}" data-field="description" bindinput="handleInput"></textarea>
+
+      <button class="submit" bindtap="submitCourse">保存课程</button>
+
+      <view class="message message--error" wx:if="{{errorMessage}}">{{errorMessage}}</view>
+      <view class="message message--success" wx:if="{{successMessage}}">{{successMessage}}</view>
+    </view>
+  </view>
+</view>
