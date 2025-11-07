@@ -26,6 +26,9 @@ import EventIcon from '@mui/icons-material/Event';
 import TimelineIcon from '@mui/icons-material/Timeline';
 import InsightsIcon from '@mui/icons-material/Insights';
 import PersonIcon from '@mui/icons-material/Person';
+import TextSnippetIcon from '@mui/icons-material/TextSnippet';
+import LibraryBooksIcon from '@mui/icons-material/LibraryBooks';
+import RecordVoiceOverIcon from '@mui/icons-material/RecordVoiceOver';
 import DarkModeIcon from '@mui/icons-material/DarkMode';
 import LightModeIcon from '@mui/icons-material/LightMode';
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
@@ -39,6 +42,9 @@ const baseNavItems = [
   { label: '概览', path: '/', icon: <SchoolIcon /> },
   { label: '课程体系', path: '/courses', icon: <AssignmentIcon /> },
   { label: '刷题训练', path: '/practice', icon: <QuizIcon /> },
+  { label: '复试自我介绍', path: '/retake-intro', icon: <TextSnippetIcon /> },
+  { label: '专业课热点', path: '/retake-subjects', icon: <LibraryBooksIcon /> },
+  { label: '英语复盘', path: '/retake-english', icon: <RecordVoiceOverIcon /> },
   { label: '学习日程', path: '/schedule', icon: <EventIcon /> },
   { label: '院校推荐', path: '/advisor', icon: <InsightsIcon /> },
   { label: '学习分析', path: '/analytics', icon: <TimelineIcon /> },
@@ -64,7 +70,7 @@ const AppLayout = ({ mode, onToggleMode }: AppLayoutProps) => {
   const navigate = useNavigate();
   const { user, loading: authLoading, logout } = useAuth();
 
-  const isAdmin = useMemo(() => user?.role === 'admin', [user?.role]);
+  const isAdmin = useMemo(() => user?.role?.toLowerCase() === 'admin', [user?.role]);
 
   const navigationItems = useMemo(() => {
     if (isAdmin) {
