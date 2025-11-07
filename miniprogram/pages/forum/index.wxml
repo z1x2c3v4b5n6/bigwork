@@ -1,0 +1,56 @@
+<view class="page">
+  <view class="section">
+    <view class="section__title">考研论坛</view>
+    <view class="section__subtitle">讨论复习策略、调剂经验与备考心得。</view>
+    <view class="topic-list" wx:if="{{topics.length}}">
+      <block wx:for="{{topics}}" wx:key="id">
+        <view class="topic-card {{item.id === selectedTopicId ? 'topic-card--active' : ''}}" data-id="{{item.id}}" bindtap="selectTopic">
+          <view class="topic-card__title">{{item.title}}</view>
+          <view class="topic-card__description">{{item.description}}</view>
+          <view class="topic-card__meta">👍 {{item.likes}} · 回复 {{item.replies.length}}</view>
+        </view>
+      </block>
+    </view>
+    <view class="empty" wx:else>暂无话题，欢迎先创建。</view>
+  </view>
+
+  <view class="section" wx:if="{{selectedTopicId}}">
+    <view class="section__title">话题详情</view>
+    <view class="action-bar">
+      <button class="action-bar__btn" size="mini" bindtap="toggleLike">{{likeButtonText}}</button>
+      <text class="action-bar__info">当前点赞：{{likeCount}}</text>
+    </view>
+
+    <block wx:if="{{hasReplies}}">
+      <view class="reply-list">
+        <block wx:for="{{activeTopic.replies}}" wx:key="id">
+          <view class="reply-card">
+            <view class="reply-card__author">{{item.author}}</view>
+            <view class="reply-card__content">{{item.content}}</view>
+            <view class="reply-card__time">{{item.createdAt}}</view>
+          </view>
+        </block>
+      </view>
+    </block>
+    <view class="empty" wx:else>暂无回复，快来成为第一个发言的人。</view>
+  </view>
+
+  <view class="section">
+    <view class="section__title">发布话题</view>
+    <view class="form">
+      <input class="input" placeholder="话题标题" value="{{topicForm.title}}" data-field="title" bindinput="handleTopicInput" />
+      <textarea class="textarea" placeholder="补充说明（可选）" value="{{topicForm.description}}" data-field="description" bindinput="handleTopicInput"></textarea>
+      <button class="submit" bindtap="createTopic">发布话题</button>
+    </view>
+  </view>
+
+  <view class="section" wx:if="{{selectedTopicId}}">
+    <view class="section__title">发送回复</view>
+    <view class="form">
+      <textarea class="textarea" placeholder="请输入回复内容" value="{{replyForm.content}}" bindinput="handleReplyInput"></textarea>
+      <button class="submit" bindtap="createReply">发送</button>
+      <view class="message message--error" wx:if="{{errorMessage}}">{{errorMessage}}</view>
+      <view class="message message--success" wx:if="{{successMessage}}">{{successMessage}}</view>
+    </view>
+  </view>
+</view>

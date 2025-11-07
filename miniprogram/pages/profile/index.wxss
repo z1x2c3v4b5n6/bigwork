@@ -1,0 +1,83 @@
+.page {
+  padding: 24rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 28rpx;
+  background: #f5f7fa;
+  min-height: 100vh;
+  box-sizing: border-box;
+}
+
+.section {
+  background: #ffffff;
+  border-radius: 24rpx;
+  padding: 28rpx;
+  box-shadow: 0 16rpx 36rpx rgba(15, 23, 42, 0.06);
+  display: flex;
+  flex-direction: column;
+  gap: 20rpx;
+}
+
+.section__title {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: #0b1f33;
+}
+
+.section__subtitle {
+  font-size: 26rpx;
+  color: #4d5b73;
+}
+
+.role-chip {
+  align-self: flex-start;
+  padding: 12rpx 24rpx;
+  border-radius: 999rpx;
+  background: rgba(11, 107, 203, 0.12);
+  color: #0b6bcb;
+  font-size: 24rpx;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 20rpx;
+}
+
+.input,
+.textarea,
+.picker {
+  width: 100%;
+  padding: 22rpx;
+  border-radius: 16rpx;
+  border: 1rpx solid #d8e2f2;
+  box-sizing: border-box;
+  font-size: 26rpx;
+  background: #f8fbff;
+}
+
+.textarea {
+  min-height: 160rpx;
+}
+
+.submit {
+  background: linear-gradient(135deg, #0b6bcb, #3f8cff);
+  color: #ffffff;
+  border-radius: 20rpx;
+}
+
+.message {
+  font-size: 24rpx;
+  padding: 16rpx;
+  border-radius: 16rpx;
+}
+
+.message--error {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.message--success {
+  background: #dcfce7;
+  color: #15803d;
+}

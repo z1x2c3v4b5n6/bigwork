@@ -1,0 +1,73 @@
+<view class="page">
+  <view class="section">
+    <view class="section__title">题单列表</view>
+    <view class="section__subtitle">点击题单查看详情并继续录入题目。</view>
+
+    <block wx:if="{{sets.length}}">
+      <view class="set-list">
+        <block wx:for="{{sets}}" wx:key="id">
+          <view class="set-card {{item.id === selectedSetId ? 'set-card--active' : ''}}" data-id="{{item.id}}" bindtap="selectSet">
+            <view class="set-card__title">{{item.title}}</view>
+            <view class="set-card__meta">难度：{{item.difficulty}} · 题目数：{{item.questionCount}}</view>
+            <view class="set-card__tags" wx:if="{{item.tags.length}}">
+              <block wx:for="{{item.tags}}" wx:key="{{index}}">
+                <text class="tag">{{item}}</text>
+              </block>
+            </view>
+          </view>
+        </block>
+      </view>
+    </block>
+    <block wx:else>
+      <view class="empty">暂无题单，请先创建。</view>
+    </block>
+  </view>
+
+  <view class="section">
+    <view class="section__title">题目详情</view>
+    <block wx:if="{{selectedSetId}}">
+      <view class="question-list">
+        <block wx:for="{{visibleQuestions}}" wx:key="id">
+          <view class="question-card">
+            <view class="question-card__title">{{item.questionText}}</view>
+            <view class="question-card__answer">答案：{{item.answerText}}</view>
+            <view class="question-card__explanation">解析：{{item.explanation}}</view>
+            <view class="question-card__tags" wx:if="{{item.tags.length}}">
+              <block wx:for="{{item.tags}}" wx:key="{{index}}">
+                <text class="tag tag--outline">{{item}}</text>
+              </block>
+            </view>
+          </view>
+        </block>
+      </view>
+    </block>
+    <block wx:else>
+      <view class="empty">请选择题单后查看题目。</view>
+    </block>
+  </view>
+
+  <view class="section">
+    <view class="section__title">创建题单</view>
+    <view class="form">
+      <input class="input" placeholder="题单名称" value="{{setForm.title}}" data-field="title" bindinput="handleSetInput" />
+      <textarea class="textarea" placeholder="题单简介" value="{{setForm.description}}" data-field="description" bindinput="handleSetInput"></textarea>
+      <input class="input" placeholder="难度（基础/进阶/冲刺）" value="{{setForm.difficulty}}" data-field="difficulty" bindinput="handleSetInput" />
+      <input class="input" placeholder="标签（逗号分隔）" value="{{setForm.tags}}" data-field="tags" bindinput="handleSetInput" />
+      <button class="submit" bindtap="createSet">保存题单</button>
+    </view>
+  </view>
+
+  <view class="section">
+    <view class="section__title">录入题目</view>
+    <view class="form">
+      <textarea class="textarea" placeholder="题干" value="{{questionForm.questionText}}" data-field="questionText" bindinput="handleQuestionInput"></textarea>
+      <textarea class="textarea" placeholder="答案" value="{{questionForm.answerText}}" data-field="answerText" bindinput="handleQuestionInput"></textarea>
+      <textarea class="textarea" placeholder="解析" value="{{questionForm.explanation}}" data-field="explanation" bindinput="handleQuestionInput"></textarea>
+      <input class="input" placeholder="标签（逗号分隔）" value="{{questionForm.tags}}" data-field="tags" bindinput="handleQuestionInput" />
+      <input class="input" placeholder="难度" value="{{questionForm.difficulty}}" data-field="difficulty" bindinput="handleQuestionInput" />
+      <button class="submit" bindtap="createQuestion">保存题目</button>
+      <view class="message message--error" wx:if="{{errorMessage}}">{{errorMessage}}</view>
+      <view class="message message--success" wx:if="{{successMessage}}">{{successMessage}}</view>
+    </view>
+  </view>
+</view>

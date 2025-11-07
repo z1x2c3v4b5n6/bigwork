@@ -1,0 +1,43 @@
+<view class="page">
+  <view class="section">
+    <view class="section__title">后台管理总览</view>
+    <view class="section__subtitle">掌握课程、题库、用户数据与外部资讯入口。</view>
+    <view class="metric-grid">
+      <block wx:for="{{metrics}}" wx:key="id">
+        <view class="metric-card">
+          <view class="metric-card__value">{{item.value}}</view>
+          <view class="metric-card__label">{{item.label}}</view>
+        </view>
+      </block>
+    </view>
+  </view>
+
+  <view class="section">
+    <view class="section__title">常用院校资讯网站</view>
+    <view class="site-list">
+      <block wx:for="{{referenceSites}}" wx:key="url">
+        <view class="site-card">
+          <view class="site-card__title">{{item.name}}</view>
+          <view class="site-card__description">{{item.description}}</view>
+          <view class="site-card__actions">
+            <button class="site-card__btn" size="mini" data-url="{{item.url}}" bindtap="copyLink">复制链接</button>
+            <navigator class="site-card__link" url="{{item.url}}" target="miniProgram">打开</navigator>
+          </view>
+        </view>
+      </block>
+    </view>
+  </view>
+
+  <view class="section">
+    <view class="section__title">待办事项</view>
+    <view class="task-list">
+      <block wx:for="{{tasks}}" wx:key="id">
+        <view class="task-card">
+          <view class="task-card__title">{{item.title}}</view>
+          <view class="task-card__meta">负责人：{{item.assignee}} · 状态：{{item.status}}</view>
+          <view class="task-card__time">最近更新：{{item.updatedAt}}</view>
+        </view>
+      </block>
+    </view>
+  </view>
+</view>

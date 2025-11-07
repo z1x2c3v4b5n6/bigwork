@@ -1,0 +1,268 @@
+.advisor-scroll {
+  height: 100vh;
+  box-sizing: border-box;
+  padding: 32rpx;
+}
+
+.form-card {
+  background: #ffffff;
+  border-radius: 20rpx;
+  padding: 32rpx;
+  box-shadow: 0 12rpx 32rpx rgba(11, 107, 203, 0.1);
+  margin-bottom: 32rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 24rpx;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 12rpx;
+}
+
+.group-label {
+  font-size: 26rpx;
+  color: #5f6b7c;
+}
+
+.group-input {
+  width: 100%;
+  padding: 20rpx 24rpx;
+  border-radius: 12rpx;
+  border: 2rpx solid #d8e2f0;
+  background: #f1f5f9;
+  font-size: 30rpx;
+  color: #1f2d3d;
+}
+
+.form-row {
+  display: flex;
+  gap: 24rpx;
+}
+
+.form-column {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 12rpx;
+}
+
+.picker {
+  padding: 20rpx 24rpx;
+  border-radius: 12rpx;
+  border: 2rpx solid #d8e2f0;
+  background: #f1f5f9;
+  font-size: 30rpx;
+  color: #1f2d3d;
+}
+
+.primary-button {
+  margin-top: 8rpx;
+  width: 100%;
+  background: linear-gradient(135deg, #0b6bcb, #1e88e5);
+  color: #ffffff;
+  border: none;
+  border-radius: 999rpx;
+  padding: 24rpx 0;
+  font-size: 32rpx;
+}
+
+.primary-button[disabled] {
+  opacity: 0.7;
+}
+
+.error-banner {
+  background: rgba(217, 48, 37, 0.1);
+  color: #c53030;
+  border-radius: 12rpx;
+  padding: 20rpx 24rpx;
+  font-size: 26rpx;
+}
+
+.result-section {
+  display: flex;
+  flex-direction: column;
+  gap: 32rpx;
+}
+
+.highlight-card {
+  background: linear-gradient(135deg, rgba(227, 242, 253, 0.9), rgba(255, 255, 255, 0.98));
+}
+
+.badge-row {
+  margin-top: 16rpx;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16rpx;
+}
+
+.badge {
+  padding: 8rpx 24rpx;
+  border-radius: 999rpx;
+  font-size: 24rpx;
+  font-weight: 600;
+}
+
+.badge.primary {
+  background: rgba(11, 107, 203, 0.15);
+  color: #0b6bcb;
+}
+
+.badge.success {
+  background: rgba(16, 185, 129, 0.15);
+  color: #0f9157;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 24rpx;
+}
+
+.section-title {
+  font-size: 30rpx;
+  font-weight: 600;
+  color: #1f2d3d;
+}
+
+.university-card {
+  display: flex;
+  flex-direction: column;
+  gap: 20rpx;
+}
+
+.uni-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 20rpx;
+}
+
+.uni-name {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: #0b6bcb;
+}
+
+.uni-meta {
+  margin-top: 8rpx;
+  font-size: 26rpx;
+  color: #5f6b7c;
+}
+
+.status-badge {
+  padding: 10rpx 24rpx;
+  border-radius: 999rpx;
+  font-size: 24rpx;
+  font-weight: 600;
+  align-self: flex-start;
+}
+
+.status-稳妥 {
+  background: rgba(16, 185, 129, 0.18);
+  color: #047857;
+}
+
+.status-冲刺 {
+  background: rgba(245, 158, 11, 0.18);
+  color: #b45309;
+}
+
+.status-保底 {
+  background: rgba(59, 130, 246, 0.18);
+  color: #1d4ed8;
+}
+
+.status-高风险 {
+  background: rgba(107, 114, 128, 0.2);
+  color: #374151;
+}
+
+.chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx;
+}
+
+.chip {
+  padding: 10rpx 22rpx;
+  border-radius: 999rpx;
+  background: #eef2f8;
+  color: #3c4858;
+  font-size: 24rpx;
+}
+
+.chip.accent {
+  background: rgba(11, 107, 203, 0.16);
+  color: #0b6bcb;
+}
+
+.chip.focus {
+  background: rgba(14, 116, 144, 0.18);
+  color: #0e7490;
+}
+
+.alert {
+  border-radius: 12rpx;
+  padding: 20rpx 24rpx;
+  font-size: 26rpx;
+  line-height: 1.6;
+}
+
+.alert.info {
+  background: rgba(59, 130, 246, 0.12);
+  color: #1d4ed8;
+}
+
+.alert.success {
+  background: rgba(16, 185, 129, 0.12);
+  color: #0f9157;
+}
+
+.alert.warning {
+  background: rgba(245, 158, 11, 0.12);
+  color: #b45309;
+}
+
+.timeline-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12rpx;
+}
+
+.timeline-stage {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #0b6bcb;
+}
+
+.resource-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12rpx;
+}
+
+.resource-name {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #0b6bcb;
+}
+
+.link {
+  color: #0b6bcb;
+  text-decoration: underline;
+  word-break: break-all;
+}
+
+.divider {
+  height: 2rpx;
+  background: #d8e2f0;
+  opacity: 0.6;
+  margin: 8rpx 0 16rpx;
+}
+
+@media (max-width: 375px) {
+  .form-row {
+    flex-direction: column;
+  }
+}
