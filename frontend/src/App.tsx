@@ -26,8 +26,6 @@ const App = () => {
   const [mode, setMode] = useState<'light' | 'dark'>('light');
   const { user } = useAuth();
   const theme = useMemo(() => createTheme(mode), [mode]);
-  const normalizedRole = user?.role?.toLowerCase() ?? '';
-  const hideRetakeToolkit = normalizedRole === 'admin';
 
   return (
     <ThemeProvider theme={theme}>
@@ -50,13 +48,9 @@ const App = () => {
           <Route path="advisor" element={<Advisor />} />
           <Route path="analytics" element={<Analytics />} />
           <Route path="forum" element={<Forum />} />
-          {!hideRetakeToolkit && (
-            <>
-              <Route path="retake-intro" element={<PostgraduateIntroTemplates />} />
-              <Route path="retake-subjects" element={<PostgraduateSubjectTopics />} />
-              <Route path="retake-english" element={<PostgraduateEnglishReview />} />
-            </>
-          )}
+          <Route path="retake-intro" element={<PostgraduateIntroTemplates />} />
+          <Route path="retake-subjects" element={<PostgraduateSubjectTopics />} />
+          <Route path="retake-english" element={<PostgraduateEnglishReview />} />
           <Route path="profile" element={<Profile />} />
           <Route
             path="admin"

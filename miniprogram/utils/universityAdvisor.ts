@@ -295,10 +295,10 @@ const buildRecommendations = (
   });
 
   const focusTopics = Array.from(
-    new Set(
+    new Set<string>(
       recommendedUniversities
         .flatMap((item) => item.interviewFocus || [])
-        .filter(Boolean),
+        .filter((topic): topic is string => Boolean(topic)),
     ),
   ).slice(0, 8);
 
