@@ -39,6 +39,11 @@
   color: #94a3b8;
 }
 
+.section__meta {
+  font-size: 24rpx;
+  color: #94a3b8;
+}
+
 .role-chip {
   align-self: flex-start;
   padding: 12rpx 28rpx;
@@ -250,6 +255,15 @@
 
 .link-button::after {
   display: none;
+}
+
+.secondary {
+  align-self: flex-start;
+  padding: 16rpx 32rpx;
+  border-radius: 999rpx;
+  color: #0b6bcb;
+  border: 1rpx solid #0b6bcb;
+  background: transparent;
 }
 
 .message {
