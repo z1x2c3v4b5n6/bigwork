@@ -12,7 +12,7 @@
             <view class="schedule-card__meta" wx:if="{{item.location}}">地点：{{item.location}}</view>
             <view class="schedule-card__meta" wx:if="{{item.focus}}">重点：{{item.focus}}</view>
       <view class="schedule-card__tags" wx:if="{{item.tags.length}}">
-        <block wx:for="{{item.tags}}" wx:key="{{index}}">
+        <block wx:for="{{item.tags}}" wx:key="*this">
           <text class="tag">{{item}}</text>
         </block>
       </view>
