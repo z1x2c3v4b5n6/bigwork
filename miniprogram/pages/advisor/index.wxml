@@ -61,7 +61,7 @@
                 <view class="uni-name">{{item.name}}</view>
                 <view class="uni-meta">{{item.province}} · {{item.level}} · {{item.category}}</view>
               </view>
-              <view class="status-badge status-{{item.matchLevel}}">{{item.matchLevel}}</view>
+              <view class="status-badge status-{{item.matchLevelClass}}">{{item.matchLevel}}</view>
             </view>
             <view class="chip-list">
               <view class="chip">{{item.scoreWindow}}</view>

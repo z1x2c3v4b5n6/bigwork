@@ -8,10 +8,24 @@ const defaultConfig: ApiConfig = {
   timeout: 8000,
 };
 
+const isPartialApiConfig = (value: unknown): value is Partial<ApiConfig> => {
+  if (!value || typeof value !== 'object') {
+    return false;
+  }
+  const record = value as Record<string, unknown>;
+  if (typeof record.baseUrl !== 'string') {
+    return false;
+  }
+  if ('timeout' in record && typeof record.timeout !== 'number') {
+    return false;
+  }
+  return true;
+};
+
 export const getApiConfig = (): ApiConfig => {
   try {
     const envConfig = wx.getStorageSync('apiConfig');
-    if (envConfig && typeof envConfig === 'object' && typeof envConfig.baseUrl === 'string') {
+    if (isPartialApiConfig(envConfig)) {
       return {
         baseUrl: envConfig.baseUrl,
         timeout: typeof envConfig.timeout === 'number' ? envConfig.timeout : defaultConfig.timeout,
