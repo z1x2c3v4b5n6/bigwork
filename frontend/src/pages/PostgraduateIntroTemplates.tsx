@@ -8,6 +8,12 @@ import {
   ListItemIcon,
   ListItemText,
   Paper,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
   Stack,
   Typography,
 } from '@mui/material';
@@ -17,7 +23,33 @@ import ChecklistIcon from '@mui/icons-material/Checklist';
 import BoltIcon from '@mui/icons-material/Bolt';
 import BookmarkAddedIcon from '@mui/icons-material/BookmarkAdded';
 import { scoreBandGuides } from '../data/postgraduateResources';
-import MiniProgramGuide from '../components/MiniProgramGuide';
+
+const miniProgramIssues = [
+  {
+    type: "WXSS 编译错误 (unexpected '�')",
+    symptom: '无法编译通过',
+    cause: '文件编码不是 UTF-8 无 BOM；或包含零宽空格、BOM、隐藏字符',
+    fix: '用 VS Code → “UTF-8 无 BOM” 重新保存；删除隐形字符；中文类名改英文',
+  },
+  {
+    type: '基础库下载失败 / 换版本仍失败',
+    symptom: '任意版本都报错',
+    cause: '实际是前端文件语法或编码错误导致工具编译中断',
+    fix: '修完编码错误再重试；版本号随意选 2.29.x/2.30.x 即可',
+  },
+  {
+    type: '500 Internal Server Error',
+    symptom: '接口返回 500',
+    cause: '后端逻辑异常或域名白名单没配置',
+    fix: '查后端日志或小程序后台配置',
+  },
+  {
+    type: 'SharedArrayBuffer 弃用提示',
+    symptom: '控制台黄色警告',
+    cause: 'Chrome/微信内核提示跨域隔离',
+    fix: '纯提示，不影响运行。',
+  },
+];
 
 const bilingualTemplate = [
   {
@@ -203,7 +235,60 @@ const PostgraduateIntroTemplates = () => {
         </Stack>
       </Paper>
 
-      <MiniProgramGuide />
+      <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid', borderColor: 'divider' }}>
+        <Stack spacing={2.5}>
+          <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} alignItems={{ md: 'center' }}>
+            <AutoAwesomeIcon color="success" fontSize="large" />
+            <Box>
+              <Typography variant="h6" fontWeight={600} gutterBottom>
+                小程序常见问题速查
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                将资料同步到微信小程序时，优先排查下列编码、基础库与接口配置问题，避免因工具报错阻塞提审。
+              </Typography>
+            </Box>
+          </Stack>
+          <TableContainer component={Paper} elevation={0} sx={{ borderRadius: 2, border: '1px solid', borderColor: 'divider' }}>
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell width="22%">类型</TableCell>
+                  <TableCell width="18%">表现</TableCell>
+                  <TableCell width="32%">根因</TableCell>
+                  <TableCell width="28%">修复方向</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {miniProgramIssues.map((issue) => (
+                  <TableRow key={issue.type}>
+                    <TableCell>
+                      <Typography variant="body2" fontWeight={600}>
+                        {issue.type}
+                      </Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Typography variant="body2" color="text.secondary">
+                        {issue.symptom}
+                      </Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Typography variant="body2" color="text.secondary">
+                        {issue.cause}
+                      </Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Typography variant="body2" color="text.secondary">
+                        {issue.fix}
+                      </Typography>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </Stack>
+      </Paper>
+
     </Stack>
   );
 };
