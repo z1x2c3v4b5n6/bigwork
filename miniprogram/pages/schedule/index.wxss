@@ -80,6 +80,17 @@
   background: #f8fbff;
 }
 
+.picker {
+  width: 100%;
+  padding: 22rpx;
+  border-radius: 16rpx;
+  border: 1rpx solid #d8e2f2;
+  box-sizing: border-box;
+  font-size: 26rpx;
+  background: #f0f7ff;
+  color: #0b1f33;
+}
+
 .submit {
   background: linear-gradient(135deg, #0b6bcb, #3f8cff);
   color: #ffffff;

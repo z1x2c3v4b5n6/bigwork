@@ -22,7 +22,6 @@ import InsightsIcon from '@mui/icons-material/Insights';
 import SchoolIcon from '@mui/icons-material/School';
 import { useMemo, useState } from 'react';
 import { majorRecommendations, scoreBandGuides } from '../data/postgraduateResources';
-import MiniProgramGuide from '../components/MiniProgramGuide';
 
 const PostgraduateSubjectTopics = () => {
   const [selectedMajor, setSelectedMajor] = useState<string>('all');
@@ -283,7 +282,6 @@ const PostgraduateSubjectTopics = () => {
         </Stack>
       </Paper>
 
-      <MiniProgramGuide />
     </Stack>
   );
 };

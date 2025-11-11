@@ -6,6 +6,7 @@ import {
   scheduleSeed,
   type DashboardSnapshot,
   type PracticeSetPreview,
+  type ScheduleItem,
 } from '../../data/dashboard';
 import { loadFromStorage, saveToStorage } from '../../utils/storage';
 
@@ -13,25 +14,59 @@ const DASHBOARD_STORAGE_KEY = 'dashboardSnapshot';
 
 type DashboardViewModel = DashboardSnapshot & {
   practiceSets: (PracticeSetPreview & { accuracyText: string; focusText: string })[];
+  schedule: ScheduleItem[];
+};
+
+const clampNumber = (value: unknown, min: number, max: number) => {
+  const numeric = Number(value);
+  if (Number.isNaN(numeric)) {
+    return min;
+  }
+  return Math.min(max, Math.max(min, numeric));
+};
+
+const pad = (value: number) => (value < 10 ? `0${value}` : `${value}`);
+
+const toTimestamp = (value: string | undefined | null) => {
+  if (!value) {
+    return Date.now();
+  }
+  const candidate = value.includes('T') ? value : value.replace(' ', 'T');
+  const parsed = new Date(candidate);
+  return Number.isNaN(parsed.getTime()) ? Date.now() : parsed.getTime();
+};
+
+const formatDisplayTime = (value: string | undefined | null) => {
+  const timestamp = toTimestamp(value);
+  const date = new Date(timestamp);
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(
+    date.getHours(),
+  )}:${pad(date.getMinutes())}`;
 };
 
 const normalizeDashboard = (snapshot: DashboardSnapshot): DashboardViewModel => {
   const normalizeCourses = (snapshot.courses ?? []).map((course) => ({
     ...course,
-    progress: Math.min(100, Math.max(0, Number(course.progress ?? 0))),
+    progress: clampNumber(course.progress, 0, 100),
   }));
 
   const normalizePractice = (snapshot.practiceSets ?? []).map((set) => {
-    const accuracy = Math.max(0, Math.min(1, Number(set.accuracy ?? 0)));
+    const accuracy = clampNumber(set.accuracy, 0, 1);
     const accuracyText = `${Math.round(accuracy * 100)}%`;
     const focusText = set.focus && set.focus.trim() ? set.focus : '请在刷题页补充';
     return { ...set, accuracy, accuracyText, focusText };
   });
 
-  const normalizeSchedule = (snapshot.schedule ?? []).map((item) => ({
-    ...item,
-    tags: Array.isArray(item.tags) ? item.tags : [],
-  }));
+  const normalizeSchedule = (snapshot.schedule ?? [])
+    .map((item) => ({
+      ...item,
+      start: formatDisplayTime(item.start),
+      end: formatDisplayTime(item.end),
+      tags: Array.isArray(item.tags) ? item.tags : [],
+      _timestamp: toTimestamp(item.start),
+    }))
+    .sort((a, b) => a._timestamp - b._timestamp)
+    .map(({ _timestamp, ...rest }) => rest as ScheduleItem);
 
   return {
     userName: snapshot.userName || dashboardSnapshotSeed.userName,
@@ -45,10 +80,15 @@ const normalizeDashboard = (snapshot: DashboardSnapshot): DashboardViewModel => 
             accuracyText: `${Math.round((set.accuracy ?? 0) * 100)}%`,
             focusText: set.focus && set.focus.trim() ? set.focus : '请在刷题页补充',
           })),
-    schedule: normalizeSchedule.length > 0 ? normalizeSchedule : scheduleSeed.map((item) => ({
-      ...item,
-      tags: Array.isArray(item.tags) ? item.tags : [],
-    })),
+    schedule:
+      normalizeSchedule.length > 0
+        ? normalizeSchedule
+        : scheduleSeed.map((item) => ({
+            ...item,
+            start: formatDisplayTime(item.start),
+            end: formatDisplayTime(item.end),
+            tags: Array.isArray(item.tags) ? item.tags : [],
+          })),
     recommendation: snapshot.recommendation || dashboardSnapshotSeed.recommendation,
   };
 };

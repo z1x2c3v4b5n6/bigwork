@@ -31,12 +31,30 @@ const {
   SESSION_SAME_SITE = 'lax',
 } = process.env;
 
-const allowedOrigins = ALLOWED_ORIGINS.split(',').map((origin) => origin.trim()).filter(Boolean);
+const defaultAllowedOrigins = [
+  'http://localhost:5173',
+  'http://localhost:5174',
+  'http://localhost:5175',
+  'https://servicewechat.com',
+  'https://servicewechatapp.com',
+];
+
+const allowedOrigins = new Set(
+  [...defaultAllowedOrigins, ...ALLOWED_ORIGINS.split(',')]
+    .map((origin) => origin.trim())
+    .filter(Boolean),
+);
+
+const serviceWechatPattern = /^https:\/\/servicewechat(app)?\.com/i;
 
 app.use(
   cors({
     origin: (origin, callback) => {
-      if (!origin || allowedOrigins.includes(origin)) {
+      if (
+        !origin ||
+        allowedOrigins.has(origin) ||
+        serviceWechatPattern.test(origin)
+      ) {
         return callback(null, origin);
       }
       console.warn(`阻止来自未授权来源的请求: ${origin}`);

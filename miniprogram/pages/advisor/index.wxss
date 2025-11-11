@@ -158,22 +158,22 @@
   align-self: flex-start;
 }
 
-.status-稳妥 {
+.status-stable {
   background: rgba(16, 185, 129, 0.18);
   color: #047857;
 }
 
-.status-冲刺 {
+.status-sprint {
   background: rgba(245, 158, 11, 0.18);
   color: #b45309;
 }
 
-.status-保底 {
+.status-safe {
   background: rgba(59, 130, 246, 0.18);
   color: #1d4ed8;
 }
 
-.status-高风险 {
+.status-risky {
   background: rgba(107, 114, 128, 0.2);
   color: #374151;
 }
