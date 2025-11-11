@@ -19,6 +19,244 @@ const router = express.Router();
 
 const quoteIdentifier = (identifier = '') => `\`${identifier}\``;
 
+const fallbackAdminDashboard = {
+  metrics: {
+    activeStudents: 128,
+    tasksCompletedToday: 42,
+    followUpsPending: 9,
+    systemAlerts: 1,
+  },
+  studentProgress: [
+    {
+      id: 1001,
+      name: '李晨',
+      university: '北京大学软件工程',
+      studyHours: 18,
+      completion: 82,
+    },
+    {
+      id: 1002,
+      name: '王晓',
+      university: '复旦大学金融专硕',
+      studyHours: 15,
+      completion: 76,
+    },
+    {
+      id: 1003,
+      name: '周敏',
+      university: '中国人民大学新闻传播',
+      studyHours: 12,
+      completion: 68,
+    },
+  ],
+  auditLogs: [
+    {
+      id: 2001,
+      title: '示例 · 批量导入学员',
+      description: '成功导入 38 名调剂学员，并同步到进度追踪表。',
+      actor: '示例管理员',
+      createdAt: '2024-03-12 09:30',
+    },
+    {
+      id: 2002,
+      title: '示例 · 更新资料库',
+      description: '上传《408 重点真题精讲》并推送至目标课程。',
+      actor: '示例管理员',
+      createdAt: '2024-03-11 19:20',
+    },
+  ],
+  administrators: ['示例管理员（文案组）', '示例管理员（教研组）'],
+  securityNote: '当前展示为示例数据，真实环境请接入数据库并开启操作审计。',
+};
+
+const fallbackAdminSettings = {
+  platform_name: '研途备考管理后台（示例）',
+  support_email: 'support@example.com',
+  security_note: '示例提示：请在正式环境中配置双因素认证与访问控制策略。',
+};
+
+const fallbackAdminUsers = [
+  {
+    id: 3001,
+    username: 'demo_admin',
+    displayName: '示例管理员',
+    email: 'admin@example.com',
+    role: 'admin',
+    created_at: '2024-03-10 08:00',
+    updated_at: '2024-03-10 08:00',
+  },
+  {
+    id: 3002,
+    username: 'demo_student',
+    displayName: '示例学员',
+    email: 'student@example.com',
+    role: 'student',
+    created_at: '2024-03-09 10:15',
+    updated_at: '2024-03-09 10:15',
+  },
+];
+
+const fallbackMajors = [
+  {
+    id: 4001,
+    name: '计算机科学与技术（示例）',
+    description: '覆盖数据结构、408 真题整理、复试项目指导等内容。',
+  },
+  {
+    id: 4002,
+    name: '新闻与传播（示例）',
+    description: '包含新闻写作、面试热点梳理与院校案例拆解。',
+  },
+];
+
+const fallbackCourses = [
+  {
+    id: 5001,
+    title: '示例 · 408 高频考点串讲',
+    description: '围绕数据结构、操作系统、计算机组成原理展开的 8 次直播课。',
+    teacher: '陈老师',
+    credit: 2,
+    majorId: 4001,
+    majorName: '计算机科学与技术（示例）',
+  },
+  {
+    id: 5002,
+    title: '示例 · 复试面试真题工作坊',
+    description: '针对新闻传播院校复试面试的即兴评述与热点分析。',
+    teacher: '赵老师',
+    credit: 1,
+    majorId: 4002,
+    majorName: '新闻与传播（示例）',
+  },
+];
+
+const fallbackMaterials = [
+  {
+    id: 6001,
+    title: '示例 · 计组易错题精编',
+    description: '覆盖缓存一致性、流水线与性能优化等高频错题。',
+    fileUrl: 'https://example.com/materials/cpu.pdf',
+    courseId: 5001,
+    courseTitle: '示例 · 408 高频考点串讲',
+  },
+  {
+    id: 6002,
+    title: '示例 · 新闻热点速览',
+    description: '按照时事模块整理的复试热点解读与口述模板。',
+    fileUrl: 'https://example.com/materials/news.pdf',
+    courseId: 5002,
+    courseTitle: '示例 · 复试面试真题工作坊',
+  },
+];
+
+const fallbackForumTopics = [
+  {
+    id: 7001,
+    title: '示例 · 调剂经验互助',
+    description: '分享调剂系统开放后的时间安排与材料准备注意事项。',
+    created_at: '2024-03-08 14:00',
+    updated_at: '2024-03-08 16:45',
+  },
+  {
+    id: 7002,
+    title: '示例 · 复试面试打卡',
+    description: '每日更新面试自我介绍练习与老师反馈要点。',
+    created_at: '2024-03-07 09:20',
+    updated_at: '2024-03-09 12:10',
+  },
+];
+
+const fallbackForumPosts = {
+  7001: [
+    {
+      id: 7101,
+      content: '【示例】提交调剂志愿前记得确认联系电话畅通，方便院校回访。',
+      author: '示例管理员',
+      created_at: '2024-03-08 14:30',
+      updated_at: '2024-03-08 14:30',
+    },
+    {
+      id: 7102,
+      content: '【示例】附上材料清单模板，建议调剂生提前备齐纸质版本。',
+      author: '示例管理员',
+      created_at: '2024-03-08 16:10',
+      updated_at: '2024-03-08 16:10',
+    },
+  ],
+  7002: [
+    {
+      id: 7201,
+      content: '【示例】今天练习的面试题：请结合新闻热点谈谈人工智能监管。',
+      author: '示例管理员',
+      created_at: '2024-03-07 09:40',
+      updated_at: '2024-03-07 09:40',
+    },
+  ],
+};
+
+const fallbackStatisticsOverview = {
+  totalUsers: 256,
+  totalMajors: 12,
+  totalCourses: 48,
+  totalMaterials: 136,
+  totalPracticeSets: 64,
+  totalForumPosts: 320,
+  lastUpdatedAt: '2024-03-12 09:30',
+};
+
+const sampleSearchData = {
+  users: fallbackAdminUsers,
+  majors: fallbackMajors,
+  courses: fallbackCourses,
+  materials: fallbackMaterials,
+  forumTopics: fallbackForumTopics,
+};
+
+const matchesKeyword = (text = '', keyword = '') => {
+  if (!text || !keyword) {
+    return false;
+  }
+  return text.toLowerCase().includes(keyword.toLowerCase());
+};
+
+const searchFallbackData = (keyword = '') => {
+  if (!keyword) {
+    return {
+      users: [],
+      majors: [],
+      courses: [],
+      materials: [],
+      forumTopics: [],
+    };
+  }
+
+  return {
+    users: sampleSearchData.users.filter(
+      (user) =>
+        matchesKeyword(user.username, keyword) ||
+        matchesKeyword(user.displayName, keyword) ||
+        matchesKeyword(user.email, keyword),
+    ),
+    majors: sampleSearchData.majors.filter(
+      (major) => matchesKeyword(major.name, keyword) || matchesKeyword(major.description, keyword),
+    ),
+    courses: sampleSearchData.courses.filter(
+      (course) =>
+        matchesKeyword(course.title, keyword) ||
+        matchesKeyword(course.description, keyword) ||
+        matchesKeyword(course.teacher, keyword) ||
+        matchesKeyword(course.majorName, keyword),
+    ),
+    materials: sampleSearchData.materials.filter(
+      (material) =>
+        matchesKeyword(material.title, keyword) || matchesKeyword(material.description, keyword),
+    ),
+    forumTopics: sampleSearchData.forumTopics.filter(
+      (topic) => matchesKeyword(topic.title, keyword) || matchesKeyword(topic.description, keyword),
+    ),
+  };
+};
+
 const pickColumn = (columns = new Set(), candidates = []) => {
   for (const candidate of candidates) {
     if (columns.has(candidate)) {
@@ -183,13 +421,24 @@ router.get('/dashboard', requireAdmin, async (req, res) => {
         .sort((a, b) => a.localeCompare(b, 'zh-CN'));
     }
 
-    res.json({
+    const payload = {
       metrics,
       studentProgress,
       auditLogs,
       administrators,
       securityNote: '所有敏感操作均会记录审计日志，请定期检查异常行为。',
-    });
+    };
+
+    const isEmptyDashboard =
+      (metrics.activeStudents ?? 0) === 0 &&
+      (metrics.tasksCompletedToday ?? 0) === 0 &&
+      (metrics.followUpsPending ?? 0) === 0 &&
+      (metrics.systemAlerts ?? 0) === 0 &&
+      studentProgress.length === 0 &&
+      auditLogs.length === 0 &&
+      administrators.length === 0;
+
+    res.json(isEmptyDashboard ? fallbackAdminDashboard : payload);
   } catch (error) {
     console.error('获取后台看板失败', error);
     res.status(500).json({ message: '无法加载后台数据，请稍后重试' });
@@ -208,7 +457,9 @@ router.get('/settings', requireAdmin, async (req, res) => {
       settings[row.key] = row.value;
     });
 
-    res.json({ settings });
+    const payload = Object.keys(settings).length > 0 ? settings : fallbackAdminSettings;
+
+    res.json({ settings: payload });
   } catch (error) {
     console.error('获取站点设置失败', error);
     res.status(500).json({ message: '无法加载站点设置' });
@@ -277,7 +528,7 @@ router.get('/users', requireAdmin, async (req, res) => {
       updated_at: normalizeDate(row.updated_at),
     }));
 
-    res.json({ users });
+    res.json({ users: users.length > 0 ? users : fallbackAdminUsers });
   } catch (error) {
     console.error('获取用户失败', error);
     res.status(500).json({ message: '无法加载用户列表' });
@@ -390,7 +641,7 @@ router.get('/majors', requireAdmin, async (req, res) => {
       description: row.description ?? null,
     }));
 
-    res.json({ majors });
+    res.json({ majors: majors.length > 0 ? majors : fallbackMajors });
   } catch (error) {
     console.error('获取专业失败', error);
     res.status(500).json({ message: '无法加载专业列表' });
@@ -526,7 +777,7 @@ router.get('/courses', requireAdmin, async (req, res) => {
       majorName: row.major_name ?? null,
     }));
 
-    res.json({ courses });
+    res.json({ courses: courses.length > 0 ? courses : fallbackCourses });
   } catch (error) {
     console.error('获取课程失败', error);
     res.status(500).json({ message: '无法加载课程列表' });
@@ -732,7 +983,7 @@ router.get('/materials', requireAdmin, async (req, res) => {
       courseTitle: row.course_title ?? null,
     }));
 
-    res.json({ materials });
+    res.json({ materials: materials.length > 0 ? materials : fallbackMaterials });
   } catch (error) {
     console.error('获取资料失败', error);
     res.status(500).json({ message: '无法加载资料列表' });
@@ -862,7 +1113,7 @@ router.get('/forum/topics', requireAdmin, async (req, res) => {
       updated_at: normalizeDate(row.updated_at),
     }));
 
-    res.json({ topics });
+    res.json({ topics: topics.length > 0 ? topics : fallbackForumTopics });
   } catch (error) {
     console.error('获取论坛话题失败', error);
     res.status(500).json({ message: '无法加载论坛话题' });
@@ -920,7 +1171,8 @@ router.get('/forum/topics/:topicId/posts', requireAdmin, async (req, res) => {
       updated_at: normalizeDate(row.updated_at),
     }));
 
-    res.json({ posts });
+    const fallbackPosts = fallbackForumPosts[Number(topicId)] ?? [];
+    res.json({ posts: posts.length > 0 ? posts : fallbackPosts });
   } catch (error) {
     console.error('获取论坛帖子失败', error);
     res.status(500).json({ message: '无法加载论坛帖子' });
@@ -978,7 +1230,15 @@ router.get('/statistics/overview', requireAdmin, async (req, res) => {
       overview.lastUpdatedAt = normalizeDate(rows[0]?.created_at);
     }
 
-    res.json(overview);
+    const isEmptyOverview =
+      (overview.totalUsers ?? 0) === 0 &&
+      (overview.totalMajors ?? 0) === 0 &&
+      (overview.totalCourses ?? 0) === 0 &&
+      (overview.totalMaterials ?? 0) === 0 &&
+      (overview.totalPracticeSets ?? 0) === 0 &&
+      (overview.totalForumPosts ?? 0) === 0;
+
+    res.json(isEmptyOverview ? fallbackStatisticsOverview : overview);
   } catch (error) {
     console.error('获取统计概览失败', error);
     res.status(500).json({ message: '无法加载统计信息' });
@@ -1219,6 +1479,18 @@ router.get('/statistics/search', requireAdmin, async (req, res) => {
         description: row.description ?? null,
       }));
     })());
+
+    const allEmpty =
+      users.length === 0 &&
+      majors.length === 0 &&
+      courses.length === 0 &&
+      materials.length === 0 &&
+      forumTopics.length === 0;
+
+    if (allEmpty) {
+      const fallback = searchFallbackData(keyword);
+      return res.json(fallback);
+    }
 
     res.json({ users, majors, courses, materials, forumTopics });
   } catch (error) {
