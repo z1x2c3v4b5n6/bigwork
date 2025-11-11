@@ -1,5 +1,10 @@
 const { apiRequest } = require('../../utils/api.js');
-const { ensureSession, login: loginRequest, logout: logoutRequest } = require('../../utils/session.js');
+const {
+  ensureSession,
+  getStoredSession,
+  login: loginRequest,
+  logout: logoutRequest,
+} = require('../../utils/session.js');
 
 const createEmptyProfile = () => ({
   id: '',
@@ -79,11 +84,21 @@ Page({
 
     const app = getApp();
 
-    if (app && app.globalData && app.globalData.sessionUser) {
-      this.setData({ sessionUser: app.globalData.sessionUser });
+    let session = app && app.globalData ? app.globalData.sessionUser : null;
+
+    if (!session) {
+      session = getStoredSession();
+      if (session && app && typeof app.setSessionUser === 'function') {
+        app.setSessionUser(session);
+      }
     }
 
-    let session = null;
+    if (!session) {
+      this.setData({ loading: false, sessionUser: null });
+      return;
+    }
+
+    this.setData({ sessionUser: session });
 
     try {
       session = await ensureSession();

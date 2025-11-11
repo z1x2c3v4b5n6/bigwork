@@ -2,6 +2,7 @@ import { type UserProfile } from '../../data/profile';
 import { apiRequest, type ApiError } from '../../utils/api';
 import {
   ensureSession,
+  getStoredSession,
   login as loginRequest,
   logout as logoutRequest,
   type SessionUser,
@@ -100,11 +101,21 @@ Page({
       setSessionUser?: (user: SessionUser | null) => void;
     }>();
 
-    if (app?.globalData?.sessionUser) {
-      this.setData({ sessionUser: app.globalData.sessionUser });
+    let session: SessionUser | null = app?.globalData?.sessionUser ?? null;
+
+    if (!session) {
+      session = getStoredSession();
+      if (session && app?.setSessionUser) {
+        app.setSessionUser(session);
+      }
     }
 
-    let session: SessionUser | null = null;
+    if (!session) {
+      this.setData({ loading: false, sessionUser: null });
+      return;
+    }
+
+    this.setData({ sessionUser: session });
 
     try {
       session = await ensureSession();
