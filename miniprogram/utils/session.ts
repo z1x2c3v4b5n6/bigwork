@@ -1,4 +1,5 @@
 import { apiRequest, type ApiError } from './api';
+import { clearStoredCookies } from './authCookies';
 import { loadFromStorage, resetStorageKey, saveToStorage } from './storage';
 
 export interface SessionUser {
@@ -73,6 +74,7 @@ export const saveSession = (user: SessionUser | null) => {
     saveToStorage(SESSION_STORAGE_KEY, user);
   } else {
     resetStorageKey(SESSION_STORAGE_KEY);
+    clearStoredCookies();
   }
 };
 
@@ -95,6 +97,7 @@ export const fetchSession = async (): Promise<SessionUser> => {
   const sessionUser = extractSessionUser(response);
 
   if (!sessionUser) {
+    clearStoredCookies();
     throw createUnauthorizedError('登录状态无效，请重新登录。');
   }
 
@@ -116,6 +119,7 @@ export const ensureSession = async (): Promise<SessionUser> => {
 
     if (apiError?.statusCode === 401 || apiError?.statusCode === 404) {
       saveSession(null);
+      clearStoredCookies();
       throw createUnauthorizedError('请先登录后再进行操作。');
     }
 
@@ -150,4 +154,5 @@ export const logout = async (): Promise<void> => {
     }
   }
   saveSession(null);
+  clearStoredCookies();
 };

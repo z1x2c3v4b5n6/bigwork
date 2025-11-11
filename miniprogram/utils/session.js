@@ -1,4 +1,5 @@
 const { apiRequest } = require('./api.js');
+const { clearStoredCookies } = require('./authCookies.js');
 const { loadFromStorage, resetStorageKey, saveToStorage } = require('./storage.js');
 
 const SESSION_STORAGE_KEY = 'sessionUser';
@@ -55,6 +56,7 @@ const saveSession = (user) => {
     saveToStorage(SESSION_STORAGE_KEY, user);
   } else {
     resetStorageKey(SESSION_STORAGE_KEY);
+    clearStoredCookies();
   }
 };
 
@@ -77,6 +79,7 @@ const fetchSession = async () => {
   const sessionUser = extractSessionUser(response);
 
   if (!sessionUser) {
+    clearStoredCookies();
     throw createUnauthorizedError('登录状态无效，请重新登录。');
   }
 
@@ -96,6 +99,7 @@ const ensureSession = async () => {
   } catch (error) {
     if (error && (error.statusCode === 401 || error.statusCode === 404)) {
       saveSession(null);
+      clearStoredCookies();
       throw createUnauthorizedError('请先登录后再进行操作。');
     }
 
@@ -128,6 +132,7 @@ const logout = async () => {
     }
   }
   saveSession(null);
+  clearStoredCookies();
 };
 
 module.exports = {
