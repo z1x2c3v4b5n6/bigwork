@@ -3,6 +3,9 @@
     <view class="section__title">题单列表</view>
     <view class="section__subtitle">点击题单查看详情并继续录入题目。</view>
 
+    <view class="message message--error" wx:if="{{errorMessage}}">{{errorMessage}}</view>
+    <view class="message" wx:if="{{loadingSets}}">题单加载中，请稍候…</view>
+
     <block wx:if="{{sets.length}}">
       <view class="set-list">
         <block wx:for="{{sets}}" wx:key="id">
@@ -26,6 +29,7 @@
   <view class="section">
     <view class="section__title">题目详情</view>
     <block wx:if="{{selectedSetId}}">
+      <view class="message" wx:if="{{loadingQuestions}}">题目加载中，请稍候…</view>
       <view class="question-list">
         <block wx:for="{{visibleQuestions}}" wx:key="id">
           <view class="question-card">
@@ -53,7 +57,7 @@
       <textarea class="textarea" placeholder="题单简介" value="{{setForm.description}}" data-field="description" bindinput="handleSetInput"></textarea>
       <input class="input" placeholder="难度（基础/进阶/冲刺）" value="{{setForm.difficulty}}" data-field="difficulty" bindinput="handleSetInput" />
       <input class="input" placeholder="标签（逗号分隔）" value="{{setForm.tags}}" data-field="tags" bindinput="handleSetInput" />
-      <button class="submit" bindtap="createSet">保存题单</button>
+      <button class="submit" bindtap="createSet" loading="{{submittingSet}}" disabled="{{submittingSet}}">保存题单</button>
     </view>
   </view>
 
@@ -65,8 +69,8 @@
       <textarea class="textarea" placeholder="解析" value="{{questionForm.explanation}}" data-field="explanation" bindinput="handleQuestionInput"></textarea>
       <input class="input" placeholder="标签（逗号分隔）" value="{{questionForm.tags}}" data-field="tags" bindinput="handleQuestionInput" />
       <input class="input" placeholder="难度" value="{{questionForm.difficulty}}" data-field="difficulty" bindinput="handleQuestionInput" />
-      <button class="submit" bindtap="createQuestion">保存题目</button>
-      <view class="message message--error" wx:if="{{errorMessage}}">{{errorMessage}}</view>
+      <button class="submit" bindtap="createQuestion" loading="{{submittingQuestion}}" disabled="{{submittingQuestion}}">保存题目</button>
+      <view class="message message--error" wx:if="{{!loadingSets && !loadingQuestions && errorMessage}}">{{errorMessage}}</view>
       <view class="message message--success" wx:if="{{successMessage}}">{{successMessage}}</view>
     </view>
   </view>

@@ -1,8 +1,11 @@
-import { practiceSetSeed, practiceQuestionSeed, type PracticeQuestion, type PracticeSetSummary } from '../../data/practice';
-import { loadFromStorage, saveToStorage } from '../../utils/storage';
-
-const SET_STORAGE_KEY = 'practiceSets';
-const QUESTION_STORAGE_KEY = 'practiceQuestions';
+import {
+  practiceSetSeed,
+  practiceQuestionSeed,
+  type PracticeQuestion,
+  type PracticeSetSummary,
+} from '../../data/practice';
+import { apiRequest, type ApiError } from '../../utils/api';
+import { ensureSession } from '../../utils/session';
 
 const createSetForm = () => ({
   title: '',
@@ -19,65 +22,137 @@ const createQuestionForm = () => ({
   difficulty: '基础',
 });
 
-const normalizeSets = (sets: PracticeSetSummary[]): PracticeSetSummary[] =>
-  sets.map((set) => ({
-    ...set,
-    id: set.id || `set_${Date.now()}`,
-    questionCount: Number(set.questionCount ?? 0),
-  }));
+const difficultyDisplayMap: Record<string, string> = {
+  easy: '基础',
+  medium: '进阶',
+  hard: '冲刺',
+};
 
-const normalizeQuestions = (questions: PracticeQuestion[]): PracticeQuestion[] =>
-  questions.map((question) => ({
-    ...question,
-    id: question.id || `question_${Date.now()}`,
-  }));
+const difficultyApiMap: Record<string, string> = {
+  基础: 'easy',
+  进阶: 'medium',
+  冲刺: 'hard',
+};
+
+const toDisplayDifficulty = (value: string | null | undefined): string => {
+  if (!value) {
+    return '基础';
+  }
+  const trimmed = String(value).trim();
+  return difficultyDisplayMap[trimmed] || trimmed || '基础';
+};
+
+const toApiDifficulty = (value: string | null | undefined): string => {
+  if (!value) {
+    return 'medium';
+  }
+  const trimmed = String(value).trim();
+  return difficultyApiMap[trimmed] || trimmed || 'medium';
+};
+
+const mapSet = (set: PracticeSetSummary): PracticeSetSummary => ({
+  ...set,
+  difficulty: toDisplayDifficulty(set.difficulty),
+  questionCount: Number(set.questionCount ?? 0),
+  tags: Array.isArray(set.tags) ? set.tags : [],
+});
+
+const mapQuestion = (question: PracticeQuestion, setId: string): PracticeQuestion => ({
+  ...question,
+  setId,
+  difficulty: toDisplayDifficulty(question.difficulty),
+  tags: Array.isArray(question.tags) ? question.tags : [],
+});
 
 Page({
   data: {
-    sets: practiceSetSeed as PracticeSetSummary[],
-    questions: practiceQuestionSeed as PracticeQuestion[],
+    sets: practiceSetSeed.map((set) => mapSet(set)) as PracticeSetSummary[],
     selectedSetId: practiceSetSeed[0]?.id ?? '',
-    visibleQuestions: practiceQuestionSeed.filter((item) => item.setId === (practiceSetSeed[0]?.id ?? '')) as PracticeQuestion[],
+    visibleQuestions: practiceQuestionSeed
+      .filter((item) => item.setId === (practiceSetSeed[0]?.id ?? ''))
+      .map((question) => mapQuestion(question, question.setId)) as PracticeQuestion[],
     setForm: createSetForm(),
     questionForm: createQuestionForm(),
     errorMessage: '',
     successMessage: '',
+    loadingSets: false,
+    loadingQuestions: false,
+    submittingSet: false,
+    submittingQuestion: false,
   },
 
   onShow() {
-    const savedSets = loadFromStorage<PracticeSetSummary[]>(SET_STORAGE_KEY, practiceSetSeed);
-    const savedQuestions = loadFromStorage<PracticeQuestion[]>(QUESTION_STORAGE_KEY, practiceQuestionSeed);
+    void this.loadSets();
+  },
 
-    const sets = normalizeSets(savedSets);
-    const questions = normalizeQuestions(savedQuestions);
-    const defaultSetId = sets[0]?.id ?? '';
-    const selectedSetId = sets.some((item) => item.id === this.data.selectedSetId)
-      ? this.data.selectedSetId
-      : defaultSetId;
+  async loadSets() {
+    this.setData({ loadingSets: true, errorMessage: '', successMessage: '' });
 
-    this.setData({
-      sets,
-      questions,
-      selectedSetId,
-      visibleQuestions: questions.filter((question) => question.setId === selectedSetId),
-    });
+    try {
+      await ensureSession();
+    } catch (error) {
+      const apiError = error as ApiError;
+      const message =
+        apiError?.statusCode === 401
+          ? '请先登录后再同步题单，可在个人中心完成账号密码登录。'
+          : apiError?.message || '无法校验登录状态，请稍后重试。';
+      this.setData({ loadingSets: false, errorMessage: message });
+      return;
+    }
+
+    try {
+      const response = await apiRequest<{ sets: PracticeSetSummary[] }>({ path: '/practice/sets' });
+      const sets = Array.isArray(response.sets) ? response.sets.map((set) => mapSet(set)) : [];
+      const selectedSetId = sets.some((set) => set.id === this.data.selectedSetId)
+        ? this.data.selectedSetId
+        : sets[0]?.id ?? '';
+
+      this.setData({ sets, selectedSetId });
+
+      if (selectedSetId) {
+        await this.loadQuestions(selectedSetId);
+      } else {
+        this.setData({ visibleQuestions: [] });
+      }
+    } catch (error) {
+      const apiError = error as ApiError;
+      this.setData({ errorMessage: apiError?.message || '加载题单失败，请稍后重试。' });
+    } finally {
+      this.setData({ loadingSets: false });
+    }
+  },
+
+  async loadQuestions(setId: string) {
+    this.setData({ loadingQuestions: true, errorMessage: '', successMessage: '' });
+
+    try {
+      const response = await apiRequest<{ questions: PracticeQuestion[] }>({
+        path: `/practice/sets/${setId}/questions`,
+      });
+      const questions = Array.isArray(response.questions)
+        ? response.questions.map((question) => mapQuestion(question, setId))
+        : [];
+      this.setData({ visibleQuestions: questions });
+    } catch (error) {
+      const apiError = error as ApiError;
+      this.setData({ errorMessage: apiError?.message || '加载题目失败，请稍后重试。' });
+      this.setData({ visibleQuestions: [] });
+    } finally {
+      this.setData({ loadingQuestions: false });
+    }
   },
 
   selectSet(event: WechatMiniprogram.BaseEvent) {
     const id = event.currentTarget?.dataset?.id;
-    if (!id) {
+    if (!id || id === this.data.selectedSetId) {
       return;
     }
-    this.setData({
-      selectedSetId: id,
-      visibleQuestions: this.data.questions.filter((question) => question.setId === id),
-      errorMessage: '',
-      successMessage: '',
-    });
+    this.setData({ selectedSetId: id, visibleQuestions: [] });
+    void this.loadQuestions(id);
   },
 
   handleSetInput(event: WechatMiniprogram.Input) {
-    const field = event.currentTarget?.dataset?.field;
+    const field = event.currentTarget?.dataset?.field as keyof ReturnType<typeof createSetForm> | undefined;
     if (!field) {
       return;
     }
@@ -90,7 +165,7 @@ Page({
   },
 
   handleQuestionInput(event: WechatMiniprogram.Input) {
-    const field = event.currentTarget?.dataset?.field;
+    const field = event.currentTarget?.dataset?.field as keyof ReturnType<typeof createQuestionForm> | undefined;
     if (!field) {
       return;
     }
@@ -102,7 +177,7 @@ Page({
     });
   },
 
-  createSet() {
+  async createSet() {
     const form = this.data.setForm;
     if (!form.title || !form.title.trim()) {
       this.setData({ errorMessage: '请输入题单名称' });
@@ -114,30 +189,31 @@ Page({
       .map((tag) => tag.trim())
       .filter(Boolean);
 
-    const set: PracticeSetSummary = {
-      id: `set_${Date.now()}`,
-      title: form.title.trim(),
-      description: form.description?.trim() || '尚未填写简介',
-      difficulty: (form.difficulty as PracticeSetSummary['difficulty']) || '基础',
-      tags,
-      questionCount: 0,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
+    this.setData({ submittingSet: true, errorMessage: '', successMessage: '' });
 
-    const sets = [set, ...this.data.sets];
-    saveToStorage(SET_STORAGE_KEY, sets);
-    this.setData({
-      sets,
-      selectedSetId: set.id,
-      visibleQuestions: [],
-      setForm: createSetForm(),
-      successMessage: '题单创建成功，请继续添加题目。',
-      errorMessage: '',
-    });
+    try {
+      await apiRequest({
+        path: '/practice/sets',
+        method: 'POST',
+        data: {
+          title: form.title.trim(),
+          description: form.description?.trim() || null,
+          difficulty: toApiDifficulty(form.difficulty),
+          tags,
+        },
+      });
+
+      await this.loadSets();
+      this.setData({ setForm: createSetForm(), successMessage: '题单创建成功，请继续添加题目。' });
+    } catch (error) {
+      const apiError = error as ApiError;
+      this.setData({ errorMessage: apiError?.message || '创建题单失败，请稍后重试。' });
+    } finally {
+      this.setData({ submittingSet: false });
+    }
   },
 
-  createQuestion() {
+  async createQuestion() {
     const form = this.data.questionForm;
     const setId = this.data.selectedSetId;
 
@@ -156,35 +232,28 @@ Page({
       .map((tag) => tag.trim())
       .filter(Boolean);
 
-    const question: PracticeQuestion = {
-      id: `question_${Date.now()}`,
-      setId,
-      questionText: form.questionText.trim(),
-      answerText: form.answerText?.trim() || '请在刷题后补充答案',
-      explanation: form.explanation?.trim() || '建议整理思路、补充解析。',
-      tags,
-      difficulty: (form.difficulty as PracticeQuestion['difficulty']) || '基础',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
+    this.setData({ submittingQuestion: true, errorMessage: '', successMessage: '' });
 
-    const questions = [question, ...this.data.questions];
-    const sets = this.data.sets.map((set) =>
-      set.id === setId
-        ? { ...set, questionCount: Number(set.questionCount ?? 0) + 1, updatedAt: new Date().toISOString() }
-        : set,
-    );
+    try {
+      await apiRequest({
+        path: `/practice/sets/${setId}/questions`,
+        method: 'POST',
+        data: {
+          questionText: form.questionText.trim(),
+          answerText: form.answerText?.trim() || null,
+          explanation: form.explanation?.trim() || null,
+          tags,
+          difficulty: toApiDifficulty(form.difficulty),
+        },
+      });
 
-    saveToStorage(QUESTION_STORAGE_KEY, questions);
-    saveToStorage(SET_STORAGE_KEY, sets);
-
-    this.setData({
-      questions,
-      sets,
-      visibleQuestions: questions.filter((item) => item.setId === setId),
-      questionForm: createQuestionForm(),
-      successMessage: '题目已录入。',
-      errorMessage: '',
-    });
+      await this.loadQuestions(setId);
+      this.setData({ questionForm: createQuestionForm(), successMessage: '题目已录入。' });
+    } catch (error) {
+      const apiError = error as ApiError;
+      this.setData({ errorMessage: apiError?.message || '保存题目失败，请稍后重试。' });
+    } finally {
+      this.setData({ submittingQuestion: false });
+    }
   },
 });

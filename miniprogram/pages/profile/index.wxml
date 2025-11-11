@@ -1,12 +1,29 @@
 <view class="page">
-  <view class="section">
+  <view class="section" wx:if="{{sessionUser}}">
     <view class="section__title">个人中心</view>
     <view class="section__subtitle">完善个人资料，获取更精准的学习推荐。</view>
-    <view class="role-chip" bindtap="toggleRole">当前身份：{{profile.role === 'admin' ? '管理员' : '学员'}}（点击切换）</view>
+    <view class="role-chip">当前身份：{{sessionUser.role === 'admin' ? '管理员' : '学员'}}</view>
+    <view class="section__meta">当前账号：{{sessionUser.name}}</view>
+    <button class="secondary" bindtap="logoutUser" loading="{{loading}}" disabled="{{loading}}">退出登录</button>
   </view>
 
-  <view class="section">
+  <view class="section" wx:if="{{!sessionUser}}">
+    <view class="section__title">账号登录</view>
+    <view class="section__subtitle">使用教务或后台账号登录后即可同步数据库资料。</view>
     <view class="form">
+      <input class="input" placeholder="用户名" value="{{loginForm.username}}" data-field="username" bindinput="handleLoginInput" />
+      <input class="input" placeholder="密码" password="true" value="{{loginForm.password}}" data-field="password" bindinput="handleLoginInput" />
+      <button class="submit" bindtap="submitLogin" loading="{{loggingIn}}" disabled="{{loggingIn}}">登录</button>
+      <view class="message message--error" wx:if="{{errorMessage}}">{{errorMessage}}</view>
+      <view class="message message--success" wx:if="{{successMessage}}">{{successMessage}}</view>
+    </view>
+  </view>
+
+  <view class="section" wx:if="{{sessionUser}}">
+    <view class="section__title">个人资料</view>
+    <view class="section__subtitle">修改联系方式、目标与自述内容，保存后将同步数据库。</view>
+    <view class="message" wx:if="{{loading}}">资料加载中，请稍候…</view>
+    <view class="form" wx:if="{{!loading}}">
       <input class="input" placeholder="姓名" value="{{profile.name}}" data-field="name" bindinput="handleInput" />
       <input class="input" placeholder="邮箱" value="{{profile.email}}" data-field="email" bindinput="handleInput" />
       <input class="input" placeholder="电话" value="{{profile.phone}}" data-field="phone" bindinput="handleInput" />
@@ -19,7 +36,7 @@
 
       <textarea class="textarea" placeholder="个人简介 / 学习自述" value="{{profile.bio}}" data-field="bio" bindinput="handleInput"></textarea>
 
-      <button class="submit" bindtap="saveProfile">保存资料</button>
+      <button class="submit" bindtap="saveProfile" loading="{{saving}}" disabled="{{saving}}">保存资料</button>
       <view class="message message--error" wx:if="{{errorMessage}}">{{errorMessage}}</view>
       <view class="message message--success" wx:if="{{successMessage}}">{{successMessage}}</view>
     </view>

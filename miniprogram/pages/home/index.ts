@@ -8,6 +8,8 @@ import {
   type PracticeSetPreview,
   type ScheduleItem,
 } from '../../data/dashboard';
+import { apiRequest, type ApiError } from '../../utils/api';
+import { ensureSession } from '../../utils/session';
 import { loadFromStorage, saveToStorage } from '../../utils/storage';
 
 const DASHBOARD_STORAGE_KEY = 'dashboardSnapshot';
@@ -95,16 +97,44 @@ const normalizeDashboard = (snapshot: DashboardSnapshot): DashboardViewModel => 
 
 Page({
   data: {
-    snapshot: normalizeDashboard(dashboardSnapshotSeed),
+    snapshot: normalizeDashboard(
+      loadFromStorage<DashboardSnapshot>(DASHBOARD_STORAGE_KEY, dashboardSnapshotSeed),
+    ),
+    loading: false,
+    errorMessage: '',
   },
 
   onShow() {
-    const snapshot = loadFromStorage<DashboardSnapshot>(DASHBOARD_STORAGE_KEY, dashboardSnapshotSeed);
-    const normalized = normalizeDashboard(snapshot);
+    void this.loadDashboard();
+  },
 
-    this.setData({ snapshot: normalized });
+  async loadDashboard() {
+    this.setData({ loading: true, errorMessage: '' });
 
-    saveToStorage(DASHBOARD_STORAGE_KEY, normalized);
+    try {
+      await ensureSession();
+    } catch (error) {
+      const apiError = error as ApiError;
+      const message =
+        apiError?.statusCode === 401
+          ? '请先在个人中心使用账号密码登录后，再刷新学习看板。'
+          : apiError?.message || '无法校验登录状态，请稍后重试。';
+      this.setData({ loading: false, errorMessage: message });
+      return;
+    }
+
+    try {
+      const snapshot = await apiRequest<DashboardSnapshot>({ path: '/learning/dashboard' });
+      const normalized = normalizeDashboard(snapshot);
+      this.setData({ snapshot: normalized });
+      saveToStorage(DASHBOARD_STORAGE_KEY, snapshot);
+    } catch (error) {
+      const apiError = error as ApiError;
+      const message = apiError?.message || '加载学习看板失败，请稍后重试。';
+      this.setData({ errorMessage: message });
+    } finally {
+      this.setData({ loading: false });
+    }
   },
 
   navigateToPage(event: WechatMiniprogram.BaseEvent) {

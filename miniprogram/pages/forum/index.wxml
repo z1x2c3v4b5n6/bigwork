@@ -2,12 +2,19 @@
   <view class="section">
     <view class="section__title">考研论坛</view>
     <view class="section__subtitle">讨论复习策略、调剂经验与备考心得。</view>
+    <view class="message message--error" wx:if="{{errorMessage}}">{{errorMessage}}</view>
+    <view class="message" wx:if="{{loadingTopics}}">话题加载中，请稍候…</view>
     <view class="topic-list" wx:if="{{topics.length}}">
       <block wx:for="{{topics}}" wx:key="id">
         <view class="topic-card {{item.id === selectedTopicId ? 'topic-card--active' : ''}}" data-id="{{item.id}}" bindtap="selectTopic">
           <view class="topic-card__title">{{item.title}}</view>
           <view class="topic-card__description">{{item.description}}</view>
-          <view class="topic-card__meta">👍 {{item.likes}} · 回复 {{item.replies.length}}</view>
+          <view class="topic-card__meta">{{item.author}} · 👍 {{item.likes}} · 回复 {{item.replyCount}}</view>
+          <view class="topic-card__tags" wx:if="{{item.tags.length}}">
+            <block wx:for="{{item.tags}}" wx:key="*this">
+              <text class="tag">{{item}}</text>
+            </block>
+          </view>
         </view>
       </block>
     </view>
@@ -16,14 +23,21 @@
 
   <view class="section" wx:if="{{selectedTopicId}}">
     <view class="section__title">话题详情</view>
+    <view class="topic-detail" wx:if="{{activeTopic}}">
+      <view class="topic-detail__title">{{activeTopic.title}}</view>
+      <view class="topic-detail__meta">由 {{activeTopic.author}} 发布 · {{activeTopic.createdAt}}</view>
+      <view class="topic-detail__description">{{activeTopic.description}}</view>
+    </view>
     <view class="action-bar">
-      <button class="action-bar__btn" size="mini" bindtap="toggleLike">{{likeButtonText}}</button>
+      <button class="action-bar__btn" size="mini" bindtap="toggleLike" loading="{{liking}}" disabled="{{liking}}">{{likeButtonText}}</button>
       <text class="action-bar__info">当前点赞：{{likeCount}}</text>
     </view>
 
-    <block wx:if="{{hasReplies}}">
+    <view class="message" wx:if="{{loadingPosts}}">回复加载中，请稍候…</view>
+
+    <block wx:if="{{posts.length}}">
       <view class="reply-list">
-        <block wx:for="{{activeTopic.replies}}" wx:key="id">
+        <block wx:for="{{posts}}" wx:key="id">
           <view class="reply-card">
             <view class="reply-card__author">{{item.author}}</view>
             <view class="reply-card__content">{{item.content}}</view>
@@ -40,7 +54,8 @@
     <view class="form">
       <input class="input" placeholder="话题标题" value="{{topicForm.title}}" data-field="title" bindinput="handleTopicInput" />
       <textarea class="textarea" placeholder="补充说明（可选）" value="{{topicForm.description}}" data-field="description" bindinput="handleTopicInput"></textarea>
-      <button class="submit" bindtap="createTopic">发布话题</button>
+      <input class="input" placeholder="标签（逗号分隔，可选）" value="{{topicForm.tags}}" data-field="tags" bindinput="handleTopicInput" />
+      <button class="submit" bindtap="createTopic" loading="{{submittingTopic}}" disabled="{{submittingTopic}}">发布话题</button>
     </view>
   </view>
 
@@ -48,8 +63,8 @@
     <view class="section__title">发送回复</view>
     <view class="form">
       <textarea class="textarea" placeholder="请输入回复内容" value="{{replyForm.content}}" bindinput="handleReplyInput"></textarea>
-      <button class="submit" bindtap="createReply">发送</button>
-      <view class="message message--error" wx:if="{{errorMessage}}">{{errorMessage}}</view>
+      <button class="submit" bindtap="createReply" loading="{{submittingReply}}" disabled="{{submittingReply}}">发送</button>
+      <view class="message message--error" wx:if="{{!loadingTopics && !loadingPosts && errorMessage}}">{{errorMessage}}</view>
       <view class="message message--success" wx:if="{{successMessage}}">{{successMessage}}</view>
     </view>
   </view>
