@@ -1,7 +1,6 @@
 import { scheduleSeed, type ScheduleItem } from '../../data/dashboard';
-import { loadFromStorage, saveToStorage } from '../../utils/storage';
-
-const SCHEDULE_STORAGE_KEY = 'scheduleItems';
+import { apiRequest, type ApiError } from '../../utils/api';
+import { ensureSession } from '../../utils/session';
 
 interface FormState {
   title: string;
@@ -77,15 +76,43 @@ Page({
     form: createForm(),
     errorMessage: '',
     successMessage: '',
+    loading: false,
+    submitting: false,
   },
 
   onShow() {
-    const saved = loadFromStorage<ScheduleItem[]>(SCHEDULE_STORAGE_KEY, scheduleSeed);
-    this.setData({ schedule: normalizeSchedule(saved) });
+    void this.loadSchedule();
+  },
+
+  async loadSchedule() {
+    this.setData({ loading: true, errorMessage: '', successMessage: '' });
+
+    try {
+      await ensureSession();
+    } catch (error) {
+      const apiError = error as ApiError;
+      const message =
+        apiError?.statusCode === 401
+          ? '请先在个人中心完成登录后，再同步学习日程。'
+          : apiError?.message || '无法校验登录状态，请稍后重试。';
+      this.setData({ loading: false, errorMessage: message });
+      return;
+    }
+
+    try {
+      const response = await apiRequest<{ schedule: ScheduleItem[] }>({ path: '/learning/schedule' });
+      const items = Array.isArray(response.schedule) ? response.schedule : [];
+      this.setData({ schedule: normalizeSchedule(items) });
+    } catch (error) {
+      const apiError = error as ApiError;
+      this.setData({ errorMessage: apiError?.message || '加载学习日程失败，请稍后重试。' });
+    } finally {
+      this.setData({ loading: false });
+    }
   },
 
   handleInput(event: WechatMiniprogram.Input) {
-    const field = event.currentTarget?.dataset?.field;
+    const field = event.currentTarget?.dataset?.field as keyof FormState | undefined;
     if (!field) {
       return;
     }
@@ -98,7 +125,7 @@ Page({
   },
 
   handleDateChange(event: WechatMiniprogram.PickerChange) {
-    const field = event.currentTarget?.dataset?.field;
+    const field = event.currentTarget?.dataset?.field as keyof FormState | undefined;
     if (!field) {
       return;
     }
@@ -111,7 +138,7 @@ Page({
   },
 
   handleTimeChange(event: WechatMiniprogram.PickerChange) {
-    const field = event.currentTarget?.dataset?.field;
+    const field = event.currentTarget?.dataset?.field as keyof FormState | undefined;
     if (!field) {
       return;
     }
@@ -123,7 +150,7 @@ Page({
     });
   },
 
-  createSchedule() {
+  async createSchedule() {
     const form = this.data.form;
     if (!form.title || !form.title.trim()) {
       this.setData({ errorMessage: '请输入日程标题' });
@@ -140,25 +167,31 @@ Page({
       .map((tag) => tag.trim())
       .filter(Boolean);
 
-    const scheduleItem: ScheduleItem = {
-      id: `schedule_${Date.now()}`,
-      title: form.title.trim(),
-      type: form.type?.trim() || '自习',
-      start: `${form.startDate} ${form.startTime}`,
-      end: `${form.endDate} ${form.endTime}`,
-      location: form.location?.trim() || undefined,
-      focus: form.focus?.trim() || undefined,
-      tags,
-    };
+    this.setData({ submitting: true, errorMessage: '', successMessage: '' });
 
-    const schedule = normalizeSchedule([scheduleItem, ...this.data.schedule]);
-    saveToStorage(SCHEDULE_STORAGE_KEY, schedule);
+    try {
+      await apiRequest({
+        path: '/learning/schedule',
+        method: 'POST',
+        data: {
+          title: form.title.trim(),
+          type: form.type?.trim() || '自习',
+          start: `${form.startDate} ${form.startTime}`,
+          end: `${form.endDate} ${form.endTime}`,
+          allDay: false,
+          location: form.location?.trim() || null,
+          focus: form.focus?.trim() || null,
+          tags,
+        },
+      });
 
-    this.setData({
-      schedule,
-      form: createForm(),
-      successMessage: '日程已创建。',
-      errorMessage: '',
-    });
+      await this.loadSchedule();
+      this.setData({ form: createForm(), successMessage: '日程已创建。' });
+    } catch (error) {
+      const apiError = error as ApiError;
+      this.setData({ errorMessage: apiError?.message || '创建日程失败，请稍后重试。' });
+    } finally {
+      this.setData({ submitting: false });
+    }
   },
 });
