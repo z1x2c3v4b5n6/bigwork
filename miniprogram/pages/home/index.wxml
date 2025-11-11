@@ -10,6 +10,9 @@
     </view>
   </view>
 
+  <view class="message message--error" wx:if="{{errorMessage}}">{{errorMessage}}</view>
+  <view class="message" wx:if="{{loading}}">数据加载中，请稍候…</view>
+
   <view class="section">
     <view class="section__title">关键指标</view>
     <view class="stats-grid">

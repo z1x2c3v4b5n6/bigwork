@@ -14,6 +14,7 @@ declare const wx: {
 };
 
 declare function App(options: AnyRecord): void;
+declare function getApp<T = AnyRecord>(): T;
 
 type DataDefinition = Record<string, any>;
 
@@ -46,4 +47,6 @@ declare namespace WechatMiniprogram {
   interface PickerChange extends BaseEvent {
     detail: { value: number | string | string[] };
   }
+
+  interface TouchEvent extends BaseEvent {}
 }
