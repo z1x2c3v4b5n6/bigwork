@@ -190,3 +190,17 @@
   padding: 20rpx;
   border-radius: 16rpx;
 }
+
+.message {
+  margin-top: 16rpx;
+  padding: 20rpx 24rpx;
+  border-radius: 16rpx;
+  font-size: 24rpx;
+  color: #1e293b;
+  background: #e2e8f0;
+}
+
+.message--error {
+  background: rgba(239, 68, 68, 0.15);
+  color: #b91c1c;
+}

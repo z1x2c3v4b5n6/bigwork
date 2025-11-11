@@ -3,6 +3,9 @@
     <view class="section__title">课程体系</view>
     <view class="section__subtitle">管理公共课与专业课的学习计划，随时补充下一步任务。</view>
 
+    <view class="message message--error" wx:if="{{errorMessage}}">{{errorMessage}}</view>
+    <view class="message" wx:if="{{loading}}">数据加载中，请稍候…</view>
+
     <block wx:if="{{courses.length}}">
       <view class="course-list">
         <block wx:for="{{courses}}" wx:key="id">
@@ -48,9 +51,9 @@
       <input class="input" placeholder="下一步任务" value="{{form.nextTask}}" data-field="nextTask" bindinput="handleInput" />
       <textarea class="textarea" placeholder="备注（可选）" value="{{form.description}}" data-field="description" bindinput="handleInput"></textarea>
 
-      <button class="submit" bindtap="submitCourse">保存课程</button>
+      <button class="submit" bindtap="submitCourse" loading="{{submitting}}" disabled="{{submitting}}">保存课程</button>
 
-      <view class="message message--error" wx:if="{{errorMessage}}">{{errorMessage}}</view>
+      <view class="message message--error" wx:if="{{!loading && errorMessage}}">{{errorMessage}}</view>
       <view class="message message--success" wx:if="{{successMessage}}">{{successMessage}}</view>
     </view>
   </view>

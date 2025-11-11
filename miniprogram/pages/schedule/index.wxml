@@ -3,6 +3,9 @@
     <view class="section__title">学习日程</view>
     <view class="section__subtitle">同步直播课、自习与模拟考试的时间安排。</view>
 
+    <view class="message message--error" wx:if="{{errorMessage}}">{{errorMessage}}</view>
+    <view class="message" wx:if="{{loading}}">数据加载中，请稍候…</view>
+
     <block wx:if="{{schedule.length}}">
       <view class="schedule-list">
         <block wx:for="{{schedule}}" wx:key="id">
@@ -45,8 +48,8 @@
       <input class="input" placeholder="地点（可选）" value="{{form.location}}" data-field="location" bindinput="handleInput" />
       <input class="input" placeholder="重点（可选）" value="{{form.focus}}" data-field="focus" bindinput="handleInput" />
       <input class="input" placeholder="标签（逗号分隔）" value="{{form.tags}}" data-field="tags" bindinput="handleInput" />
-      <button class="submit" bindtap="createSchedule">保存日程</button>
-      <view class="message message--error" wx:if="{{errorMessage}}">{{errorMessage}}</view>
+      <button class="submit" bindtap="createSchedule" loading="{{submitting}}" disabled="{{submitting}}">保存日程</button>
+      <view class="message message--error" wx:if="{{!loading && errorMessage}}">{{errorMessage}}</view>
       <view class="message message--success" wx:if="{{successMessage}}">{{successMessage}}</view>
     </view>
   </view>
