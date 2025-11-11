@@ -4,16 +4,74 @@
     <view class="section__subtitle">完善个人资料，获取更精准的学习推荐。</view>
     <view class="role-chip">当前身份：{{sessionUser.role === 'admin' ? '管理员' : '学员'}}</view>
     <view class="section__meta">当前账号：{{sessionUser.name}}</view>
-    <button class="secondary" bindtap="logoutUser" loading="{{loading}}" disabled="{{loading}}">退出登录</button>
+    <button
+      class="button button--secondary"
+      bindtap="logoutUser"
+      loading="{{loading}}"
+      disabled="{{loading}}"
+      hover-class="none"
+    >
+      退出登录
+    </button>
   </view>
 
-  <view class="section" wx:if="{{!sessionUser}}">
-    <view class="section__title">账号登录</view>
-    <view class="section__subtitle">使用教务或后台账号登录后即可同步数据库资料。</view>
-    <view class="form">
+  <view class="section section--login" wx:if="{{!sessionUser}}">
+    <view class="login-header">
+      <view class="login-icon">🔐</view>
+      <view class="login-title">欢迎登录考研学习平台</view>
+      <view class="login-desc">请输入数据库中已存在的账号密码，或选择下方体验账号一键填充。</view>
+    </view>
+
+    <view class="demo-section">
+      <view class="demo-section__title">体验账号快速进入</view>
+      <view class="demo-section__desc">支持学生与教研管理员两种身份，帮助您快速了解功能。</view>
+      <view class="demo-list">
+        <view
+          wx:for="{{demoAccounts}}"
+          wx:key="key"
+          class="demo-card {{selectedDemoKey === item.key ? 'demo-card--active' : ''}}"
+          data-key="{{item.key}}"
+          data-username="{{item.username}}"
+          data-password="{{item.password}}"
+          hover-class="demo-card--hover"
+          bindtap="useDemoAccount"
+        >
+          <view class="demo-card__info">
+            <view class="demo-card__title">{{item.label}}</view>
+            <view class="demo-card__meta">用户名 {{item.username}} · 密码 {{item.password}}</view>
+            <view class="demo-card__desc">{{item.description}}</view>
+          </view>
+          <view class="demo-card__action">一键填充</view>
+        </view>
+      </view>
+    </view>
+
+    <view class="divider"></view>
+
+    <view class="form form--login">
+      <view class="form__title">账号密码登录</view>
       <input class="input" placeholder="用户名" value="{{loginForm.username}}" data-field="username" bindinput="handleLoginInput" />
-      <input class="input" placeholder="密码" password="true" value="{{loginForm.password}}" data-field="password" bindinput="handleLoginInput" />
-      <button class="submit" bindtap="submitLogin" loading="{{loggingIn}}" disabled="{{loggingIn}}">登录</button>
+      <input
+        class="input"
+        placeholder="密码"
+        password="true"
+        value="{{loginForm.password}}"
+        data-field="password"
+        bindinput="handleLoginInput"
+      />
+      <button
+        class="button button--primary"
+        bindtap="submitLogin"
+        loading="{{loggingIn}}"
+        disabled="{{loggingIn}}"
+        hover-class="none"
+      >
+        登录
+      </button>
+      <view class="form__register">
+        <text class="form__register-text">没有账号？</text>
+        <button class="link-button" bindtap="handleRegisterTap" disabled="{{loggingIn}}" hover-class="none">查看注册指引</button>
+      </view>
       <view class="message message--error" wx:if="{{errorMessage}}">{{errorMessage}}</view>
       <view class="message message--success" wx:if="{{successMessage}}">{{successMessage}}</view>
     </view>
@@ -36,7 +94,15 @@
 
       <textarea class="textarea" placeholder="个人简介 / 学习自述" value="{{profile.bio}}" data-field="bio" bindinput="handleInput"></textarea>
 
-      <button class="submit" bindtap="saveProfile" loading="{{saving}}" disabled="{{saving}}">保存资料</button>
+      <button
+        class="button button--primary"
+        bindtap="saveProfile"
+        loading="{{saving}}"
+        disabled="{{saving}}"
+        hover-class="none"
+      >
+        保存资料
+      </button>
       <view class="message message--error" wx:if="{{errorMessage}}">{{errorMessage}}</view>
       <view class="message message--success" wx:if="{{successMessage}}">{{successMessage}}</view>
     </view>

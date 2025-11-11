@@ -111,9 +111,13 @@ Page({
       return;
     }
     const value = event.detail.value;
-    const nextForm = { ...this.data.form } as Record<string, unknown>;
-    nextForm[field] = field === 'progress' ? Number(value) : value;
-    this.setData({ form: nextForm, errorMessage: '', successMessage: '' });
+    const key = field;
+    const nextValue = key === 'progress' ? Number(value) : value;
+    this.setData({
+      form: { ...this.data.form, [key]: nextValue } as typeof this.data.form,
+      errorMessage: '',
+      successMessage: '',
+    });
   },
 
   handleMajorChange(event: WechatMiniprogram.PickerChange) {

@@ -4,7 +4,7 @@ export interface ApiRequestOptions<TData = any> {
   path: string;
   method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
   data?: TData;
-  header?: WechatMiniprogram.IAnyObject;
+  header?: Record<string, unknown>;
   timeout?: number;
 }
 
@@ -45,9 +45,12 @@ export const apiRequest = <TResponse = any, TData = any>({
           resolve(res.data as TResponse);
           return;
         }
-        const error: ApiError = new Error(
-          (res.data as WechatMiniprogram.IAnyObject)?.message || '请求失败，请稍后重试。',
-        );
+        const responseData = (res.data ?? {}) as Record<string, unknown>;
+        const message =
+          typeof responseData.message === 'string' && responseData.message
+            ? responseData.message
+            : '请求失败，请稍后重试。';
+        const error: ApiError = new Error(message);
         error.statusCode = res.statusCode;
         error.data = res.data;
         reject(error);

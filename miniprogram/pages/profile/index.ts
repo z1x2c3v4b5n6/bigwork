@@ -1,6 +1,11 @@
 import { type UserProfile } from '../../data/profile';
 import { apiRequest, type ApiError } from '../../utils/api';
-import { ensureSession, login as loginRequest, logout as logoutRequest, type SessionUser } from '../../utils/session';
+import {
+  ensureSession,
+  login as loginRequest,
+  logout as logoutRequest,
+  type SessionUser,
+} from '../../utils/session';
 
 interface MajorOption {
   id: string;
@@ -26,6 +31,31 @@ const createLoginForm = () => ({
   password: '',
 });
 
+interface DemoAccount {
+  key: string;
+  label: string;
+  username: string;
+  password: string;
+  description: string;
+}
+
+const demoAccounts: DemoAccount[] = [
+  {
+    key: 'student',
+    label: '普通学生体验账号',
+    username: 'student',
+    password: 'study2025',
+    description: '体验学习首页、刷题、课程与日程等全部学生功能。',
+  },
+  {
+    key: 'admin',
+    label: '教研管理员体验账号',
+    username: 'admin',
+    password: 'admin123',
+    description: '可访问后台管理面板，演示课程、题库与论坛审核流程。',
+  },
+];
+
 const resolveMajorName = (majorId: string, majors: MajorOption[]) =>
   majors.find((major) => major.id === majorId)?.name ?? '请选择';
 
@@ -49,6 +79,8 @@ Page({
     selectedMajorName: '请选择',
     sessionUser: null as SessionUser | null,
     loginForm: createLoginForm(),
+    demoAccounts,
+    selectedDemoKey: '',
     errorMessage: '',
     successMessage: '',
     loading: false,
@@ -161,9 +193,30 @@ Page({
     const value = event.detail.value ?? '';
     this.setData({
       loginForm: { ...this.data.loginForm, [field]: value },
+      selectedDemoKey: '',
       errorMessage: '',
       successMessage: '',
     });
+  },
+
+  useDemoAccount(event: WechatMiniprogram.BaseEvent) {
+    const dataset = event.currentTarget?.dataset as
+      | (Record<string, unknown> & { key?: string; username?: string; password?: string })
+      | undefined;
+    const username = typeof dataset?.username === 'string' ? dataset.username : '';
+    const password = typeof dataset?.password === 'string' ? dataset.password : '';
+    const key = typeof dataset?.key === 'string' ? dataset.key : '';
+
+    if (!username || !password || !key) {
+      return;
+    }
+    this.setData({
+      loginForm: { username, password },
+      selectedDemoKey: key,
+      errorMessage: '',
+      successMessage: '',
+    });
+    wx.showToast({ title: '已填充体验账号', icon: 'none' });
   },
 
   async submitLogin() {
@@ -182,14 +235,20 @@ Page({
       if (app?.setSessionUser) {
         app.setSessionUser(session);
       }
-      this.setData({ sessionUser: session, loginForm: createLoginForm(), successMessage: '登录成功。' });
+      this.setData({ sessionUser: session, loginForm: createLoginForm(), selectedDemoKey: '' });
       await this.loadProfile();
+      this.setData({ successMessage: '登录成功。' });
+      wx.showToast({ title: '登录成功', icon: 'success' });
     } catch (error) {
       const apiError = error as ApiError;
       this.setData({ errorMessage: apiError?.message || '登录失败，请稍后重试。' });
     } finally {
       this.setData({ loggingIn: false });
     }
+  },
+
+  handleRegisterTap() {
+    wx.navigateTo({ url: '/pages/intro/index' });
   },
 
   async logoutUser() {
@@ -205,6 +264,7 @@ Page({
         profile: createEmptyProfile(),
         majors: [],
         selectedMajorName: '请选择',
+        selectedDemoKey: '',
         successMessage: '已退出登录。',
       });
     } catch (error) {
