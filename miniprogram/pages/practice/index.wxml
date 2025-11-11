@@ -10,7 +10,7 @@
             <view class="set-card__title">{{item.title}}</view>
             <view class="set-card__meta">难度：{{item.difficulty}} · 题目数：{{item.questionCount}}</view>
             <view class="set-card__tags" wx:if="{{item.tags.length}}">
-              <block wx:for="{{item.tags}}" wx:key="{{index}}">
+              <block wx:for="{{item.tags}}" wx:key="*this">
                 <text class="tag">{{item}}</text>
               </block>
             </view>
@@ -33,7 +33,7 @@
             <view class="question-card__answer">答案：{{item.answerText}}</view>
             <view class="question-card__explanation">解析：{{item.explanation}}</view>
             <view class="question-card__tags" wx:if="{{item.tags.length}}">
-              <block wx:for="{{item.tags}}" wx:key="{{index}}">
+              <block wx:for="{{item.tags}}" wx:key="*this">
                 <text class="tag tag--outline">{{item}}</text>
               </block>
             </view>

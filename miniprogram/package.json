@@ -1,0 +1,10 @@
+{
+  "name": "postgraduate-review-miniapp",
+  "version": "1.0.0",
+  "private": true,
+  "description": "WeChat mini program toolkit for postgraduate review",
+  "scripts": {
+    "lint": "tsc --noEmit -p tsconfig.json"
+  },
+  "devDependencies": {}
+}
