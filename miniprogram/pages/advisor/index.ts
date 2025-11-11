@@ -1,4 +1,9 @@
-import { buildRecommendationResponse, type RecommendationPayload, type UniversityRecommendationResponse } from '../../utils/universityAdvisor';
+import {
+  buildRecommendationResponse,
+  type MatchLevel,
+  type RecommendationPayload,
+  type UniversityRecommendationResponse,
+} from '../../utils/universityAdvisor';
 
 type AdvisorPageData = {
   scoreInput: string;
@@ -9,8 +14,23 @@ type AdvisorPageData = {
   englishIndex: number;
   loading: boolean;
   errorMessage: string;
-  recommendation: UniversityRecommendationResponse | null;
+  recommendation: AdvisorRecommendationView | null;
   focusPreview: string[];
+};
+
+type AdvisorRecommendationItemView = UniversityRecommendationResponse['recommendedUniversities'][number] & {
+  matchLevelClass: string;
+};
+
+type AdvisorRecommendationView = Omit<UniversityRecommendationResponse, 'recommendedUniversities'> & {
+  recommendedUniversities: AdvisorRecommendationItemView[];
+};
+
+const matchLevelClassMap: Record<MatchLevel, string> = {
+  稳妥: 'stable',
+  冲刺: 'sprint',
+  保底: 'safe',
+  高风险: 'risky',
 };
 
 Page<AdvisorPageData>({
@@ -92,8 +112,15 @@ Page<AdvisorPageData>({
     try {
       const recommendation = buildRecommendationResponse(payload);
       const focusPreview = recommendation.interviewPreparation.focusTopics.slice(0, 3);
+      const sanitizedRecommendation: AdvisorRecommendationView = {
+        ...recommendation,
+        recommendedUniversities: recommendation.recommendedUniversities.map((item) => ({
+          ...item,
+          matchLevelClass: matchLevelClassMap[item.matchLevel] || 'stable',
+        })),
+      };
       this.setData({
-        recommendation,
+        recommendation: sanitizedRecommendation,
         loading: false,
         focusPreview,
       });
