@@ -14,6 +14,8 @@ const router = express.Router();
 
 const resolveColumn = (columns, candidates) => candidates.find((column) => columns.has(column)) || null;
 
+const wrongQuestionTableCandidates = ['wrong_questions', 'practice_wrong_questions'];
+
 const getPracticeSetConfig = async () => {
   const columns = await getTableColumns('practice_sets');
 
@@ -62,6 +64,33 @@ const getPracticeQuestionConfig = async () => {
     createdAt: resolveColumn(columns, ['created_at', 'create_time']),
     updatedAt: resolveColumn(columns, ['updated_at', 'update_time']),
   };
+};
+
+const getWrongQuestionConfig = async () => {
+  for (const tableName of wrongQuestionTableCandidates) {
+    const columns = await getTableColumns(tableName);
+
+    if (columns.size === 0) {
+      continue;
+    }
+
+    const columnDetails = await getTableColumnDetails(tableName);
+
+    return {
+      tableName,
+      columns,
+      columnDetails,
+      id: resolveColumn(columns, ['id', 'question_id', 'wrong_id']),
+      userId: resolveColumn(columns, ['user_id', 'owner_id', 'student_id']),
+      question: resolveColumn(columns, ['question', 'stem', 'content']),
+      answer: resolveColumn(columns, ['answer', 'solution']),
+      analysis: resolveColumn(columns, ['analysis', 'explanation', 'commentary']),
+      updatedAt: resolveColumn(columns, ['updated_at', 'update_time', 'modified_at']),
+      createdAt: resolveColumn(columns, ['created_at', 'create_time']),
+    };
+  }
+
+  return null;
 };
 
 const createSetPayload = (config, { title, description, difficulty, tags, createdBy }) => {
@@ -193,6 +222,14 @@ const createQuestionPayload = (
 
   return payload;
 };
+
+const mapWrongQuestionRow = (row) => ({
+  id: row.id != null ? String(row.id) : '',
+  question: row.question || '',
+  answer: row.answer || '',
+  analysis: row.analysis || '',
+  updatedAt: row.updated_at || row.updatedAt || row.created_at || row.createdAt || null,
+});
 
 const formatSetRow = (row, index = 0) => ({
   id: row.id != null ? String(row.id) : String(index + 1),
@@ -547,6 +584,139 @@ router.post('/sets/:setId/questions', requireAuth, async (req, res) => {
   } catch (error) {
     console.error('创建题目失败', error);
     res.status(500).json({ message: '录入题目失败，请稍后重试' });
+  }
+});
+
+
+router.get('/wrong-questions', requireAuth, async (req, res) => {
+  try {
+    const config = await getWrongQuestionConfig();
+
+    if (!config || !config.id || !config.userId || !config.question) {
+      return res.json({ questions: [] });
+    }
+
+    const normalizedUserId = normalizeIdentifier(req.session?.user?.id);
+    if (!normalizedUserId) {
+      return res.json({ questions: [] });
+    }
+
+    const selectFragments = [
+      `w.\`${config.id}\` AS id`,
+      `w.\`${config.question}\` AS question`,
+    ];
+
+    if (config.answer) {
+      selectFragments.push(`w.\`${config.answer}\` AS answer`);
+    } else {
+      selectFragments.push("'' AS answer");
+    }
+
+    if (config.analysis) {
+      selectFragments.push(`w.\`${config.analysis}\` AS analysis`);
+    } else {
+      selectFragments.push('NULL AS analysis');
+    }
+
+    if (config.updatedAt) {
+      selectFragments.push(`w.\`${config.updatedAt}\` AS updated_at`);
+    } else if (config.createdAt) {
+      selectFragments.push(`w.\`${config.createdAt}\` AS updated_at`);
+    } else {
+      selectFragments.push('NULL AS updated_at');
+    }
+
+    const orderColumn = config.updatedAt || config.createdAt || config.id;
+
+    const rows = await query(
+      `SELECT ${selectFragments.join(', ')}
+         FROM \`${config.tableName}\` w
+        WHERE w.\`${config.userId}\` = :userId
+        ORDER BY w.\`${orderColumn}\` DESC
+        LIMIT 200`,
+      { userId: normalizedUserId },
+    );
+
+    res.json({ questions: rows.map((row) => mapWrongQuestionRow(row)) });
+  } catch (error) {
+    console.error('获取错题本失败', error);
+    res.status(500).json({ message: '无法加载错题本，请稍后再试。' });
+  }
+});
+
+router.post('/wrong-questions/bulk', requireAuth, async (req, res) => {
+  const { questions } = req.body || {};
+
+  if (!Array.isArray(questions) || questions.length === 0) {
+    return res.status(400).json({ message: '请提供至少一道错题内容。' });
+  }
+
+  try {
+    const config = await getWrongQuestionConfig();
+
+    if (!config || !config.id || !config.userId || !config.question) {
+      return res
+        .status(500)
+        .json({ message: '当前数据库未配置错题本表结构，请联系管理员检查 wrong_questions 表。' });
+    }
+
+    const normalizedUserId = normalizeIdentifier(req.session.user.id);
+    const processedIds = [];
+
+    for (const entry of questions) {
+      const rawId = entry?.id;
+      const id = typeof rawId === 'string' ? rawId.trim() : rawId != null ? String(rawId).trim() : '';
+      const questionText = typeof entry?.question === 'string' ? entry.question.trim() : '';
+
+      if (!id || !questionText) {
+        continue;
+      }
+
+      const insertColumns = [`\`${config.id}\``, `\`${config.userId}\``, `\`${config.question}\``];
+      const valuePlaceholders = [':id', ':userId', ':question'];
+      const params = {
+        id,
+        userId: normalizedUserId,
+        question: questionText,
+      };
+
+      if (config.answer) {
+        insertColumns.push(`\`${config.answer}\``);
+        valuePlaceholders.push(':answer');
+        params['answer'] = entry?.answer != null ? String(entry.answer) : null;
+      }
+
+      if (config.analysis) {
+        insertColumns.push(`\`${config.analysis}\``);
+        valuePlaceholders.push(':analysis');
+        params['analysis'] = entry?.analysis != null ? String(entry.analysis) : null;
+      }
+
+      const updateFragments = [`\`${config.question}\` = VALUES(\`${config.question}\`)`];
+      if (config.answer) {
+        updateFragments.push(`\`${config.answer}\` = VALUES(\`${config.answer}\`)`);
+      }
+      if (config.analysis) {
+        updateFragments.push(`\`${config.analysis}\` = VALUES(\`${config.analysis}\`)`);
+      }
+      if (config.updatedAt) {
+        updateFragments.push(`\`${config.updatedAt}\` = NOW()`);
+      }
+
+      await query(
+        `INSERT INTO \`${config.tableName}\` (${insertColumns.join(', ')})
+           VALUES (${valuePlaceholders.join(', ')})
+           ON DUPLICATE KEY UPDATE ${updateFragments.join(', ')}`,
+        params,
+      );
+
+      processedIds.push(id);
+    }
+
+    res.json({ success: true, synced: processedIds.length });
+  } catch (error) {
+    console.error('批量同步错题失败', error);
+    res.status(500).json({ message: '同步错题失败，请稍后再试。' });
   }
 });
 
