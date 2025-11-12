@@ -19,6 +19,18 @@ type DashboardViewModel = DashboardSnapshot & {
   schedule: ScheduleItem[];
 };
 
+type QuickLinkVariant = 'default' | 'accent';
+
+interface QuickLinkItem {
+  id: string;
+  label: string;
+  caption?: string;
+  icon?: string;
+  page: string;
+  openType?: 'navigate' | 'switchTab';
+  variant?: QuickLinkVariant;
+}
+
 const clampNumber = (value: unknown, min: number, max: number) => {
   const numeric = Number(value);
   if (Number.isNaN(numeric)) {
@@ -95,8 +107,18 @@ const normalizeDashboard = (snapshot: DashboardSnapshot): DashboardViewModel => 
   };
 };
 
+const quickLinkEntries: QuickLinkItem[] = [
+  { id: 'advisor', label: '院校推荐', caption: '智能匹配', icon: '🎯', page: 'advisor' },
+  { id: 'analytics', label: '学习分析', caption: '数据看板', icon: '📊', page: 'analytics' },
+  { id: 'forum', label: '考研论坛', caption: '交流讨论', icon: '💬', page: 'forum' },
+  { id: 'admin', label: '后台管理', caption: '运营任务', icon: '🛠️', page: 'admin' },
+  { id: 'checkin', label: '今日打卡', caption: '完成计划', icon: '✅', page: 'checkin', variant: 'accent' },
+  { id: 'ai', label: 'AI 助手', caption: '随问随答', icon: '🤖', page: 'ai', variant: 'accent' },
+];
+
 Page({
   data: {
+    quickLinks: quickLinkEntries,
     snapshot: normalizeDashboard(
       loadFromStorage<DashboardSnapshot>(DASHBOARD_STORAGE_KEY, dashboardSnapshotSeed),
     ),
@@ -138,11 +160,20 @@ Page({
   },
 
   navigateToPage(event: WechatMiniprogram.BaseEvent) {
-    const page = event.currentTarget?.dataset?.page;
+    const dataset = event.currentTarget?.dataset ?? {};
+    const page = dataset.page as string | undefined;
+    const openType = (dataset.openType as QuickLinkItem['openType']) ?? 'navigate';
     if (!page) {
       return;
     }
-    wx.navigateTo({ url: `/pages/${page}/index` }).catch((error) => {
+    const url = `/pages/${page}/index`;
+    if (openType === 'switchTab') {
+      wx.switchTab({ url }).catch((error) => {
+        console.warn('切换 Tab 失败', error);
+      });
+      return;
+    }
+    wx.navigateTo({ url }).catch((error) => {
       console.warn('导航失败', error);
     });
   },

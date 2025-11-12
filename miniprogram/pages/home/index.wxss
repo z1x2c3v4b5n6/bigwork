@@ -30,21 +30,58 @@
 }
 
 .hero__quick-nav {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18rpx;
+}
+
+.hero__quick-card {
   display: flex;
-  flex-wrap: wrap;
+  align-items: center;
   gap: 16rpx;
-}
-
-.hero__btn {
-  border-radius: 999rpx;
+  padding: 20rpx 22rpx;
+  border-radius: 20rpx;
   background: rgba(255, 255, 255, 0.16);
+  border: 1rpx solid rgba(255, 255, 255, 0.28);
   color: #ffffff;
+  backdrop-filter: blur(6rpx);
+  transition: transform 0.2s ease, background 0.2s ease;
 }
 
-.hero__btn--accent {
-  background: rgba(250, 204, 21, 0.24);
+.hero__quick-card:active {
+  transform: translateY(2rpx);
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.hero__quick-card--accent {
+  background: rgba(250, 204, 21, 0.22);
   color: #0b1f33;
+  border-color: rgba(250, 204, 21, 0.45);
+}
+
+.hero__quick-icon {
+  font-size: 34rpx;
+  line-height: 1;
+}
+
+.hero__quick-text {
+  display: flex;
+  flex-direction: column;
+  gap: 6rpx;
+}
+
+.hero__quick-label {
+  font-size: 26rpx;
   font-weight: 600;
+}
+
+.hero__quick-caption {
+  font-size: 22rpx;
+  opacity: 0.85;
+}
+
+.hero__quick-card--accent .hero__quick-caption {
+  opacity: 0.72;
 }
 
 .section {
