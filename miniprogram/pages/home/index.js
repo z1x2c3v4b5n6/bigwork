@@ -101,9 +101,19 @@ const normalizeDashboard = (snapshot) => {
   };
 };
 
+const quickLinkEntries = [
+  { id: 'advisor', label: '院校推荐', caption: '智能匹配', icon: '🎯', page: 'advisor' },
+  { id: 'analytics', label: '学习分析', caption: '数据看板', icon: '📊', page: 'analytics' },
+  { id: 'forum', label: '考研论坛', caption: '交流讨论', icon: '💬', page: 'forum' },
+  { id: 'admin', label: '后台管理', caption: '运营任务', icon: '🛠️', page: 'admin' },
+  { id: 'checkin', label: '今日打卡', caption: '完成计划', icon: '✅', page: 'checkin', variant: 'accent' },
+  { id: 'ai', label: 'AI 助手', caption: '随问随答', icon: '🤖', page: 'ai', variant: 'accent' },
+];
+
 Page({
   data: {
-    snapshot: normalizeDashboard(dashboardSnapshotSeed),
+    quickLinks: quickLinkEntries,
+    snapshot: normalizeDashboard(loadFromStorage(DASHBOARD_STORAGE_KEY, dashboardSnapshotSeed)),
   },
 
   onShow() {
@@ -116,11 +126,21 @@ Page({
   navigateToPage(event) {
     const dataset = (event && event.currentTarget && event.currentTarget.dataset) || {};
     const page = dataset.page;
+    const openType = dataset.openType || 'navigate';
     if (!page) {
       return;
     }
+    const url = `/pages/${page}/index`;
+    if (openType === 'switchTab') {
+      wx
+        .switchTab({ url })
+        .catch((error) => {
+          console.warn('切换 Tab 失败', error);
+        });
+      return;
+    }
     wx
-      .navigateTo({ url: `/pages/${page}/index` })
+      .navigateTo({ url })
       .catch((error) => {
         console.warn('导航失败', error);
       });
