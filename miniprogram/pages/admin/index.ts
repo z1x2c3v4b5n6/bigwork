@@ -272,6 +272,94 @@ const cloneForumPosts = (topicId: string): ForumPost[] => {
 
 const cloneStatistics = (): StatisticsOverview => ({ ...adminStatisticsSeed });
 
+const buildToolkitInsights = (
+  metricsCards: MetricCard[],
+  fieldNotes: MobileFieldNote[],
+): MobileToolkitInsight[] => {
+  const pendingNotes = fieldNotes.filter((note) => !note.resolved).length;
+  const followUps = metricsCards.find((card) => card.id === 'followUpsPending')?.value ?? 0;
+  const systemAlerts = metricsCards.find((card) => card.id === 'systemAlerts')?.value ?? 0;
+  const today = new Date();
+  const todayLabel = `${today.getMonth() + 1}月${today.getDate()}日`;
+
+  return [
+    {
+      id: 'fieldNotes',
+      title: '巡课速记进度',
+      description:
+        pendingNotes > 0
+          ? `还有 ${pendingNotes} 条巡课速记待跟进，可直接在掌上工具中更新状态。`
+          : '所有巡课速记均已处理，保持巡课节奏，持续补充新的现场记录。',
+    },
+    {
+      id: 'followUps',
+      title: '待跟进提醒',
+      description:
+        followUps > 0
+          ? `后台待跟进提醒 ${followUps} 条，建议结合巡课速记逐一回访。`
+          : '暂无待跟进提醒，可利用移动端完成线下巡查与访谈记录。',
+    },
+    {
+      id: 'systemHealth',
+      title: '系统健康度',
+      description:
+        systemAlerts > 0
+          ? `系统当前存在 ${systemAlerts} 条告警，建议尽快登录 Web 后台处理。`
+          : `系统运行正常。${todayLabel} 可安排新的直播或资料推送计划。`,
+    },
+    {
+      id: 'dailySuggestion',
+      title: `${todayLabel} 掌上建议`,
+      description: '巡课时点击“新增巡课速记”，拍照、定位与记录反馈，一次完成数据沉淀。',
+    },
+  ];
+};
+
+const buildInitialAdminState = () => {
+  const metricsCards = cloneMetricCards();
+  const studentProgress = cloneStudentProgress();
+  const auditLogs = cloneAuditLogs();
+  const administrators = cloneAdministrators();
+  const users = cloneUsers();
+  const majors = cloneMajors();
+  const majorsForCourses = majors.map((item) => ({ ...item }));
+  const courses = cloneCourses();
+  const coursesForMaterials = courses.map((item) => ({ ...item }));
+  const materials = cloneMaterials();
+  const statistics = cloneStatistics();
+  const forumTopics = cloneForumTopics();
+  const selectedTopicId = forumTopics.length > 0 ? String(forumTopics[0].id) : '';
+  const forumPosts = selectedTopicId ? cloneForumPosts(selectedTopicId) : [];
+  const settingsForm = createSettingsForm({ ...adminSettingsSeed });
+  const courseForm = createCourseForm(majors);
+  const materialForm = createMaterialForm(courses);
+  const mobileFieldNotes: MobileFieldNote[] = [];
+  const mobileToolkitInsights = buildToolkitInsights(metricsCards, mobileFieldNotes);
+
+  return {
+    metricsCards,
+    dashboardNote: adminDashboardNote,
+    studentProgress,
+    auditLogs,
+    administrators,
+    users,
+    majors,
+    majorsForCourses,
+    courses,
+    coursesForMaterials,
+    materials,
+    statistics,
+    forumTopics,
+    forumPosts,
+    selectedTopicId,
+    settingsForm,
+    courseForm,
+    materialForm,
+    mobileFieldNotes,
+    mobileToolkitInsights,
+  };
+};
+
 const isUnauthorizedError = (error: unknown): boolean => {
   const apiError = error as ApiError | undefined;
   const statusCode = apiError?.statusCode;
@@ -362,6 +450,7 @@ Page({
     activeTab: 'overview' as AdminTab,
     referenceSites: adminReferenceSites,
     globalError: '',
+    ...buildInitialAdminState(),
     sectionLoading: {
       overview: false,
       settings: false,
@@ -395,22 +484,8 @@ Page({
       mobileToolkit: false,
       statistics: false,
     } as Record<AdminTab, boolean>,
-    metricsCards: [] as MetricCard[],
-    dashboardNote: '',
-    studentProgress: [] as StudentProgressRow[],
-    auditLogs: [] as AuditLogRow[],
-    administrators: [] as string[],
-    users: [] as AdminUser[],
-    majors: [] as MajorRecord[],
-    courses: [] as CourseRecord[],
-    materials: [] as MaterialRecord[],
-    statistics: null as StatisticsOverview | null,
-    forumTopics: [] as ForumTopic[],
-    forumPosts: [] as ForumPost[],
     forumPostsLoading: false,
     forumPostsError: '',
-    selectedTopicId: '',
-    settingsForm: createSettingsForm(),
     settingsFormError: '',
     settingsMessage: '',
     settingsSubmitting: false,
@@ -429,23 +504,17 @@ Page({
     majorFormError: '',
     majorSubmitting: false,
     courseFormVisible: false,
-    courseForm: createCourseForm(),
     courseFormError: '',
     courseSubmitting: false,
-    majorsForCourses: [] as MajorRecord[],
     courseFormMajorIndex: 0,
     materialFormVisible: false,
-    materialForm: createMaterialForm(),
     materialFormError: '',
     materialSubmitting: false,
-    coursesForMaterials: [] as CourseRecord[],
     materialFormCourseIndex: 0,
     statisticsSearchKeyword: '',
     statisticsSearchLoading: false,
     statisticsSearchError: '',
     statisticsSearchResult: null as AdminSearchResult | null,
-    mobileFieldNotes: [] as MobileFieldNote[],
-    mobileToolkitInsights: [] as MobileToolkitInsight[],
     fieldNoteFormVisible: false,
     fieldNoteForm: createFieldNoteForm(),
     fieldNoteFormError: '',
@@ -510,7 +579,7 @@ Page({
 
   applySettingsFallback() {
     this.setData({
-      settingsForm: createSettingsForm(adminSettingsSeed),
+      settingsForm: createSettingsForm({ ...adminSettingsSeed }),
       'loadedTabs.settings': true,
       settingsFormError: '',
     });
@@ -655,17 +724,23 @@ Page({
       this.refreshMobileToolkitInsights();
     } catch (error) {
       const message = getErrorMessage(error, '无法加载后台概览数据，请稍后重试。');
-      if (!this.data.loadedTabs.overview) {
-        const note = isUnauthorizedError(error)
+      const unauthorized = isUnauthorizedError(error);
+      const wasLoaded = this.data.loadedTabs.overview;
+
+      if (!wasLoaded || unauthorized) {
+        const note = unauthorized
           ? `${adminDashboardNote} 若需查看实时数据，请使用管理员账号登录。`
           : `${adminDashboardNote} 当前为示例数据展示，稍后重试可获取实时数据。`;
         this.applyOverviewFallback(note);
-      }
-
-      if (isUnauthorizedError(error)) {
-        this.setData({ globalError: message, 'sectionErrors.overview': '' });
+        if (!unauthorized) {
+          wx.showToast({ title: message, icon: 'none' });
+        }
       } else {
         this.setData({ 'sectionErrors.overview': message });
+      }
+
+      if (unauthorized) {
+        this.setData({ globalError: message, 'sectionErrors.overview': '' });
       }
     } finally {
       this.setData({ 'sectionLoading.overview': false });
@@ -689,9 +764,15 @@ Page({
       });
     } catch (error) {
       const message = getErrorMessage(error, '无法加载平台基础信息。');
-      if (isUnauthorizedError(error)) {
+      const unauthorized = isUnauthorizedError(error);
+      const wasLoaded = this.data.loadedTabs.settings;
+      if (!wasLoaded || unauthorized) {
         this.applySettingsFallback();
-        this.setData({ globalError: message });
+        if (unauthorized) {
+          this.setData({ globalError: message });
+        } else {
+          wx.showToast({ title: message, icon: 'none' });
+        }
       } else {
         this.setData({ 'sectionErrors.settings': message });
       }
@@ -761,9 +842,15 @@ Page({
       });
     } catch (error) {
       const message = getErrorMessage(error, '无法加载用户列表。');
-      if (isUnauthorizedError(error)) {
+      const unauthorized = isUnauthorizedError(error);
+      const wasLoaded = this.data.loadedTabs.users;
+      if (!wasLoaded || unauthorized) {
         this.applyUsersFallback();
-        this.setData({ globalError: message });
+        if (unauthorized) {
+          this.setData({ globalError: message });
+        } else {
+          wx.showToast({ title: message, icon: 'none' });
+        }
       } else {
         this.setData({ 'sectionErrors.users': message });
       }
@@ -914,9 +1001,15 @@ Page({
       this.syncCourseFormMajor(majors);
     } catch (error) {
       const message = getErrorMessage(error, '无法加载专业信息。');
-      if (isUnauthorizedError(error)) {
+      const unauthorized = isUnauthorizedError(error);
+      const wasLoaded = this.data.loadedTabs.majors;
+      if (!wasLoaded || unauthorized) {
         this.applyMajorsFallback();
-        this.setData({ globalError: message });
+        if (unauthorized) {
+          this.setData({ globalError: message });
+        } else {
+          wx.showToast({ title: message, icon: 'none' });
+        }
       } else {
         this.setData({ 'sectionErrors.majors': message });
       }
@@ -1048,12 +1141,18 @@ Page({
       this.syncMaterialFormCourse(courses);
     } catch (error) {
       const message = getErrorMessage(error, '无法加载课程列表。');
-      if (isUnauthorizedError(error)) {
+      const unauthorized = isUnauthorizedError(error);
+      const wasLoaded = this.data.loadedTabs.courses;
+      if (!wasLoaded || unauthorized) {
         if (!this.data.loadedTabs.majors) {
           this.applyMajorsFallback();
         }
         this.applyCoursesFallback();
-        this.setData({ globalError: message });
+        if (unauthorized) {
+          this.setData({ globalError: message });
+        } else {
+          wx.showToast({ title: message, icon: 'none' });
+        }
       } else {
         this.setData({ 'sectionErrors.courses': message });
       }
@@ -1218,12 +1317,18 @@ Page({
       });
     } catch (error) {
       const message = getErrorMessage(error, '无法加载资料列表。');
-      if (isUnauthorizedError(error)) {
+      const unauthorized = isUnauthorizedError(error);
+      const wasLoaded = this.data.loadedTabs.materials;
+      if (!wasLoaded || unauthorized) {
         if (!this.data.loadedTabs.courses) {
           this.applyCoursesFallback();
         }
         this.applyMaterialsFallback();
-        this.setData({ globalError: message });
+        if (unauthorized) {
+          this.setData({ globalError: message });
+        } else {
+          wx.showToast({ title: message, icon: 'none' });
+        }
       } else {
         this.setData({ 'sectionErrors.materials': message });
       }
@@ -1365,9 +1470,15 @@ Page({
       }
     } catch (error) {
       const message = getErrorMessage(error, '无法加载论坛数据。');
-      if (isUnauthorizedError(error)) {
+      const unauthorized = isUnauthorizedError(error);
+      const wasLoaded = this.data.loadedTabs.forum;
+      if (!wasLoaded || unauthorized) {
         this.applyForumFallback();
-        this.setData({ globalError: message });
+        if (unauthorized) {
+          this.setData({ globalError: message });
+        } else {
+          wx.showToast({ title: message, icon: 'none' });
+        }
       } else {
         this.setData({ 'sectionErrors.forum': message });
       }
@@ -1389,11 +1500,17 @@ Page({
       this.setData({ forumPosts: posts });
     } catch (error) {
       const message = getErrorMessage(error, '无法加载帖子列表。');
-      if (isUnauthorizedError(error)) {
+      const unauthorized = isUnauthorizedError(error);
+      const hadPosts = (this.data.forumPosts || []).length > 0;
+      if (!hadPosts || unauthorized) {
         this.applyForumPostsFallback(topicId);
-        this.setData({ globalError: message, forumPostsError: '' });
+        if (unauthorized) {
+          this.setData({ globalError: message, forumPostsError: '' });
+        } else {
+          wx.showToast({ title: message, icon: 'none' });
+        }
       } else {
-        this.setData({ forumPostsError: message, forumPosts: [] });
+        this.setData({ forumPostsError: message });
       }
     } finally {
       this.setData({ forumPostsLoading: false });
@@ -1492,44 +1609,7 @@ Page({
   },
 
   refreshMobileToolkitInsights(fieldNotes: MobileFieldNote[] = this.data.mobileFieldNotes || []) {
-    const pendingNotes = fieldNotes.filter((note) => !note.resolved).length;
-    const followUps = this.data.metricsCards.find((card) => card.id === 'followUpsPending')?.value ?? 0;
-    const systemAlerts = this.data.metricsCards.find((card) => card.id === 'systemAlerts')?.value ?? 0;
-    const today = new Date();
-    const todayLabel = `${today.getMonth() + 1}月${today.getDate()}日`;
-
-    const insights: MobileToolkitInsight[] = [
-      {
-        id: 'fieldNotes',
-        title: '巡课速记进度',
-        description:
-          pendingNotes > 0
-            ? `还有 ${pendingNotes} 条巡课速记待跟进，可直接在掌上工具中更新状态。`
-            : '所有巡课速记均已处理，保持巡课节奏，持续补充新的现场记录。',
-      },
-      {
-        id: 'followUps',
-        title: '待跟进提醒',
-        description:
-          followUps > 0
-            ? `后台待跟进提醒 ${followUps} 条，建议结合巡课速记逐一回访。`
-            : '暂无待跟进提醒，可利用移动端完成线下巡查与访谈记录。',
-      },
-      {
-        id: 'systemHealth',
-        title: '系统健康度',
-        description:
-          systemAlerts > 0
-            ? `系统告警 ${systemAlerts} 条，处理后可补充到巡课速记中形成闭环。`
-            : '系统运行平稳，放心将精力投入到现场巡课与学员辅导。',
-      },
-      {
-        id: 'dailySuggestion',
-        title: `${todayLabel} 掌上建议`,
-        description: '巡课时点击“新增巡课速记”，拍照、定位与记录反馈，一次完成数据沉淀。',
-      },
-    ];
-
+    const insights = buildToolkitInsights(this.data.metricsCards || [], fieldNotes);
     this.setData({ mobileToolkitInsights: insights });
   },
 
@@ -1772,9 +1852,15 @@ Page({
       this.setData({ statistics, 'loadedTabs.statistics': true });
     } catch (error) {
       const message = getErrorMessage(error, '无法加载统计信息。');
-      if (isUnauthorizedError(error)) {
+      const unauthorized = isUnauthorizedError(error);
+      const wasLoaded = this.data.loadedTabs.statistics;
+      if (!wasLoaded || unauthorized) {
         this.applyStatisticsFallback();
-        this.setData({ globalError: message });
+        if (unauthorized) {
+          this.setData({ globalError: message });
+        } else {
+          wx.showToast({ title: message, icon: 'none' });
+        }
       } else {
         this.setData({ 'sectionErrors.statistics': message });
       }

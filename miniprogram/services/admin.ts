@@ -142,7 +142,7 @@ const toNullableString = (value: unknown): string | null => {
 
 export const fetchAdminDashboard = async (): Promise<AdminDashboardResponse> => {
   const response = await apiRequest<Partial<AdminDashboardResponse>>({ path: '/admin/dashboard' });
-  const metricsSource = response?.metrics ?? {};
+  const metricsSource = (response?.metrics ?? {}) as Partial<AdminDashboardMetrics>;
   const metrics: AdminDashboardMetrics = {
     activeStudents: toNumber(metricsSource.activeStudents),
     tasksCompletedToday: toNumber(metricsSource.tasksCompletedToday),
