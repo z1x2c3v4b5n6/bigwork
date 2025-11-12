@@ -7,6 +7,7 @@ import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import LanguageIcon from '@mui/icons-material/Language';
 import LaunchIcon from '@mui/icons-material/Launch';
+import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
 import {
   Alert,
   Avatar,
@@ -14,6 +15,11 @@ import {
   Button,
   Chip,
   Collapse,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogContentText,
+  DialogTitle,
   Divider,
   FormControl,
   FormHelperText,
@@ -94,6 +100,23 @@ type AdminTab =
   | 'forum'
   | 'statistics';
 
+type DeleteTarget =
+  | { kind: 'user'; id: number; name: string }
+  | { kind: 'major'; id: number; name: string }
+  | { kind: 'course'; id: number; name: string }
+  | { kind: 'material'; id: number; name: string }
+  | { kind: 'forumTopic'; id: number; name: string }
+  | { kind: 'forumPost'; id: number; name: string; topicTitle?: string };
+
+const deleteLabelMap: Record<DeleteTarget['kind'], string> = {
+  user: '用户',
+  major: '专业',
+  course: '课程',
+  material: '资料',
+  forumTopic: '论坛话题',
+  forumPost: '帖子',
+};
+
 const AdminDashboard = () => {
   const { user, loading: authLoading } = useAuth();
   const queryClient = useQueryClient();
@@ -117,6 +140,11 @@ const AdminDashboard = () => {
   } | null>(null);
   const [forumTopicId, setForumTopicId] = useState<number | null>(null);
   const [actionFeedback, setActionFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [userDialogOpen, setUserDialogOpen] = useState(false);
+  const [majorDialogOpen, setMajorDialogOpen] = useState(false);
+  const [courseDialogOpen, setCourseDialogOpen] = useState(false);
+  const [materialDialogOpen, setMaterialDialogOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
 
   const getErrorMessage = (error: unknown, fallback: string) => {
     if (error && typeof error === 'object') {
@@ -145,6 +173,14 @@ const AdminDashboard = () => {
     const timer = window.setTimeout(() => setActionFeedback(null), 5000);
     return () => window.clearTimeout(timer);
   }, [actionFeedback]);
+
+  useEffect(() => {
+    setUserDialogOpen(false);
+    setMajorDialogOpen(false);
+    setCourseDialogOpen(false);
+    setMaterialDialogOpen(false);
+    setDeleteTarget(null);
+  }, [activeTab]);
 
   const dashboardQuery = useQuery<AdminDashboardResponse>({
     queryKey: ['admin-dashboard'],
@@ -253,6 +289,9 @@ const AdminDashboard = () => {
     queryFn: () => adminService.fetchAdminForumPosts(forumTopicId as number),
     enabled: activeTab === 'forum' && forumTopicId !== null,
   });
+
+  const selectedForumTopic =
+    forumTopicsQuery.data?.find((topic) => topic.id === forumTopicId) ?? null;
 
   const materialPreviewUrl = materialForm.fileUrl
     ? resolveAssetUrl(materialForm.fileUrl) ?? materialForm.fileUrl
@@ -453,6 +492,7 @@ const AdminDashboard = () => {
         email: userForm.email || undefined,
         role: userForm.role,
       });
+      setUserDialogOpen(false);
     } catch (error) {
       console.error('创建管理员失败', error);
     }
@@ -466,6 +506,7 @@ const AdminDashboard = () => {
 
     try {
       await createMajorMutation.mutateAsync({ name: majorForm.name, description: majorForm.description || undefined });
+      setMajorDialogOpen(false);
     } catch (error) {
       console.error('创建专业失败', error);
     }
@@ -485,6 +526,7 @@ const AdminDashboard = () => {
         credit: courseForm.credit ? Number(courseForm.credit) : undefined,
         majorId: courseForm.majorId ? Number(courseForm.majorId) : undefined,
       });
+      setCourseDialogOpen(false);
     } catch (error) {
       console.error('创建课程失败', error);
     }
@@ -503,8 +545,51 @@ const AdminDashboard = () => {
         fileUrl: materialForm.fileUrl || undefined,
         courseId: materialForm.courseId ? Number(materialForm.courseId) : undefined,
       });
+      setMaterialDialogOpen(false);
     } catch (error) {
       console.error('创建资料失败', error);
+    }
+  };
+
+  const deleteDialogBusy =
+    (deleteTarget?.kind === 'user' && deleteUserMutation.isPending) ||
+    (deleteTarget?.kind === 'major' && deleteMajorMutation.isPending) ||
+    (deleteTarget?.kind === 'course' && deleteCourseMutation.isPending) ||
+    (deleteTarget?.kind === 'material' && deleteMaterialMutation.isPending) ||
+    (deleteTarget?.kind === 'forumTopic' && deleteForumTopicMutation.isPending) ||
+    (deleteTarget?.kind === 'forumPost' && deleteForumPostMutation.isPending);
+
+  const handleConfirmDelete = async () => {
+    if (!deleteTarget) {
+      return;
+    }
+
+    try {
+      switch (deleteTarget.kind) {
+        case 'user':
+          await deleteUserMutation.mutateAsync(deleteTarget.id);
+          break;
+        case 'major':
+          await deleteMajorMutation.mutateAsync(deleteTarget.id);
+          break;
+        case 'course':
+          await deleteCourseMutation.mutateAsync(deleteTarget.id);
+          break;
+        case 'material':
+          await deleteMaterialMutation.mutateAsync(deleteTarget.id);
+          break;
+        case 'forumTopic':
+          await deleteForumTopicMutation.mutateAsync(deleteTarget.id);
+          break;
+        case 'forumPost':
+          await deleteForumPostMutation.mutateAsync(deleteTarget.id);
+          break;
+        default:
+          break;
+      }
+      setDeleteTarget(null);
+    } catch (error) {
+      console.error('删除操作失败', error);
     }
   };
 
@@ -565,7 +650,8 @@ const AdminDashboard = () => {
   const securityNote = dashboardData.securityNote ?? '建议启用双因素认证，并定期复审管理员账户权限，确保敏感数据安全。';
 
   return (
-    <Stack spacing={3}>
+    <>
+      <Stack spacing={3}>
       <Collapse in={Boolean(actionFeedback)}>
         {actionFeedback ? (
           <Alert
@@ -852,60 +938,26 @@ const AdminDashboard = () => {
       {activeTab === 'users' ? (
         <Stack spacing={3}>
           <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid', borderColor: 'divider' }}>
-            <Stack spacing={2} component="form" onSubmit={handleUserSubmit}>
-              <Typography variant="h6" fontWeight={600}>
+            <Stack
+              direction={{ xs: 'column', sm: 'row' }}
+              spacing={2}
+              alignItems={{ xs: 'flex-start', sm: 'center' }}
+              justifyContent="space-between"
+            >
+              <Box>
+                <Typography variant="h6" fontWeight={600}>
+                  用户管理
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  点击按钮打开表单后新增管理员或学员账号。
+                </Typography>
+              </Box>
+              <Button
+                variant="contained"
+                startIcon={<AddCircleOutlineIcon />}
+                onClick={() => setUserDialogOpen(true)}
+              >
                 新增用户
-              </Typography>
-              <Grid container spacing={2}>
-                <Grid item xs={12} md={3}>
-                  <TextField
-                    label="用户名"
-                    value={userForm.username}
-                    onChange={(event) => setUserForm((prev) => ({ ...prev, username: event.target.value }))}
-                    required
-                  />
-                </Grid>
-                <Grid item xs={12} md={3}>
-                  <TextField
-                    label="姓名"
-                    value={userForm.displayName}
-                    onChange={(event) => setUserForm((prev) => ({ ...prev, displayName: event.target.value }))}
-                    required
-                  />
-                </Grid>
-                <Grid item xs={12} md={3}>
-                  <TextField
-                    label="密码"
-                    type="password"
-                    value={userForm.password}
-                    onChange={(event) => setUserForm((prev) => ({ ...prev, password: event.target.value }))}
-                    required
-                  />
-                </Grid>
-                <Grid item xs={12} md={3}>
-                  <TextField
-                    label="邮箱（可选）"
-                    value={userForm.email}
-                    onChange={(event) => setUserForm((prev) => ({ ...prev, email: event.target.value }))}
-                  />
-                </Grid>
-                <Grid item xs={12} md={3}>
-                  <FormControl fullWidth>
-                    <InputLabel id="create-user-role-label">角色</InputLabel>
-                    <Select
-                      labelId="create-user-role-label"
-                      label="角色"
-                      value={userForm.role}
-                      onChange={(event) => setUserForm((prev) => ({ ...prev, role: event.target.value }))}
-                    >
-                      <MenuItem value="student">学员</MenuItem>
-                      <MenuItem value="admin">管理员</MenuItem>
-                    </Select>
-                  </FormControl>
-                </Grid>
-              </Grid>
-              <Button type="submit" variant="contained" disabled={createUserMutation.isPending}>
-                {createUserMutation.isPending ? '创建中…' : '添加用户'}
               </Button>
             </Stack>
           </Paper>
@@ -954,7 +1006,13 @@ const AdminDashboard = () => {
                           <span>
                             <IconButton
                               color="error"
-                              onClick={() => deleteUserMutation.mutate(item.id)}
+                              onClick={() =>
+                                setDeleteTarget({
+                                  kind: 'user',
+                                  id: item.id,
+                                  name: item.displayName || item.username,
+                                })
+                              }
                               disabled={deleteUserMutation.isPending || user?.id === String(item.id)}
                               size="small"
                             >
@@ -979,31 +1037,26 @@ const AdminDashboard = () => {
       {activeTab === 'majors' ? (
         <Stack spacing={3}>
           <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid', borderColor: 'divider' }}>
-            <Stack spacing={2} component="form" onSubmit={handleMajorSubmit}>
-              <Typography variant="h6" fontWeight={600}>
+            <Stack
+              direction={{ xs: 'column', sm: 'row' }}
+              spacing={2}
+              alignItems={{ xs: 'flex-start', sm: 'center' }}
+              justifyContent="space-between"
+            >
+              <Box>
+                <Typography variant="h6" fontWeight={600}>
+                  专业管理
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  通过弹窗表单维护专业档案及描述信息。
+                </Typography>
+              </Box>
+              <Button
+                variant="contained"
+                startIcon={<AddCircleOutlineIcon />}
+                onClick={() => setMajorDialogOpen(true)}
+              >
                 新增专业
-              </Typography>
-              <Grid container spacing={2}>
-                <Grid item xs={12} md={4}>
-                  <TextField
-                    label="专业名称"
-                    value={majorForm.name}
-                    onChange={(event) => setMajorForm((prev) => ({ ...prev, name: event.target.value }))}
-                    required
-                  />
-                </Grid>
-                <Grid item xs={12}>
-                  <TextField
-                    label="专业简介（可选）"
-                    value={majorForm.description}
-                    onChange={(event) => setMajorForm((prev) => ({ ...prev, description: event.target.value }))}
-                    multiline
-                    minRows={2}
-                  />
-                </Grid>
-              </Grid>
-              <Button type="submit" variant="contained" disabled={createMajorMutation.isPending}>
-                {createMajorMutation.isPending ? '创建中…' : '保存专业'}
               </Button>
             </Stack>
           </Paper>
@@ -1027,7 +1080,9 @@ const AdminDashboard = () => {
                           <IconButton
                             edge="end"
                             color="error"
-                            onClick={() => deleteMajorMutation.mutate(major.id)}
+                            onClick={() =>
+                              setDeleteTarget({ kind: 'major', id: major.id, name: major.name })
+                            }
                             disabled={deleteMajorMutation.isPending}
                           >
                             <DeleteOutlineIcon />
@@ -1055,63 +1110,26 @@ const AdminDashboard = () => {
       {activeTab === 'courses' ? (
         <Stack spacing={3}>
           <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid', borderColor: 'divider' }}>
-            <Stack spacing={2} component="form" onSubmit={handleCourseSubmit}>
-              <Typography variant="h6" fontWeight={600}>
+            <Stack
+              direction={{ xs: 'column', sm: 'row' }}
+              spacing={2}
+              alignItems={{ xs: 'flex-start', sm: 'center' }}
+              justifyContent="space-between"
+            >
+              <Box>
+                <Typography variant="h6" fontWeight={600}>
+                  课程管理
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  使用表单弹窗集中维护课程基础信息、学分与归属专业。
+                </Typography>
+              </Box>
+              <Button
+                variant="contained"
+                startIcon={<AddCircleOutlineIcon />}
+                onClick={() => setCourseDialogOpen(true)}
+              >
                 新增课程
-              </Typography>
-              <Grid container spacing={2}>
-                <Grid item xs={12} md={4}>
-                  <TextField
-                    label="课程名称"
-                    value={courseForm.title}
-                    onChange={(event) => setCourseForm((prev) => ({ ...prev, title: event.target.value }))}
-                    required
-                  />
-                </Grid>
-                <Grid item xs={12} md={4}>
-                  <TextField
-                    label="授课老师（可选）"
-                    value={courseForm.teacher}
-                    onChange={(event) => setCourseForm((prev) => ({ ...prev, teacher: event.target.value }))}
-                  />
-                </Grid>
-                <Grid item xs={12} md={4}>
-                  <TextField
-                    label="学分（可选）"
-                    value={courseForm.credit}
-                    onChange={(event) => setCourseForm((prev) => ({ ...prev, credit: event.target.value }))}
-                    type="number"
-                    inputProps={{ min: 0, step: 0.5 }}
-                  />
-                </Grid>
-                <Grid item xs={12}>
-                  <TextField
-                    label="课程简介（可选）"
-                    value={courseForm.description}
-                    onChange={(event) => setCourseForm((prev) => ({ ...prev, description: event.target.value }))}
-                    multiline
-                    minRows={2}
-                  />
-                </Grid>
-                <Grid item xs={12} md={4}>
-                  <FormControl fullWidth>
-                    <InputLabel id="course-major-label">所属专业</InputLabel>
-                    <Select
-                      labelId="course-major-label"
-                      label="所属专业"
-                      value={courseForm.majorId}
-                      onChange={(event) => setCourseForm((prev) => ({ ...prev, majorId: event.target.value }))}
-                    >
-                      <MenuItem value="">未指定</MenuItem>
-                      {(majorsQuery.data ?? []).map((major) => (
-                        <MenuItem key={major.id} value={String(major.id)}>{major.name}</MenuItem>
-                      ))}
-                    </Select>
-                  </FormControl>
-                </Grid>
-              </Grid>
-              <Button type="submit" variant="contained" disabled={createCourseMutation.isPending}>
-                {createCourseMutation.isPending ? '创建中…' : '保存课程'}
               </Button>
             </Stack>
           </Paper>
@@ -1148,7 +1166,9 @@ const AdminDashboard = () => {
                             <IconButton
                               color="error"
                               size="small"
-                              onClick={() => deleteCourseMutation.mutate(course.id)}
+                              onClick={() =>
+                                setDeleteTarget({ kind: 'course', id: course.id, name: course.title })
+                              }
                               disabled={deleteCourseMutation.isPending}
                             >
                               <DeleteOutlineIcon fontSize="small" />
@@ -1172,100 +1192,26 @@ const AdminDashboard = () => {
       {activeTab === 'materials' ? (
         <Stack spacing={3}>
           <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid', borderColor: 'divider' }}>
-            <Stack spacing={2} component="form" onSubmit={handleMaterialSubmit}>
-              <Typography variant="h6" fontWeight={600}>
+            <Stack
+              direction={{ xs: 'column', sm: 'row' }}
+              spacing={2}
+              alignItems={{ xs: 'flex-start', sm: 'center' }}
+              justifyContent="space-between"
+            >
+              <Box>
+                <Typography variant="h6" fontWeight={600}>
+                  资料管理
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  通过弹窗上传课件或讲义，并可选择关联课程与外部链接。
+                </Typography>
+              </Box>
+              <Button
+                variant="contained"
+                startIcon={<AddCircleOutlineIcon />}
+                onClick={() => setMaterialDialogOpen(true)}
+              >
                 新增资料
-              </Typography>
-              <Grid container spacing={2}>
-                <Grid item xs={12} md={4}>
-                  <TextField
-                    label="资料标题"
-                    value={materialForm.title}
-                    onChange={(event) => setMaterialForm((prev) => ({ ...prev, title: event.target.value }))}
-                    required
-                  />
-                </Grid>
-                <Grid item xs={12}>
-                  <TextField
-                    label="资料描述（可选）"
-                    value={materialForm.description}
-                    onChange={(event) => setMaterialForm((prev) => ({ ...prev, description: event.target.value }))}
-                    multiline
-                    minRows={2}
-                  />
-                </Grid>
-                <Grid item xs={12} md={6}>
-                  <Stack spacing={1}>
-                    <Button
-                      variant="outlined"
-                      startIcon={<CloudUploadIcon />}
-                      component="label"
-                      disabled={materialUploading}
-                    >
-                      {materialUploading ? '上传中…' : '上传资料文件'}
-                      <input type="file" hidden onChange={handleMaterialFileSelect} />
-                    </Button>
-                    {materialUploadInfo ? (
-                      <Stack direction="row" spacing={1} alignItems="center">
-                        <Chip label={materialUploadInfo.name} variant="outlined" />
-                        <Typography variant="caption" color="text.secondary">
-                          {formatFileSize(materialUploadInfo.size)}
-                        </Typography>
-                      </Stack>
-                    ) : (
-                      <Typography variant="caption" color="text.secondary">
-                        支持 PDF/Word/图片等格式，上传后自动生成访问链接。
-                      </Typography>
-                    )}
-                    {materialUploadError && (
-                      <Typography variant="caption" color="error">
-                        {materialUploadError}
-                      </Typography>
-                    )}
-                    <TextField
-                      label="文件链接"
-                      value={materialPreviewUrl}
-                      InputProps={{ readOnly: true }}
-                      helperText={
-                        materialForm.fileUrl
-                          ? '链接将在保存后向学员开放访问'
-                          : '可手动修改为外部链接，或留空仅保存资料说明'
-                      }
-                    />
-                    {materialPreviewUrl ? (
-                      <Button
-                        variant="text"
-                        size="small"
-                        component="a"
-                        href={materialPreviewUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        sx={{ alignSelf: 'flex-start' }}
-                      >
-                        预览资料链接
-                      </Button>
-                    ) : null}
-                  </Stack>
-                </Grid>
-                <Grid item xs={12} md={6}>
-                  <FormControl fullWidth>
-                    <InputLabel id="material-course-label">关联课程</InputLabel>
-                    <Select
-                      labelId="material-course-label"
-                      label="关联课程"
-                      value={materialForm.courseId}
-                      onChange={(event) => setMaterialForm((prev) => ({ ...prev, courseId: event.target.value }))}
-                    >
-                      <MenuItem value="">未指定</MenuItem>
-                      {(coursesQuery.data ?? []).map((course) => (
-                        <MenuItem key={course.id} value={String(course.id)}>{course.title}</MenuItem>
-                      ))}
-                    </Select>
-                  </FormControl>
-                </Grid>
-              </Grid>
-              <Button type="submit" variant="contained" disabled={createMaterialMutation.isPending || materialUploading}>
-                {createMaterialMutation.isPending || materialUploading ? '创建中…' : '保存资料'}
               </Button>
             </Stack>
           </Paper>
@@ -1289,7 +1235,9 @@ const AdminDashboard = () => {
                           <IconButton
                             edge="end"
                             color="error"
-                            onClick={() => deleteMaterialMutation.mutate(material.id)}
+                            onClick={() =>
+                              setDeleteTarget({ kind: 'material', id: material.id, name: material.title })
+                            }
                             disabled={deleteMaterialMutation.isPending}
                           >
                             <DeleteOutlineIcon />
@@ -1385,7 +1333,11 @@ const AdminDashboard = () => {
                                 color="error"
                                 onClick={(event) => {
                                   event.stopPropagation();
-                                  deleteForumTopicMutation.mutate(topic.id);
+                                  setDeleteTarget({
+                                    kind: 'forumTopic',
+                                    id: topic.id,
+                                    name: topic.title,
+                                  });
                                 }}
                                 size="small"
                                 disabled={deleteForumTopicMutation.isPending}
@@ -1439,7 +1391,17 @@ const AdminDashboard = () => {
                               <IconButton
                                 size="small"
                                 color="error"
-                                onClick={() => deleteForumPostMutation.mutate(post.id)}
+                                onClick={() =>
+                                  setDeleteTarget({
+                                    kind: 'forumPost',
+                                    id: post.id,
+                                    name:
+                                      post.content?.length && post.content.length > 16
+                                        ? `${post.content.slice(0, 16)}…`
+                                        : post.content || '帖子',
+                                    topicTitle: selectedForumTopic?.title ?? undefined,
+                                  })
+                                }
                                 disabled={deleteForumPostMutation.isPending}
                               >
                                 <DeleteOutlineIcon fontSize="small" />
@@ -1544,7 +1506,411 @@ const AdminDashboard = () => {
           </Paper>
         </Stack>
       ) : null}
-    </Stack>
+
+      </Stack>
+
+      <Dialog
+        open={activeTab === 'users' && userDialogOpen}
+        onClose={() => {
+          if (!createUserMutation.isPending) {
+            setUserDialogOpen(false);
+            setUserForm({ username: '', password: '', displayName: '', email: '', role: 'student' });
+          }
+        }}
+        fullWidth
+        maxWidth="sm"
+      >
+        <Box component="form" onSubmit={handleUserSubmit}>
+          <DialogTitle>新增用户</DialogTitle>
+          <DialogContent dividers>
+            <Grid container spacing={2}>
+              <Grid item xs={12} md={6}>
+                <TextField
+                  label="用户名"
+                  value={userForm.username}
+                  onChange={(event) => setUserForm((prev) => ({ ...prev, username: event.target.value }))}
+                  required
+                />
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <TextField
+                  label="姓名"
+                  value={userForm.displayName}
+                  onChange={(event) => setUserForm((prev) => ({ ...prev, displayName: event.target.value }))}
+                  required
+                />
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <TextField
+                  label="密码"
+                  type="password"
+                  value={userForm.password}
+                  onChange={(event) => setUserForm((prev) => ({ ...prev, password: event.target.value }))}
+                  required
+                />
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <TextField
+                  label="邮箱（可选）"
+                  value={userForm.email}
+                  onChange={(event) => setUserForm((prev) => ({ ...prev, email: event.target.value }))}
+                />
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <FormControl fullWidth>
+                  <InputLabel id="create-user-role-label">角色</InputLabel>
+                  <Select
+                    labelId="create-user-role-label"
+                    label="角色"
+                    value={userForm.role}
+                    onChange={(event) => setUserForm((prev) => ({ ...prev, role: event.target.value }))}
+                  >
+                    <MenuItem value="student">学员</MenuItem>
+                    <MenuItem value="admin">管理员</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+            </Grid>
+          </DialogContent>
+          <DialogActions>
+            <Button
+              onClick={() => {
+                if (createUserMutation.isPending) {
+                  return;
+                }
+                setUserDialogOpen(false);
+                setUserForm({ username: '', password: '', displayName: '', email: '', role: 'student' });
+              }}
+            >
+              取消
+            </Button>
+            <Button type="submit" variant="contained" disabled={createUserMutation.isPending}>
+              {createUserMutation.isPending ? '创建中…' : '保存用户'}
+            </Button>
+          </DialogActions>
+        </Box>
+      </Dialog>
+
+      <Dialog
+        open={activeTab === 'majors' && majorDialogOpen}
+        onClose={() => {
+          if (!createMajorMutation.isPending) {
+            setMajorDialogOpen(false);
+            setMajorForm({ name: '', description: '' });
+          }
+        }}
+        fullWidth
+        maxWidth="sm"
+      >
+        <Box component="form" onSubmit={handleMajorSubmit}>
+          <DialogTitle>新增专业</DialogTitle>
+          <DialogContent dividers>
+            <Grid container spacing={2}>
+              <Grid item xs={12}>
+                <TextField
+                  label="专业名称"
+                  value={majorForm.name}
+                  onChange={(event) => setMajorForm((prev) => ({ ...prev, name: event.target.value }))}
+                  required
+                />
+              </Grid>
+              <Grid item xs={12}>
+                <TextField
+                  label="专业简介（可选）"
+                  value={majorForm.description}
+                  onChange={(event) => setMajorForm((prev) => ({ ...prev, description: event.target.value }))}
+                  multiline
+                  minRows={3}
+                />
+              </Grid>
+            </Grid>
+          </DialogContent>
+          <DialogActions>
+            <Button
+              onClick={() => {
+                if (createMajorMutation.isPending) {
+                  return;
+                }
+                setMajorDialogOpen(false);
+                setMajorForm({ name: '', description: '' });
+              }}
+            >
+              取消
+            </Button>
+            <Button type="submit" variant="contained" disabled={createMajorMutation.isPending}>
+              {createMajorMutation.isPending ? '创建中…' : '保存专业'}
+            </Button>
+          </DialogActions>
+        </Box>
+      </Dialog>
+
+      <Dialog
+        open={activeTab === 'courses' && courseDialogOpen}
+        onClose={() => {
+          if (!createCourseMutation.isPending) {
+            setCourseDialogOpen(false);
+            setCourseForm({ title: '', description: '', teacher: '', credit: '', majorId: '' });
+          }
+        }}
+        fullWidth
+        maxWidth="md"
+      >
+        <Box component="form" onSubmit={handleCourseSubmit}>
+          <DialogTitle>新增课程</DialogTitle>
+          <DialogContent dividers>
+            <Grid container spacing={2}>
+              <Grid item xs={12} md={6}>
+                <TextField
+                  label="课程名称"
+                  value={courseForm.title}
+                  onChange={(event) => setCourseForm((prev) => ({ ...prev, title: event.target.value }))}
+                  required
+                />
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <TextField
+                  label="授课老师（可选）"
+                  value={courseForm.teacher}
+                  onChange={(event) => setCourseForm((prev) => ({ ...prev, teacher: event.target.value }))}
+                />
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <TextField
+                  label="学分（可选）"
+                  value={courseForm.credit}
+                  onChange={(event) => setCourseForm((prev) => ({ ...prev, credit: event.target.value }))}
+                  type="number"
+                  inputProps={{ min: 0, step: 0.5 }}
+                />
+              </Grid>
+              <Grid item xs={12}>
+                <TextField
+                  label="课程简介（可选）"
+                  value={courseForm.description}
+                  onChange={(event) => setCourseForm((prev) => ({ ...prev, description: event.target.value }))}
+                  multiline
+                  minRows={3}
+                />
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <FormControl fullWidth>
+                  <InputLabel id="course-major-label">所属专业</InputLabel>
+                  <Select
+                    labelId="course-major-label"
+                    label="所属专业"
+                    value={courseForm.majorId}
+                    onChange={(event) => setCourseForm((prev) => ({ ...prev, majorId: event.target.value }))}
+                  >
+                    <MenuItem value="">未指定</MenuItem>
+                    {(majorsQuery.data ?? []).map((major) => (
+                      <MenuItem key={major.id} value={String(major.id)}>
+                        {major.name}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Grid>
+            </Grid>
+          </DialogContent>
+          <DialogActions>
+            <Button
+              onClick={() => {
+                if (createCourseMutation.isPending) {
+                  return;
+                }
+                setCourseDialogOpen(false);
+                setCourseForm({ title: '', description: '', teacher: '', credit: '', majorId: '' });
+              }}
+            >
+              取消
+            </Button>
+            <Button type="submit" variant="contained" disabled={createCourseMutation.isPending}>
+              {createCourseMutation.isPending ? '创建中…' : '保存课程'}
+            </Button>
+          </DialogActions>
+        </Box>
+      </Dialog>
+
+      <Dialog
+        open={activeTab === 'materials' && materialDialogOpen}
+        onClose={() => {
+          if (!createMaterialMutation.isPending && !materialUploading) {
+            setMaterialDialogOpen(false);
+            setMaterialForm({ title: '', description: '', fileUrl: '', courseId: '' });
+            setMaterialUploadInfo(null);
+            setMaterialUploadError(null);
+          }
+        }}
+        fullWidth
+        maxWidth="md"
+      >
+        <Box component="form" onSubmit={handleMaterialSubmit}>
+          <DialogTitle>新增资料</DialogTitle>
+          <DialogContent dividers>
+            <Grid container spacing={2}>
+              <Grid item xs={12} md={6}>
+                <TextField
+                  label="资料标题"
+                  value={materialForm.title}
+                  onChange={(event) => setMaterialForm((prev) => ({ ...prev, title: event.target.value }))}
+                  required
+                />
+              </Grid>
+              <Grid item xs={12}>
+                <TextField
+                  label="资料描述（可选）"
+                  value={materialForm.description}
+                  onChange={(event) => setMaterialForm((prev) => ({ ...prev, description: event.target.value }))}
+                  multiline
+                  minRows={3}
+                />
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <Stack spacing={1}>
+                  <Button
+                    variant="outlined"
+                    startIcon={<CloudUploadIcon />}
+                    component="label"
+                    disabled={materialUploading}
+                  >
+                    {materialUploading ? '上传中…' : '上传资料文件'}
+                    <input type="file" hidden onChange={handleMaterialFileSelect} />
+                  </Button>
+                  {materialUploadInfo ? (
+                    <Stack direction="row" spacing={1} alignItems="center">
+                      <Chip label={materialUploadInfo.name} variant="outlined" />
+                      <Typography variant="caption" color="text.secondary">
+                        {formatFileSize(materialUploadInfo.size)}
+                      </Typography>
+                    </Stack>
+                  ) : (
+                    <Typography variant="caption" color="text.secondary">
+                      支持 PDF/Word/图片等格式，上传后自动生成访问链接。
+                    </Typography>
+                  )}
+                  {materialUploadError ? (
+                    <Typography variant="caption" color="error">
+                      {materialUploadError}
+                    </Typography>
+                  ) : null}
+                  <TextField
+                    label="文件链接"
+                    value={materialPreviewUrl}
+                    InputProps={{ readOnly: true }}
+                    helperText={
+                      materialForm.fileUrl
+                        ? '链接将在保存后向学员开放访问'
+                        : '可手动填写外部链接，或留空仅保存资料说明'
+                    }
+                  />
+                  {materialPreviewUrl ? (
+                    <Button
+                      variant="text"
+                      size="small"
+                      component="a"
+                      href={materialPreviewUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      sx={{ alignSelf: 'flex-start' }}
+                    >
+                      预览资料链接
+                    </Button>
+                  ) : null}
+                </Stack>
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <FormControl fullWidth>
+                  <InputLabel id="material-course-label">关联课程（可选）</InputLabel>
+                  <Select
+                    labelId="material-course-label"
+                    label="关联课程（可选）"
+                    value={materialForm.courseId}
+                    onChange={(event) => setMaterialForm((prev) => ({ ...prev, courseId: event.target.value }))}
+                  >
+                    <MenuItem value="">未关联</MenuItem>
+                    {(coursesQuery.data ?? []).map((course) => (
+                      <MenuItem key={course.id} value={String(course.id)}>
+                        {course.title}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Grid>
+            </Grid>
+          </DialogContent>
+          <DialogActions>
+            <Button
+              onClick={() => {
+                if (createMaterialMutation.isPending || materialUploading) {
+                  return;
+                }
+                setMaterialDialogOpen(false);
+                setMaterialForm({ title: '', description: '', fileUrl: '', courseId: '' });
+                setMaterialUploadInfo(null);
+                setMaterialUploadError(null);
+              }}
+            >
+              取消
+            </Button>
+            <Button
+              type="submit"
+              variant="contained"
+              disabled={createMaterialMutation.isPending || materialUploading}
+            >
+              {createMaterialMutation.isPending || materialUploading ? '创建中…' : '保存资料'}
+            </Button>
+          </DialogActions>
+        </Box>
+      </Dialog>
+
+      <Dialog
+        open={Boolean(deleteTarget)}
+        onClose={() => {
+          if (deleteDialogBusy) {
+            return;
+          }
+          setDeleteTarget(null);
+        }}
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitle>确认删除</DialogTitle>
+        <DialogContent>
+          <Stack spacing={1.5}>
+            <DialogContentText>
+              确定要删除{deleteTarget ? deleteLabelMap[deleteTarget.kind] : ''}「
+              {deleteTarget?.name ?? ''}」吗？此操作无法撤销。
+            </DialogContentText>
+            {deleteTarget?.kind === 'forumTopic' ? (
+              <DialogContentText>
+                提示：删除话题会同步清理其下的所有帖子。
+              </DialogContentText>
+            ) : null}
+            {deleteTarget?.kind === 'forumPost' && deleteTarget.topicTitle ? (
+              <DialogContentText>
+                所属话题：{deleteTarget.topicTitle}
+              </DialogContentText>
+            ) : null}
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button
+            onClick={() => {
+              if (deleteDialogBusy) {
+                return;
+              }
+              setDeleteTarget(null);
+            }}
+            disabled={deleteDialogBusy}
+          >
+            取消
+          </Button>
+          <Button onClick={handleConfirmDelete} color="error" variant="contained" disabled={deleteDialogBusy}>
+            {deleteDialogBusy ? '删除中…' : '确认删除'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </>
   );
 };
 
