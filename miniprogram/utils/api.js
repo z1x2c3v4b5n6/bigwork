@@ -13,7 +13,7 @@ var __assign = (this && this.__assign) || function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.apiRequest = void 0;
 var config_1 = require("../config");
-var authCookies_1 = require("./authCookies");
+var authToken_1 = require("./authToken");
 var joinUrl = function (baseUrl, path) {
     var trimmedBase = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
     var trimmedPath = path.startsWith('/') ? path.slice(1) : path;
@@ -92,10 +92,10 @@ var apiRequest = function (_a) {
         return Promise.reject(error);
     }
     return new Promise(function (resolve, reject) {
-        var storedCookie = (0, authCookies_1.getStoredCookieHeader)();
+        var storedToken = (0, authToken_1.getStoredToken)();
         var requestHeader = __assign({ 'Content-Type': 'application/json' }, header);
-        if (storedCookie && !requestHeader.Cookie && !requestHeader.cookie) {
-            requestHeader.Cookie = storedCookie;
+        if (storedToken && !requestHeader.Authorization && !requestHeader.authorization) {
+            requestHeader.Authorization = "Bearer ".concat(storedToken);
         }
         wx.request({
             url: url,
@@ -103,10 +103,9 @@ var apiRequest = function (_a) {
             data: data,
             header: requestHeader,
             timeout: timeout !== null && timeout !== void 0 ? timeout : defaultTimeout,
-            withCredentials: true,
+            withCredentials: false,
             success: function (res) {
                 var _a;
-                (0, authCookies_1.storeResponseCookies)(res);
                 if (res.statusCode >= 200 && res.statusCode < 300) {
                     resolve(res.data);
                     return;
@@ -119,7 +118,7 @@ var apiRequest = function (_a) {
                 error.statusCode = res.statusCode;
                 error.data = res.data;
                 if (res.statusCode === 401) {
-                    (0, authCookies_1.clearStoredCookies)();
+                    (0, authToken_1.clearStoredToken)();
                 }
                 reject(error);
             },

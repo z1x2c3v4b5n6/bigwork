@@ -204,6 +204,71 @@ const mapDailyTaskRow = (row) => ({
   estimatedMinutes: Number(row.estimated_minutes ?? row.estimatedMinutes ?? 45) || 45,
 });
 
+const ensureDailyTaskForDate = async (config, today) => {
+  if (!config || !config.table || !config.date) {
+    return null;
+  }
+
+  const fallbackTask =
+    getFallbackTaskForDate(today) ||
+    getFallbackTaskForDate(new Date()) || {
+      id: `fallback-${today}`,
+      title: '今日任务待发布',
+      description: '',
+      targetText: '请保持专注完成打卡任务',
+      estimatedMinutes: 45,
+    };
+
+  const payload = {};
+
+  const assignValue = (columnName, rawValue, defaultValue = undefined) => {
+    if (!columnName) {
+      return;
+    }
+    const normalized = normalizeValueForColumn(config.columnDetails, columnName, rawValue);
+    if (normalized !== undefined && normalized !== null) {
+      payload[columnName] = normalized;
+      return;
+    }
+    if (defaultValue !== undefined) {
+      payload[columnName] = defaultValue;
+    }
+  };
+
+  if (config.id) {
+    const fallbackId =
+      fallbackTask?.id || `${today}-${Math.random().toString(36).slice(2, 10)}`;
+    const normalizedId = normalizeValueForColumn(config.columnDetails, config.id, fallbackId);
+    if (normalizedId !== undefined && normalizedId !== null) {
+      payload[config.id] = normalizedId;
+    }
+  }
+
+  assignValue(config.date, today, today);
+  assignValue(config.title, fallbackTask?.title || '今日任务待发布', '今日任务待发布');
+  assignValue(config.description, fallbackTask?.description || '', '');
+  assignValue(config.targetText, fallbackTask?.targetText || '请保持专注完成打卡任务', '请保持专注完成打卡任务');
+  assignValue(
+    config.estimatedMinutes,
+    Number(fallbackTask?.estimatedMinutes ?? 45),
+    45,
+  );
+
+  if (Object.keys(payload).length === 0) {
+    return null;
+  }
+
+  try {
+    await insertRecord(config.table, payload);
+  } catch (error) {
+    if (error?.code !== 'ER_DUP_ENTRY') {
+      console.warn('ensureDailyTaskForDate insert failed', error);
+    }
+  }
+
+  return null;
+};
+
 const loadDailyTaskForDate = async (targetDate) => {
   const today = formatDateOnly(targetDate) || formatDateOnly(new Date());
   const config = await getDailyTaskConfig();
@@ -234,7 +299,7 @@ const loadDailyTaskForDate = async (targetDate) => {
 
   const orderColumn = config.updatedAt || config.createdAt || config.id;
 
-  const rows = await query(
+  let rows = await query(
     `
     SELECT ${selectFragments.join(', ')}
     FROM \`${config.table}\` t
@@ -246,6 +311,21 @@ const loadDailyTaskForDate = async (targetDate) => {
   );
 
   let row = rows[0];
+
+  if (!row) {
+    await ensureDailyTaskForDate(config, today);
+    rows = await query(
+      `
+      SELECT ${selectFragments.join(', ')}
+      FROM \`${config.table}\` t
+      WHERE DATE(t.\`${dateColumn}\`) = :target
+      ORDER BY t.\`${orderColumn || config.id}\` DESC
+      LIMIT 1
+      `,
+      { target: today },
+    );
+    row = rows[0];
+  }
 
   if (!row) {
     const fallbackRows = await query(
@@ -1139,8 +1219,9 @@ router.get('/daily-task', requireAuth, async (req, res) => {
 
 router.post('/daily-task/complete', requireAuth, async (req, res) => {
   const { taskId } = req.body || {};
+  const normalizedTaskId = taskId != null ? String(taskId).trim() : '';
 
-  if (!taskId) {
+  if (!normalizedTaskId) {
     return res.status(400).json({ message: '缺少任务编号，请刷新后重试。' });
   }
 
@@ -1156,8 +1237,28 @@ router.post('/daily-task/complete', requireAuth, async (req, res) => {
     const today = formatDateOnly(new Date());
     const todayTask = await loadDailyTaskForDate(today);
 
-    if (!todayTask || String(todayTask.id) !== String(taskId)) {
+    if (!todayTask || String(todayTask.id) !== normalizedTaskId) {
       return res.status(400).json({ message: '任务已更新，请刷新后重新打卡。' });
+    }
+
+    const normalizedTaskKeyForDb =
+      taskConfig && taskConfig.id
+        ? normalizeValueForColumn(taskConfig.columnDetails, taskConfig.id, normalizedTaskId)
+        : normalizedTaskId;
+
+    if (normalizedTaskKeyForDb === null || normalizedTaskKeyForDb === undefined) {
+      return res.status(409).json({ message: '任务已更新，请刷新后重试。' });
+    }
+
+    if (taskConfig && taskConfig.id) {
+      const taskRows = await query(
+        `SELECT 1 AS found FROM \`${taskConfig.table}\` WHERE \`${taskConfig.id}\` = :taskId LIMIT 1`,
+        { taskId: normalizedTaskKeyForDb },
+      );
+
+      if (!taskRows[0]?.found) {
+        return res.status(409).json({ message: '任务已更新，请刷新后重试。' });
+      }
     }
 
     if (
@@ -1178,11 +1279,31 @@ router.post('/daily-task/complete', requireAuth, async (req, res) => {
       });
     }
 
+    const completionTaskId = normalizeValueForColumn(
+      completionConfig.columnDetails,
+      completionConfig.taskId,
+      normalizedTaskKeyForDb,
+    );
+
+    const completionUserId = normalizeValueForColumn(
+      completionConfig.columnDetails,
+      completionConfig.userId,
+      normalizedUserId,
+    );
+
+    if (completionTaskId === null || completionTaskId === undefined) {
+      return res.status(409).json({ message: '任务已更新，请刷新后重试。' });
+    }
+
+    if (completionUserId === null || completionUserId === undefined) {
+      return res.status(401).json({ message: '登录状态已失效，请重新登录后再试。' });
+    }
+
     await query(
       `INSERT INTO \`${completionConfig.table}\` (\`${completionConfig.taskId}\`, \`${completionConfig.userId}\`, \`${completionConfig.completedAt}\`)
          VALUES (:taskId, :userId, NOW())
         ON DUPLICATE KEY UPDATE \`${completionConfig.completedAt}\` = NOW()`,
-      { taskId: String(taskId), userId: normalizedUserId },
+      { taskId: completionTaskId, userId: completionUserId },
     );
 
     const stats = await loadUserDailyStats(normalizedUserId, today);

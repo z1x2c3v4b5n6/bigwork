@@ -2,7 +2,14 @@ const express = require('express');
 const bcrypt = require('bcryptjs');
 const { query, insertRecord, getTableColumns } = require('../database');
 const { requireAuth } = require('../middleware/auth');
-const { normalizeRole } = require('../utils/auth');
+const {
+  normalizeRole,
+  createAuthToken,
+  verifyAuthToken,
+  resolveUserFromTokenPayload,
+  extractBearerToken,
+  sanitizeSessionUser,
+} = require('../utils/auth');
 
 const { SESSION_NAME = 'connect.sid' } = process.env;
 
@@ -97,26 +104,54 @@ const fetchUserByUsername = async (username) => {
   return { record: rows[0] || null, map };
 };
 
-const serializeUser = (row) => ({
-  id: row?.id != null ? String(row.id) : '',
-  name: row?.display_name || row?.username || '未命名用户',
-  role: normalizeRole(row?.role),
-  email: row?.email || null,
-  phone: row?.phone || null,
-  organization: row?.organization || null,
-  goal: row?.goal || null,
-  majorId: row?.major_id ? String(row.major_id) : null,
-  majorName: row?.major_name || null,
-  avatar: row?.avatar || null,
-  bio: row?.bio || null,
-});
+const serializeUser = (row) =>
+  sanitizeSessionUser({
+    id: row?.id,
+    name: row?.display_name || row?.username,
+    role: row?.role,
+    email: row?.email,
+    phone: row?.phone,
+    organization: row?.organization,
+    goal: row?.goal,
+    majorId: row?.major_id,
+    majorName: row?.major_name,
+    avatar: row?.avatar,
+    bio: row?.bio,
+  });
 
-router.get('/session', (req, res) => {
-  if (!req.session || !req.session.user) {
-    return res.status(401).json({ message: '未登录' });
+const resolveTokenFromRequest = (req) => {
+  const header = req.headers?.authorization || req.headers?.Authorization;
+  const headerToken = extractBearerToken(header);
+  if (headerToken) {
+    return headerToken;
   }
 
-  return res.json({ user: req.session.user });
+  const queryToken = req.query && typeof req.query.token === 'string' ? req.query.token.trim() : '';
+  if (queryToken) {
+    return queryToken;
+  }
+
+  const directHeaderToken = req.headers && typeof req.headers.token === 'string' ? req.headers.token.trim() : '';
+  return directHeaderToken || null;
+};
+
+router.get('/session', (req, res) => {
+  if (req.session && req.session.user && req.session.user.id) {
+    return res.json({ user: req.session.user });
+  }
+
+  const token = resolveTokenFromRequest(req);
+  const payload = verifyAuthToken(token);
+  const user = resolveUserFromTokenPayload(payload);
+
+  if (user && user.id) {
+    if (req.session) {
+      req.session.user = user;
+    }
+    return res.json({ user });
+  }
+
+  return res.status(401).json({ message: '未登录' });
 });
 
 router.post('/register', async (req, res) => {
@@ -163,9 +198,13 @@ router.post('/register', async (req, res) => {
     const { record: createdRecord } = await fetchUserByUsername(username);
     const user = serializeUser(createdRecord || { username, display_name: displayName, email, role: 'student' });
 
-    req.session.user = user;
+    const token = createAuthToken(user);
 
-    return res.status(201).json({ user });
+    if (req.session) {
+      req.session.user = user;
+    }
+
+    return res.status(201).json({ token, user });
   } catch (error) {
     console.error('注册失败', error);
     return res.status(500).json({ message: '注册失败，请稍后重试' });
@@ -202,9 +241,13 @@ router.post('/login', async (req, res) => {
     }
 
     const user = serializeUser(record);
-    req.session.user = user;
+    const token = createAuthToken(user);
 
-    return res.json({ user });
+    if (req.session) {
+      req.session.user = user;
+    }
+
+    return res.json({ token, user });
   } catch (error) {
     console.error('登录失败', error);
     return res.status(500).json({ message: '登录失败，请稍后重试' });
@@ -212,10 +255,15 @@ router.post('/login', async (req, res) => {
 });
 
 router.post('/logout', requireAuth, (req, res) => {
-  req.session.destroy(() => {
-    res.clearCookie(SESSION_NAME);
-    res.json({ success: true });
-  });
+  if (req.session && typeof req.session.destroy === 'function') {
+    req.session.destroy(() => {
+      res.clearCookie(SESSION_NAME);
+      res.json({ success: true });
+    });
+    return;
+  }
+
+  res.json({ success: true });
 });
 
 module.exports = router;

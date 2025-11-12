@@ -124,19 +124,29 @@ var quickLinkEntries = [
     { id: 'checkin', label: '今日打卡', caption: '完成计划', icon: '✅', page: 'checkin', variant: 'accent' },
     { id: 'ai', label: 'AI 助手', caption: '随问随答', icon: '🤖', page: 'ai', variant: 'accent' },
 ];
+var filterQuickLinksByRole = function (role) {
+    var normalizedRole = role === 'admin' ? 'admin' : 'student';
+    return quickLinkEntries.filter(function (item) { return normalizedRole === 'admin' || item.id !== 'admin'; });
+};
+var initialSession = (0, session_1.getStoredSession)();
 Page({
     data: {
-        quickLinks: quickLinkEntries,
+        quickLinks: filterQuickLinksByRole(((initialSession === null || initialSession === void 0 ? void 0 : initialSession.role) || null)),
         snapshot: normalizeDashboard((0, storage_1.loadFromStorage)(DASHBOARD_STORAGE_KEY, dashboard_1.dashboardSnapshotSeed)),
         loading: false,
         errorMessage: '',
     },
     onShow: function () {
+        var stored = (0, session_1.getStoredSession)();
+        this.updateQuickLinks((stored === null || stored === void 0 ? void 0 : stored.role) || null);
         void this.loadDashboard();
+    },
+    updateQuickLinks: function (role) {
+        this.setData({ quickLinks: filterQuickLinksByRole(role) });
     },
     loadDashboard: function () {
         return __awaiter(this, void 0, void 0, function () {
-            var error_1, apiError, message, snapshot, normalized, error_2, apiError, message;
+            var sessionUser, error_1, apiError, message, snapshot, normalized, error_2, apiError, message;
             return __generator(this, function (_a) {
                 switch (_a.label) {
                     case 0:
@@ -146,7 +156,8 @@ Page({
                         _a.trys.push([1, 3, , 4]);
                         return [4 /*yield*/, (0, session_1.ensureSession)()];
                     case 2:
-                        _a.sent();
+                        sessionUser = _a.sent();
+                        this.updateQuickLinks((sessionUser === null || sessionUser === void 0 ? void 0 : sessionUser.role) || null);
                         return [3 /*break*/, 4];
                     case 3:
                         error_1 = _a.sent();
@@ -155,6 +166,7 @@ Page({
                             ? '请先在个人中心使用账号密码登录后，再刷新学习看板。'
                             : (apiError === null || apiError === void 0 ? void 0 : apiError.message) || '无法校验登录状态，请稍后重试。';
                         this.setData({ loading: false, errorMessage: message });
+                        this.updateQuickLinks(null);
                         return [2 /*return*/];
                     case 4:
                         _a.trys.push([4, 6, 7, 8]);
