@@ -7,11 +7,39 @@
       <button class="hero__btn" size="mini" data-page="analytics" bindtap="navigateToPage">学习分析</button>
       <button class="hero__btn" size="mini" data-page="forum" bindtap="navigateToPage">考研论坛</button>
       <button class="hero__btn" size="mini" data-page="admin" bindtap="navigateToPage">后台管理</button>
+      <button class="hero__btn hero__btn--accent" size="mini" data-page="checkin" bindtap="navigateToPage">今日打卡</button>
+      <button class="hero__btn hero__btn--accent" size="mini" data-page="ai" bindtap="navigateToPage">AI 助手</button>
     </view>
   </view>
 
   <view class="message message--error" wx:if="{{errorMessage}}">{{errorMessage}}</view>
   <view class="message" wx:if="{{loading}}">数据加载中，请稍候…</view>
+
+  <view class="section section--toolkit">
+    <view class="section__title">掌上学习工具</view>
+    <view class="tool-grid">
+      <view class="tool-card" data-page="checkin" bindtap="navigateToPage">
+        <view class="tool-card__icon">📆</view>
+        <view class="tool-card__title">学习打卡</view>
+        <view class="tool-card__desc">查看今日任务与连续天数，生成学习卡片。</view>
+      </view>
+      <view class="tool-card" data-page="leaderboard" bindtap="navigateToPage">
+        <view class="tool-card__icon">🏆</view>
+        <view class="tool-card__title">进度排行榜</view>
+        <view class="tool-card__desc">对比 TOP 学员与同校进度，激发学习动力。</view>
+      </view>
+      <view class="tool-card" data-page="wrongbook" bindtap="navigateToPage">
+        <view class="tool-card__icon">📚</view>
+        <view class="tool-card__title">离线错题本</view>
+        <view class="tool-card__desc">本地缓存错题，离线也能复习，联网后自动同步。</view>
+      </view>
+      <view class="tool-card" data-page="ai" bindtap="navigateToPage">
+        <view class="tool-card__icon">🤖</view>
+        <view class="tool-card__title">AI 助手</view>
+        <view class="tool-card__desc">提问英语作文、算法难题，获取即时解答。</view>
+      </view>
+    </view>
+  </view>
 
   <view class="section">
     <view class="section__title">关键指标</view>

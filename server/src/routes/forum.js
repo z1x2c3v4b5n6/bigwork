@@ -11,6 +11,16 @@ const { requireAuth } = require('../middleware/auth');
 const { normalizeDate, parseTags, stringifyTags } = require('../utils/formatters');
 const { isAdminRole } = require('../utils/auth');
 const { normalizeIdentifier, normalizeValueForColumn } = require('../utils/db');
+const {
+  listTopics: listFallbackTopics,
+  getTopicSummary: getFallbackTopicSummary,
+  listPosts: listFallbackPosts,
+  createTopic: createFallbackTopic,
+  createPost: createFallbackPost,
+  deletePost: deleteFallbackPost,
+  toggleLike: toggleFallbackLike,
+  resolveAuthorName: resolveFallbackAuthorName,
+} = require('../data/forumFallback');
 
 const router = express.Router();
 
@@ -378,17 +388,26 @@ router.get('/topics', async (req, res) => {
     const topicConfig = await getForumTopicConfig();
     const postConfig = await getForumPostConfig();
     const likeConfig = await getForumLikeConfig();
+    const currentUserId = req.session?.user?.id != null ? String(req.session.user.id) : null;
 
-    if (!topicConfig) {
-      return res
-        .status(500)
-        .json({ message: 'forum_topics 表不存在，请按照 README 说明手动创建后再试。' });
-    }
-
-    if (!topicConfig.id || !topicConfig.title) {
-      return res
-        .status(500)
-        .json({ message: 'forum_topics 表缺少主键或标题字段，请补齐 id/title 列后再试。' });
+    if (!topicConfig || !topicConfig.id || !topicConfig.title) {
+      const fallback = listFallbackTopics().map((topic, index) => {
+        const summary = getFallbackTopicSummary(topic.id, currentUserId) || { likes: 0, replies: 0, liked: false };
+        return formatTopicRow(
+          {
+            id: topic.id,
+            title: topic.title,
+            description: topic.description,
+            tags: topic.tags,
+            created_at: topic.createdAt,
+            updated_at: topic.updatedAt,
+            author: topic.author,
+          },
+          index,
+          { likes: summary.likes, replies: summary.replies, likedByMe: summary.liked },
+        );
+      });
+      return res.json({ topics: fallback });
     }
 
     const userJoin = await getUserJoinConfig('u');
@@ -415,32 +434,45 @@ router.get('/topics', async (req, res) => {
       : `ft.\`${topicConfig.id}\``;
 
     let rows = await query(
-      `SELECT ${selectFragments.join(', ')}
-         FROM \`${topicConfig.tableName}\` ft
-         ${joinClause}
-        ORDER BY ${orderColumn} DESC, ft.\`${topicConfig.id}\` DESC`,
+      `
+        SELECT ${selectFragments.join(', ')}
+        FROM \`${topicConfig.tableName}\` ft
+        ${joinClause}
+        ORDER BY ${orderColumn} DESC, ft.\`${topicConfig.id}\` DESC
+      `,
     );
 
-    if (rows.length === 0) {
-      await seedForumTopics(topicConfig);
-      rows = await query(
-        `SELECT ${selectFragments.join(', ')}
-           FROM \`${topicConfig.tableName}\` ft
-           ${joinClause}
-          ORDER BY ${orderColumn} DESC, ft.\`${topicConfig.id}\` DESC`,
-      );
+    if (!rows.length) {
+      const fallback = listFallbackTopics().map((topic, index) => {
+        const summary = getFallbackTopicSummary(topic.id, currentUserId) || { likes: 0, replies: 0, liked: false };
+        return formatTopicRow(
+          {
+            id: topic.id,
+            title: topic.title,
+            description: topic.description,
+            tags: topic.tags,
+            created_at: topic.createdAt,
+            updated_at: topic.updatedAt,
+            author: topic.author,
+          },
+          index,
+          { likes: summary.likes, replies: summary.replies, likedByMe: summary.liked },
+        );
+      });
+      return res.json({ topics: fallback });
     }
 
     const topicIds = rows
       .map((row) => row.id)
-      .filter((value) => value !== null && value !== undefined);
+      .filter((value) => value !== null && value !== undefined)
+      .map((value) => String(value));
 
     let replyCountMap = new Map();
     if (postConfig?.topicId && topicIds.length > 0) {
       const { clause, params } = buildInClause(topicIds, 'topic');
       if (clause) {
         const replyRows = await query(
-          `SELECT fp.\`${postConfig.topicId}\` AS topic_id, COUNT(*) AS total
+          `SELECT fp.\`${postConfig.topicId}\` AS topic_id, COUNT(*) AS total`
              FROM \`${postConfig.tableName}\` fp
             WHERE fp.\`${postConfig.topicId}\` IN (${clause})
             GROUP BY fp.\`${postConfig.topicId}\``,
@@ -460,7 +492,7 @@ router.get('/topics', async (req, res) => {
       const { clause, params } = buildInClause(topicIds, 'likeTopic');
       if (clause) {
         const likeRows = await query(
-          `SELECT fl.\`${likeConfig.topicId}\` AS topic_id, COUNT(*) AS total
+          `SELECT fl.\`${likeConfig.topicId}\` AS topic_id, COUNT(*) AS total`
              FROM \`${likeConfig.tableName}\` fl
             WHERE fl.\`${likeConfig.topicId}\` IN (${clause})
             GROUP BY fl.\`${likeConfig.topicId}\``,
@@ -476,12 +508,11 @@ router.get('/topics', async (req, res) => {
     }
 
     let likedSet = new Set();
-    const currentUserId = req.session?.user?.id != null ? String(req.session.user.id) : null;
     if (likeConfig?.topicId && likeConfig?.userId && currentUserId && topicIds.length > 0) {
       const { clause, params } = buildInClause(topicIds, 'likedTopic');
       if (clause) {
         const likedRows = await query(
-          `SELECT fl.\`${likeConfig.topicId}\` AS topic_id
+          `SELECT fl.\`${likeConfig.topicId}\` AS topic_id`
              FROM \`${likeConfig.tableName}\` fl
             WHERE fl.\`${likeConfig.userId}\` = :userId
               AND fl.\`${likeConfig.topicId}\` IN (${clause})`,
@@ -505,10 +536,27 @@ router.get('/topics', async (req, res) => {
       });
     });
 
-    res.json({ topics });
+    return res.json({ topics });
   } catch (error) {
     console.error('获取话题失败', error);
-    res.status(500).json({ message: '加载考研论坛失败，请稍后重试' });
+    const currentUserId = req.session?.user?.id != null ? String(req.session.user.id) : null;
+    const fallback = listFallbackTopics().map((topic, index) => {
+      const summary = getFallbackTopicSummary(topic.id, currentUserId) || { likes: 0, replies: 0, liked: false };
+      return formatTopicRow(
+        {
+          id: topic.id,
+          title: topic.title,
+          description: topic.description,
+          tags: topic.tags,
+          created_at: topic.createdAt,
+          updated_at: topic.updatedAt,
+          author: topic.author,
+        },
+        index,
+        { likes: summary.likes, replies: summary.replies, likedByMe: summary.liked },
+      );
+    });
+    return res.json({ topics: fallback, message: '加载考研论坛失败，已展示示例数据。' });
   }
 });
 
@@ -532,16 +580,14 @@ router.post('/topics', requireAuth, async (req, res) => {
   try {
     const topicConfig = await getForumTopicConfig();
 
-    if (!topicConfig) {
-      return res
-        .status(500)
-        .json({ message: 'forum_topics 表不存在，请按照 README 说明手动创建后再试。' });
-    }
-
-    if (!topicConfig.title) {
-      return res
-        .status(500)
-        .json({ message: 'forum_topics 表缺少标题字段（title/name），请补充数据表结构。' });
+    if (!topicConfig || !topicConfig.title) {
+      const fallbackTopic = createFallbackTopic({
+        title: rawTitle,
+        description: rawDescription,
+        tags,
+        author: resolveFallbackAuthorName(req.session?.user || null),
+      });
+      return res.status(201).json({ id: fallbackTopic.id, title: fallbackTopic.title, tags: fallbackTopic.tags });
     }
 
     const payload = createTopicPayload(topicConfig, {
@@ -566,23 +612,26 @@ router.get('/topics/:topicId/posts', async (req, res) => {
   try {
     const topicConfig = await getForumTopicConfig();
     const postConfig = await getForumPostConfig();
+    const currentUserId = req.session?.user?.id != null ? String(req.session.user.id) : null;
+    const isAdmin = req.session?.user ? isAdminRole(req.session.user.role) : false;
 
-    if (!topicConfig?.id) {
-      return res
-        .status(500)
-        .json({ message: 'forum_topics 表缺少主键 id，请补齐后再试。' });
-    }
-
-    if (!postConfig) {
-      return res
-        .status(500)
-        .json({ message: 'forum_posts 表不存在，请先创建帖子表后再查询。' });
-    }
-
-    if (!postConfig.topicId || !postConfig.id) {
-      return res
-        .status(500)
-        .json({ message: 'forum_posts 表缺少 topic_id 字段，请补充数据表结构。' });
+    if (!topicConfig?.id || !postConfig || !postConfig.topicId || !postConfig.id) {
+      const fallbackPosts = listFallbackPosts(topicId).map((post, index) => {
+        const authorId = post.authorId != null ? String(post.authorId) : null;
+        const isAuthor = Boolean(currentUserId && authorId && currentUserId === authorId);
+        return formatPostRow(
+          {
+            id: post.id,
+            content: post.content,
+            author: post.author,
+            created_at: post.createdAt,
+            updated_at: post.createdAt,
+          },
+          index,
+          { canDelete: Boolean(isAdmin || isAuthor), isAuthor },
+        );
+      });
+      return res.json({ posts: fallbackPosts });
     }
 
     const userJoin = await getUserJoinConfig('u');
@@ -625,9 +674,6 @@ router.get('/topics/:topicId/posts', async (req, res) => {
       { topicId: normalizedTopicId },
     );
 
-    const currentUserId = req.session?.user?.id != null ? String(req.session.user.id) : null;
-    const isAdmin = req.session?.user ? isAdminRole(req.session.user.role) : false;
-
     const posts = rows.map((row, index) => {
       const base = formatPostRow(row, index);
       const authorId = row.author_id != null ? String(row.author_id) : null;
@@ -642,7 +688,24 @@ router.get('/topics/:topicId/posts', async (req, res) => {
     res.json({ posts });
   } catch (error) {
     console.error('获取帖子失败', error);
-    res.status(500).json({ message: '加载帖子失败，请稍后重试' });
+    const fallbackPosts = listFallbackPosts(String(topicId)).map((post, index) => {
+      const authorId = post.authorId != null ? String(post.authorId) : null;
+      const currentUserId = req.session?.user?.id != null ? String(req.session.user.id) : null;
+      const isAdmin = req.session?.user ? isAdminRole(req.session.user.role) : false;
+      const isAuthor = Boolean(currentUserId && authorId && currentUserId === authorId);
+      return formatPostRow(
+        {
+          id: post.id,
+          content: post.content,
+          author: post.author,
+          created_at: post.createdAt,
+          updated_at: post.createdAt,
+        },
+        index,
+        { canDelete: Boolean(isAdmin || isAuthor), isAuthor },
+      );
+    });
+    res.json({ posts: fallbackPosts, message: '加载帖子失败，已展示示例帖子。' });
   }
 });
 
@@ -657,16 +720,17 @@ router.post('/topics/:topicId/posts', requireAuth, async (req, res) => {
   try {
     const postConfig = await getForumPostConfig();
 
-    if (!postConfig) {
-      return res
-        .status(500)
-        .json({ message: 'forum_posts 表不存在，请先创建帖子表后再试。' });
-    }
+    if (!postConfig || !postConfig.topicId) {
+      const created = createFallbackPost(String(topicId), {
+        content: rawContent,
+        sessionUser: req.session?.user || null,
+      });
 
-    if (!postConfig.topicId) {
-      return res
-        .status(500)
-        .json({ message: 'forum_posts 表缺少 topic_id 字段，请补充数据表结构。' });
+      if (!created) {
+        return res.status(404).json({ message: '话题不存在或已被删除' });
+      }
+
+      return res.status(201).json({ id: created.id });
     }
 
     const payload = createPostPayload(postConfig, {
@@ -692,9 +756,21 @@ router.delete('/topics/:topicId/posts/:postId', requireAuth, async (req, res) =>
     const postConfig = await getForumPostConfig();
 
     if (!postConfig?.id) {
-      return res
-        .status(500)
-        .json({ message: 'forum_posts 表缺少主键 id，请补齐后再试。' });
+      const topicIdValue = String(topicId);
+      const postIdValue = String(postId);
+      const posts = listFallbackPosts(topicIdValue);
+      const exists = posts.some((post) => post.id === postIdValue);
+      const success = deleteFallbackPost(topicIdValue, postIdValue, req.session?.user || null);
+
+      if (!exists) {
+        return res.status(404).json({ message: '帖子不存在或已被删除' });
+      }
+
+      if (!success) {
+        return res.status(403).json({ message: '没有权限删除该帖子' });
+      }
+
+      return res.json({ success: true });
     }
 
     const selectFragments = [
@@ -764,22 +840,20 @@ router.post('/topics/:topicId/likes', requireAuth, async (req, res) => {
     const topicConfig = await getForumTopicConfig();
     const likeConfig = await getForumLikeConfig();
 
-    if (!topicConfig?.id) {
-      return res
-        .status(500)
-        .json({ message: 'forum_topics 表缺少主键 id，请补齐后再试。' });
-    }
+    if (!topicConfig?.id || !likeConfig || !likeConfig.topicId || !likeConfig.userId) {
+      const summaryBefore = getFallbackTopicSummary(String(topicId), currentUserId);
 
-    if (!likeConfig) {
-      return res
-        .status(500)
-        .json({ message: 'forum_topic_likes 表不存在，请在数据库中创建后再试。' });
-    }
+      if (!summaryBefore) {
+        return res.status(404).json({ message: '话题不存在或已被删除' });
+      }
 
-    if (!likeConfig.topicId || !likeConfig.userId) {
-      return res
-        .status(500)
-        .json({ message: 'forum_topic_likes 表缺少 topic_id 或 user_id 字段，请补充数据表结构。' });
+      const result = toggleFallbackLike(String(topicId), currentUserId);
+      const summaryAfter = getFallbackTopicSummary(String(topicId), currentUserId) || {
+        likes: result.likes,
+        liked: result.liked,
+        replies: summaryBefore.replies,
+      };
+      return res.json({ likes: summaryAfter.likes, liked: summaryAfter.liked });
     }
 
     const normalizedTopicId = normalizeValueForColumn(
@@ -850,7 +924,19 @@ router.post('/topics/:topicId/likes', requireAuth, async (req, res) => {
     return res.json({ likes, liked: true });
   } catch (error) {
     console.error('切换点赞状态失败', error);
-    return res.status(500).json({ message: '点赞失败，请稍后重试' });
+    const summaryBefore = getFallbackTopicSummary(String(topicId), currentUserId);
+
+    if (!summaryBefore) {
+      return res.status(500).json({ message: '点赞失败，请稍后重试' });
+    }
+
+    const result = toggleFallbackLike(String(topicId), currentUserId);
+    const summaryAfter = getFallbackTopicSummary(String(topicId), currentUserId) || {
+      likes: result.likes,
+      liked: result.liked,
+      replies: summaryBefore.replies,
+    };
+    return res.json({ likes: summaryAfter.likes, liked: summaryAfter.liked });
   }
 });
 
