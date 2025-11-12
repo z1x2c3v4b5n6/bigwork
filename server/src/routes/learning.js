@@ -16,6 +16,432 @@ const router = express.Router();
 
 const resolveColumn = (columns, candidates) => candidates.find((column) => columns.has(column)) || null;
 
+const DAILY_TASK_TABLE = 'daily_learning_tasks';
+const DAILY_TASK_COMPLETION_TABLE = 'daily_task_completions';
+
+const formatDateOnly = (value) => {
+  if (!value) {
+    return null;
+  }
+
+  const base = value instanceof Date ? new Date(value.getTime()) : new Date(value);
+
+  if (Number.isNaN(base.getTime())) {
+    return null;
+  }
+
+  base.setHours(0, 0, 0, 0);
+  const year = base.getFullYear();
+  const month = `${base.getMonth() + 1}`.padStart(2, '0');
+  const day = `${base.getDate()}`.padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const differenceInDays = (left, right) => {
+  const leftDate = formatDateOnly(left);
+  const rightDate = formatDateOnly(right);
+
+  if (!leftDate || !rightDate) {
+    return Number.NaN;
+  }
+
+  const leftTime = new Date(`${leftDate}T00:00:00`).getTime();
+  const rightTime = new Date(`${rightDate}T00:00:00`).getTime();
+  return Math.round((leftTime - rightTime) / (24 * 60 * 60 * 1000));
+};
+
+const computeStreakFromDates = (dates = [], today = formatDateOnly(new Date())) => {
+  const uniqueDates = Array.from(
+    new Set(
+      dates
+        .map((date) => formatDateOnly(date))
+        .filter((value) => typeof value === 'string' && value.length === 10),
+    ),
+  ).sort();
+
+  const totalCompletedDays = uniqueDates.length;
+
+  if (uniqueDates.length === 0) {
+    return {
+      streak: 0,
+      completedToday: false,
+      lastCompletedDate: null,
+      totalCompletedDays,
+    };
+  }
+
+  const lastDate = uniqueDates[uniqueDates.length - 1];
+  const diffToToday = differenceInDays(today, lastDate);
+
+  if (!Number.isFinite(diffToToday) || diffToToday > 1) {
+    return {
+      streak: 0,
+      completedToday: diffToToday === 0,
+      lastCompletedDate: lastDate,
+      totalCompletedDays,
+    };
+  }
+
+  if (diffToToday < 0) {
+    return {
+      streak: 0,
+      completedToday: false,
+      lastCompletedDate: lastDate,
+      totalCompletedDays,
+    };
+  }
+
+  let streak = 1;
+  let cursor = lastDate;
+
+  for (let index = uniqueDates.length - 2; index >= 0; index -= 1) {
+    const current = uniqueDates[index];
+    const diff = differenceInDays(cursor, current);
+
+    if (!Number.isFinite(diff)) {
+      continue;
+    }
+
+    if (diff === 1) {
+      streak += 1;
+      cursor = current;
+      continue;
+    }
+
+    if (diff <= 0) {
+      continue;
+    }
+
+    break;
+  }
+
+  return {
+    streak,
+    completedToday: diffToToday === 0,
+    lastCompletedDate: lastDate,
+    totalCompletedDays,
+  };
+};
+
+const buildInClause = (values = [], prefix = 'p') => {
+  if (!Array.isArray(values) || values.length === 0) {
+    return { clause: '', params: {} };
+  }
+
+  const params = {};
+  const placeholders = values
+    .map((value, index) => {
+      const key = `${prefix}_${index}`;
+      params[key] = value;
+      return `:${key}`;
+    })
+    .filter(Boolean);
+
+  if (placeholders.length === 0) {
+    return { clause: '', params: {} };
+  }
+
+  return { clause: placeholders.join(', '), params };
+};
+
+const getDailyTaskConfig = async () => {
+  const columns = await getTableColumns(DAILY_TASK_TABLE);
+
+  if (columns.size === 0) {
+    return null;
+  }
+
+  const columnDetails = await getTableColumnDetails(DAILY_TASK_TABLE);
+
+  return {
+    table: DAILY_TASK_TABLE,
+    columns,
+    columnDetails,
+    id: resolveColumn(columns, ['id', 'task_id']),
+    date: resolveColumn(columns, ['task_date', 'date']),
+    title: resolveColumn(columns, ['title', 'name']),
+    description: resolveColumn(columns, ['description', 'intro', 'content']),
+    targetText: resolveColumn(columns, ['target_text', 'target', 'action_text']),
+    estimatedMinutes: resolveColumn(columns, ['estimated_minutes', 'duration_minutes', 'duration']),
+    createdAt: resolveColumn(columns, ['created_at', 'create_time']),
+    updatedAt: resolveColumn(columns, ['updated_at', 'update_time']),
+  };
+};
+
+const getDailyTaskCompletionConfig = async () => {
+  const columns = await getTableColumns(DAILY_TASK_COMPLETION_TABLE);
+
+  if (columns.size === 0) {
+    return null;
+  }
+
+  const columnDetails = await getTableColumnDetails(DAILY_TASK_COMPLETION_TABLE);
+
+  return {
+    table: DAILY_TASK_COMPLETION_TABLE,
+    columns,
+    columnDetails,
+    id: resolveColumn(columns, ['id', 'log_id']),
+    taskId: resolveColumn(columns, ['task_id', 'daily_task_id']),
+    userId: resolveColumn(columns, ['user_id', 'student_id']),
+    completedAt: resolveColumn(columns, ['completed_at', 'finish_time', 'created_at']),
+    createdAt: resolveColumn(columns, ['created_at', 'create_time']),
+    updatedAt: resolveColumn(columns, ['updated_at', 'update_time']),
+  };
+};
+
+const mapDailyTaskRow = (row) => ({
+  id: row.id != null ? String(row.id) : '',
+  title: row.title || '今日任务待发布',
+  description: row.description || '',
+  targetText: row.target_text || row.targetText || '请保持专注完成打卡任务',
+  estimatedMinutes: Number(row.estimated_minutes ?? row.estimatedMinutes ?? 45) || 45,
+});
+
+const loadDailyTaskForDate = async (targetDate) => {
+  const today = formatDateOnly(targetDate);
+  const config = await getDailyTaskConfig();
+
+  if (!today || !config || !config.id) {
+    return null;
+  }
+
+  const dateColumn = config.date || config.createdAt || config.updatedAt;
+
+  if (!dateColumn) {
+    return null;
+  }
+
+  const selectFragments = [
+    `t.\`${config.id}\` AS id`,
+    config.title ? `t.\`${config.title}\` AS title` : "'今日任务待发布' AS title",
+    config.description ? `t.\`${config.description}\` AS description` : 'NULL AS description',
+    config.targetText ? `t.\`${config.targetText}\` AS target_text` : 'NULL AS target_text',
+    config.estimatedMinutes
+      ? `t.\`${config.estimatedMinutes}\` AS estimated_minutes`
+      : 'NULL AS estimated_minutes',
+  ];
+
+  const orderColumn = config.updatedAt || config.createdAt || config.id;
+
+  const rows = await query(
+    `SELECT ${selectFragments.join(', ')}
+       FROM \`${config.table}\` t
+      WHERE DATE(t.\`${dateColumn}\`) = :target
+      ORDER BY t.\`${orderColumn || config.id}\` DESC
+      LIMIT 1`,
+    { target: today },
+  );
+
+  let row = rows[0];
+
+  if (!row) {
+    const fallbackRows = await query(
+      `SELECT ${selectFragments.join(', ')}
+         FROM \`${config.table}\` t
+        ORDER BY t.\`${orderColumn || config.id}\` DESC
+        LIMIT 1`,
+    );
+
+    row = fallbackRows[0];
+  }
+
+  return row ? mapDailyTaskRow(row) : null;
+};
+
+const loadUserDailyStats = async (userId, today) => {
+  const todayString = formatDateOnly(today);
+
+  if (!userId || !todayString) {
+    return { streak: 0, completedToday: false, lastCompletedDate: null, totalCompletedDays: 0 };
+  }
+
+  const completionConfig = await getDailyTaskCompletionConfig();
+
+  if (!completionConfig || !completionConfig.userId || !completionConfig.completedAt) {
+    return { streak: 0, completedToday: false, lastCompletedDate: null, totalCompletedDays: 0 };
+  }
+
+  const normalizedUserId = normalizeIdentifier(userId);
+  const rows = await query(
+    `SELECT DATE(c.\`${completionConfig.completedAt}\`) AS completed_date
+       FROM \`${completionConfig.table}\` c
+      WHERE c.\`${completionConfig.userId}\` = :userId
+      ORDER BY c.\`${completionConfig.completedAt}\` ASC`,
+    { userId: normalizedUserId },
+  );
+
+  const dates = rows.map((row) => row.completed_date).filter(Boolean);
+  return computeStreakFromDates(dates, todayString);
+};
+
+const buildLeaderboard = async (scope = 'global', sessionUser = null) => {
+  const completionConfig = await getDailyTaskCompletionConfig();
+
+  if (!completionConfig || !completionConfig.userId || !completionConfig.completedAt) {
+    return [];
+  }
+
+  if (!(await tableExists('users'))) {
+    return [];
+  }
+
+  const userColumns = await getTableColumns('users');
+
+  if (userColumns.size === 0) {
+    return [];
+  }
+
+  const userIdColumn = resolveColumn(userColumns, ['id', 'user_id']);
+
+  if (!userIdColumn) {
+    return [];
+  }
+
+  const displayColumn = resolveColumn(userColumns, ['display_name', 'name', 'full_name']);
+  const usernameColumn = resolveColumn(userColumns, ['username', 'user_name']);
+  const organizationColumn = resolveColumn(userColumns, ['organization', 'university', 'school']);
+  const majorColumn = resolveColumn(userColumns, ['major_id', 'major', 'majorId']);
+
+  const nameFragments = [];
+
+  if (displayColumn) {
+    nameFragments.push(`NULLIF(TRIM(u.\`${displayColumn}\`), '')`);
+  }
+
+  if (usernameColumn) {
+    nameFragments.push(`NULLIF(TRIM(u.\`${usernameColumn}\`), '')`);
+  }
+
+  const nameExpression = nameFragments.length
+    ? `COALESCE(${nameFragments.join(', ')}, '学习同学')`
+    : `'学习同学'`;
+
+  const organizationExpression = organizationColumn
+    ? `COALESCE(NULLIF(TRIM(u.\`${organizationColumn}\`), ''), '未填写院校')`
+    : `'未填写院校'`;
+
+  const selectFragments = [
+    `u.\`${userIdColumn}\` AS user_id`,
+    `${nameExpression} AS display_name`,
+    `${organizationExpression} AS organization`,
+    `COUNT(DISTINCT DATE(c.\`${completionConfig.completedAt}\`)) AS active_days`,
+    `MAX(c.\`${completionConfig.completedAt}\`) AS last_completed_at`,
+  ];
+
+  let joinTask = '';
+  let minutesExpression = 'SUM(45) AS total_minutes';
+
+  const taskConfig = await getDailyTaskConfig();
+
+  if (taskConfig && taskConfig.id && completionConfig.taskId) {
+    joinTask = `LEFT JOIN \`${taskConfig.table}\` t ON t.\`${taskConfig.id}\` = c.\`${completionConfig.taskId}\``;
+    minutesExpression = taskConfig.estimatedMinutes
+      ? `SUM(COALESCE(t.\`${taskConfig.estimatedMinutes}\`, 45)) AS total_minutes`
+      : 'SUM(45) AS total_minutes';
+  }
+
+  selectFragments.push(minutesExpression);
+
+  const whereClauses = [];
+  const params = {};
+
+  if (scope === 'campus' && majorColumn) {
+    const majorId = sessionUser?.major_id || sessionUser?.majorId;
+
+    if (majorId) {
+      whereClauses.push(`u.\`${majorColumn}\` = :majorId`);
+      params.majorId = normalizeIdentifier(majorId);
+    } else {
+      whereClauses.push('1 = 0');
+    }
+  }
+
+  const whereSql = whereClauses.length ? `WHERE ${whereClauses.join(' AND ')}` : '';
+
+  const rows = await query(
+    `SELECT ${selectFragments.join(', ')}
+       FROM \`${completionConfig.table}\` c
+       JOIN users u ON u.\`${userIdColumn}\` = c.\`${completionConfig.userId}\`
+       ${joinTask}
+       ${whereSql}
+      GROUP BY u.\`${userIdColumn}\`
+      ORDER BY active_days DESC, last_completed_at DESC
+      LIMIT 20`,
+    params,
+  );
+
+  if (!rows.length) {
+    return [];
+  }
+
+  const userIds = rows.map((row) => row.user_id).filter(Boolean);
+  const { clause, params: inParams } = buildInClause(userIds, 'lb');
+  let completionMap = new Map();
+
+  if (clause) {
+    const dateRows = await query(
+      `SELECT c.\`${completionConfig.userId}\` AS user_id,
+              DATE(c.\`${completionConfig.completedAt}\`) AS completed_date
+         FROM \`${completionConfig.table}\` c
+        WHERE c.\`${completionConfig.userId}\` IN (${clause})
+        ORDER BY c.\`${completionConfig.userId}\`, c.\`${completionConfig.completedAt}\` ASC`,
+      inParams,
+    );
+
+    completionMap = dateRows.reduce((accumulator, row) => {
+      const userIdValue = row.user_id;
+      const date = formatDateOnly(row.completed_date);
+
+      if (!userIdValue || !date) {
+        return accumulator;
+      }
+
+      if (!accumulator.has(userIdValue)) {
+        accumulator.set(userIdValue, []);
+      }
+
+      accumulator.get(userIdValue).push(date);
+      return accumulator;
+    }, new Map());
+  }
+
+  const today = formatDateOnly(new Date());
+  const bestActiveDays = Math.max(...rows.map((row) => Number(row.active_days) || 0), 1);
+
+  return rows
+    .map((row) => {
+      const userIdValue = row.user_id;
+      const dates = completionMap.get(userIdValue) || [];
+      const streakInfo = computeStreakFromDates(dates, today);
+      const activeDays = Number(row.active_days) || 0;
+      const totalMinutes = Number(row.total_minutes) || 0;
+      const progress = Math.max(5, Math.min(100, Math.round((activeDays / bestActiveDays) * 100)));
+      const hours = Number((totalMinutes / 60).toFixed(1));
+
+      return {
+        id: String(userIdValue ?? ''),
+        name: row.display_name || '学习同学',
+        university: row.organization || '未填写院校',
+        progress,
+        hours,
+        streak: streakInfo.streak,
+        activeDays,
+      };
+    })
+    .sort((a, b) => {
+      if (b.progress !== a.progress) {
+        return b.progress - a.progress;
+      }
+
+      if (b.streak !== a.streak) {
+        return b.streak - a.streak;
+      }
+
+      return b.activeDays - a.activeDays;
+    });
+};
+
 const parseDateTimeInput = (value, referenceDate = null) => {
   if (value === null || value === undefined) {
     return null;
@@ -629,6 +1055,94 @@ router.post('/courses', requireAuth, async (req, res) => {
   } catch (error) {
     console.error('创建课程失败', error);
     res.status(500).json({ message: '创建课程失败，请稍后重试' });
+  }
+});
+
+router.get('/daily-task', requireAuth, async (req, res) => {
+  try {
+    const today = formatDateOnly(new Date());
+    const task = await loadDailyTaskForDate(today);
+
+    if (!task) {
+      return res.status(404).json({ message: '今日任务尚未配置，请稍后再试。' });
+    }
+
+    const stats = await loadUserDailyStats(req.session?.user?.id || null, today);
+
+    return res.json({
+      task,
+      streak: stats.streak,
+      completedToday: stats.completedToday,
+      lastCompletedDate: stats.lastCompletedDate,
+      totalCompletedDays: stats.totalCompletedDays,
+    });
+  } catch (error) {
+    console.error('获取今日打卡任务失败', error);
+    return res.status(500).json({ message: '获取今日任务失败，请稍后再试。' });
+  }
+});
+
+router.post('/daily-task/complete', requireAuth, async (req, res) => {
+  const { taskId } = req.body || {};
+
+  if (!taskId) {
+    return res.status(400).json({ message: '缺少任务编号，请刷新后重试。' });
+  }
+
+  try {
+    const completionConfig = await getDailyTaskCompletionConfig();
+    const taskConfig = await getDailyTaskConfig();
+
+    if (
+      !completionConfig ||
+      !completionConfig.taskId ||
+      !completionConfig.userId ||
+      !completionConfig.completedAt ||
+      !taskConfig ||
+      !taskConfig.id
+    ) {
+      return res.status(500).json({ message: '系统尚未配置打卡数据表，请联系管理员。' });
+    }
+
+    const today = formatDateOnly(new Date());
+    const todayTask = await loadDailyTaskForDate(today);
+
+    if (!todayTask || String(todayTask.id) !== String(taskId)) {
+      return res.status(400).json({ message: '任务已更新，请刷新后重新打卡。' });
+    }
+
+    const normalizedUserId = normalizeIdentifier(req.session?.user?.id);
+
+    await query(
+      `INSERT INTO \`${completionConfig.table}\` (\`${completionConfig.taskId}\`, \`${completionConfig.userId}\`, \`${completionConfig.completedAt}\`)
+         VALUES (:taskId, :userId, NOW())
+        ON DUPLICATE KEY UPDATE \`${completionConfig.completedAt}\` = NOW()`,
+      { taskId: String(taskId), userId: normalizedUserId },
+    );
+
+    const stats = await loadUserDailyStats(normalizedUserId, today);
+
+    return res.json({
+      streak: stats.streak,
+      completedToday: stats.completedToday,
+      lastCompletedDate: stats.lastCompletedDate,
+      totalCompletedDays: stats.totalCompletedDays,
+    });
+  } catch (error) {
+    console.error('记录每日打卡失败', error);
+    return res.status(500).json({ message: '记录每日打卡失败，请稍后再试。' });
+  }
+});
+
+router.get('/leaderboard', requireAuth, async (req, res) => {
+  const scope = req.query?.scope === 'campus' ? 'campus' : 'global';
+
+  try {
+    const leaderboard = await buildLeaderboard(scope, req.session?.user || null);
+    res.json({ leaderboard });
+  } catch (error) {
+    console.error('获取学习排行榜失败', error);
+    res.status(500).json({ message: '无法加载排行榜，请稍后再试。' });
   }
 });
 
