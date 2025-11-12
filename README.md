@@ -48,23 +48,172 @@
 
 ## 数据库设计摘要
 
-后端不会自动迁移数据库，请在部署前手动执行 `server/schema/structure.sql`，或参照下表创建所有业务数据表：
+后端不会自动迁移数据库，请在部署前手动执行 `server/schema/structure.sql`。下方按照业务域枚举了全部表结构及字段含义，可直接引用到论文的数据库章节：
 
-| 模块 | 数据表 | 关键字段（节选） |
-| ---- | ------ | ---------------- |
-| 用户与基础配置 | `majors` | `id`、`name`、`description`、`created_at` |
-| 用户与基础配置 | `users` | `id`、`username`、`password`、`display_name`、`role`、`major_id`、`created_at`、`updated_at` |
-| 课程与资料 | `courses` | `id`、`major_id`、`name`、`category`、`teacher`、`status`、`summary`、`created_at`、`updated_at` |
-| 课程与资料 | `materials` | `id`、`course_id`、`title`、`material_type`、`url`、`description`、`created_at` |
-| 刷题训练 | `practice_sets` | `id`、`owner_id`、`name`、`focus`、`difficulty`、`duration_minutes`、`question_count`、`last_accuracy`、`updated_at` |
-| 刷题训练 | `practice_questions` | `id`、`practice_set_id`、`question_type`、`stem`、`options_json`、`correct_options`、`created_at` |
-| 刷题训练 | `practice_attempts` | `id`、`practice_set_id`、`user_id`、`accuracy`、`score`、`answers_json`、`summary`、`created_at` |
-| 日程管理 | `schedule_events` | `id`、`user_id`、`title`、`event_type`、`start_time`、`end_time`、`location`、`tags_json`、`created_at` |
-| 学习分析 | `subject_mastery` | `id`、`user_id`、`subject`、`mastery`、`trend`、`focus` |
-| 学习分析 | `analytics_overview` | `user_id`、`mock_trend`、`time_distribution`、`behavior_insight`、`updated_at` |
-| 学习分析 | `weak_topics` | `id`、`user_id`、`topic`、`error_rate`、`suggestion` |
-| 论坛社区 | `forum_topics` | `id`、`author_id`、`title`、`content`、`tags_json`、`created_at` |
-| 论坛社区 | `forum_comments` | `id`、`topic_id`、`author_id`、`content`、`created_at` |
-| 论坛社区 | `forum_likes` | `topic_id`、`user_id`、`created_at` |
+### 基础配置模块
 
-脚本末尾同时包含示例数据（专业、课程、资料、题单等），执行一次即可完成基础数据填充，方便前端、小程序联调。【F:server/schema/structure.sql†L1-L213】
+| 表名 | 字段 | 类型 | 说明 |
+| ---- | ---- | ---- | ---- |
+| `majors` | `id` | VARCHAR(30) | 专业主键，手工指定便于跨库同步 |
+|  | `name` | VARCHAR(100) | 专业名称，唯一约束 |
+|  | `description` | TEXT | 专业简介与学习路径说明 |
+|  | `created_at` | TIMESTAMP | 创建时间，默认当前时间 |
+| `users` | `id` | VARCHAR(30) | 用户主键，使用雪花/UUID 等非自增方案 |
+|  | `username` | VARCHAR(64) | 登录账号，唯一 |
+|  | `password` | VARCHAR(255) | Bcrypt 加密后的密码摘要 |
+|  | `display_name` | VARCHAR(64) | 前端显示昵称 |
+|  | `role` | ENUM('student','admin') | 角色标识，默认学生 |
+|  | `email` | VARCHAR(128) | 邮箱（可选） |
+|  | `phone` | VARCHAR(32) | 手机号（可选） |
+|  | `organization` | VARCHAR(255) | 所属院校/机构 |
+|  | `goal` | VARCHAR(255) | 个人目标，如目标分数或院校 |
+|  | `major_id` | VARCHAR(30) | 关联专业，外键至 `majors.id` |
+|  | `avatar` | VARCHAR(255) | 头像链接或标识 |
+|  | `bio` | TEXT | 自我介绍 |
+|  | `created_at` | TIMESTAMP | 创建时间 |
+|  | `updated_at` | TIMESTAMP | 更新时间（自动更新） |
+
+### 课程与资料模块
+
+| 表名 | 字段 | 类型 | 说明 |
+| ---- | ---- | ---- | ---- |
+| `courses` | `id` | VARCHAR(30) | 课程主键 |
+|  | `major_id` | VARCHAR(30) | 关联专业，外键至 `majors.id` |
+|  | `name` | VARCHAR(200) | 课程名称 |
+|  | `category` | VARCHAR(40) | 课程分类（公共课、专业课等） |
+|  | `teacher` | VARCHAR(100) | 授课老师 |
+|  | `credit` | DECIMAL(4,1) | 学分或课时权重 |
+|  | `progress` | INT | 完成进度百分比 |
+|  | `status` | VARCHAR(20) | 发布状态（published/draft/review 等） |
+|  | `summary` | TEXT | 课程简介 |
+|  | `schedule_info` | VARCHAR(255) | 课程排期信息 |
+|  | `release_window` | VARCHAR(120) | 发布周期描述 |
+|  | `created_at` | TIMESTAMP | 创建时间 |
+|  | `updated_at` | TIMESTAMP | 更新时间 |
+| `materials` | `id` | VARCHAR(30) | 资料主键 |
+|  | `course_id` | VARCHAR(30) | 关联课程，外键至 `courses.id` |
+|  | `title` | VARCHAR(200) | 资料标题 |
+|  | `material_type` | VARCHAR(50) | 资料类型（讲义、视频等） |
+|  | `url` | VARCHAR(255) | 资料下载或访问地址 |
+|  | `description` | TEXT | 内容描述 |
+|  | `created_at` | TIMESTAMP | 创建时间 |
+
+### 刷题训练模块
+
+| 表名 | 字段 | 类型 | 说明 |
+| ---- | ---- | ---- | ---- |
+| `practice_sets` | `id` | VARCHAR(30) | 题单主键 |
+|  | `owner_id` | VARCHAR(30) | 创建人，外键至 `users.id` |
+|  | `name` | VARCHAR(200) | 题单名称 |
+|  | `focus` | VARCHAR(255) | 训练侧重点 |
+|  | `difficulty` | VARCHAR(20) | 难度标签 |
+|  | `duration_minutes` | INT | 建议练习时长 |
+|  | `question_count` | INT | 题目数量 |
+|  | `last_attempt_at` | DATETIME | 最近一次作答时间 |
+|  | `last_accuracy` | DECIMAL(5,2) | 最近一次正确率 |
+|  | `last_score` | INT | 最近一次得分 |
+|  | `last_summary` | TEXT | 最近一次作答总结 |
+|  | `source` | VARCHAR(100) | 题单来源（默认系统推荐） |
+|  | `created_at` | TIMESTAMP | 创建时间 |
+|  | `updated_at` | TIMESTAMP | 更新时间 |
+| `practice_questions` | `id` | VARCHAR(30) | 题目主键 |
+|  | `practice_set_id` | VARCHAR(30) | 所属题单，外键至 `practice_sets.id` |
+|  | `question_type` | ENUM('single','multiple') | 题目类型（单选/多选） |
+|  | `stem` | TEXT | 题干 |
+|  | `options_json` | TEXT | 选项 JSON |
+|  | `correct_options` | TEXT | 正确选项 JSON |
+|  | `explanation` | TEXT | 解析说明 |
+|  | `knowledge_point` | VARCHAR(255) | 知识点标签 |
+|  | `created_at` | TIMESTAMP | 创建时间 |
+| `practice_attempts` | `id` | VARCHAR(30) | 作答记录主键 |
+|  | `practice_set_id` | VARCHAR(30) | 关联题单 |
+|  | `user_id` | VARCHAR(30) | 作答用户 |
+|  | `accuracy` | DECIMAL(5,2) | 正确率 |
+|  | `score` | INT | 得分 |
+|  | `answers_json` | LONGTEXT | 用户作答详情 JSON |
+|  | `summary` | TEXT | 系统总结或人工批注 |
+|  | `created_at` | TIMESTAMP | 创建时间 |
+| `wrong_questions` | `id` | VARCHAR(60) | 错题主键 |
+|  | `user_id` | VARCHAR(30) | 所属用户 |
+|  | `question` | TEXT | 题干或知识点描述 |
+|  | `answer` | TEXT | 正确答案 |
+|  | `analysis` | TEXT | 解题思路或解析 |
+|  | `created_at` | TIMESTAMP | 创建时间 |
+|  | `updated_at` | TIMESTAMP | 更新时间 |
+
+### 日程与学习任务模块
+
+| 表名 | 字段 | 类型 | 说明 |
+| ---- | ---- | ---- | ---- |
+| `schedule_events` | `id` | VARCHAR(30) | 日程事件主键 |
+|  | `user_id` | VARCHAR(30) | 关联用户 |
+|  | `title` | VARCHAR(200) | 事件标题 |
+|  | `event_type` | VARCHAR(30) | 事件类型（直播、考试等） |
+|  | `start_time` | DATETIME | 开始时间 |
+|  | `end_time` | DATETIME | 结束时间 |
+|  | `location` | VARCHAR(200) | 地点 |
+|  | `focus` | VARCHAR(255) | 关注点/备注 |
+|  | `tags_json` | TEXT | 标签 JSON |
+|  | `created_at` | TIMESTAMP | 创建时间 |
+| `daily_learning_tasks` | `id` | VARCHAR(40) | 每日学习任务主键 |
+|  | `task_date` | DATE | 任务日期，唯一 |
+|  | `title` | VARCHAR(200) | 任务标题 |
+|  | `description` | TEXT | 任务描述 |
+|  | `target_text` | VARCHAR(200) | 目标说明或口号 |
+|  | `estimated_minutes` | INT | 预计耗时，默认 45 分钟 |
+|  | `created_at` | TIMESTAMP | 创建时间 |
+|  | `updated_at` | TIMESTAMP | 更新时间 |
+| `daily_task_completions` | `id` | BIGINT UNSIGNED | 自增主键 |
+|  | `task_id` | VARCHAR(40) | 对应任务，外键至 `daily_learning_tasks.id` |
+|  | `user_id` | VARCHAR(30) | 完成任务的用户 |
+|  | `completed_at` | DATETIME | 实际完成时间 |
+|  | `created_at` | TIMESTAMP | 创建时间 |
+|  | `updated_at` | TIMESTAMP | 更新时间 |
+
+### 论坛与互动模块
+
+| 表名 | 字段 | 类型 | 说明 |
+| ---- | ---- | ---- | ---- |
+| `forum_topics` | `id` | VARCHAR(30) | 话题主键 |
+|  | `author_id` | VARCHAR(30) | 发帖用户 |
+|  | `title` | VARCHAR(200) | 帖子标题 |
+|  | `content` | TEXT | 帖子正文 |
+|  | `tags_json` | TEXT | 标签 JSON |
+|  | `needs_moderation` | TINYINT(1) | 是否需人工审核 |
+|  | `created_at` | TIMESTAMP | 创建时间 |
+| `forum_comments` | `id` | VARCHAR(30) | 评论主键 |
+|  | `topic_id` | VARCHAR(30) | 所属话题 |
+|  | `author_id` | VARCHAR(30) | 评论用户 |
+|  | `content` | TEXT | 评论内容 |
+|  | `created_at` | TIMESTAMP | 创建时间 |
+| `forum_likes` | `topic_id` | VARCHAR(30) | 点赞所属话题 |
+|  | `user_id` | VARCHAR(30) | 点赞用户 |
+|  | `created_at` | TIMESTAMP | 点赞时间 |
+
+### 学习分析与 AI 模块
+
+| 表名 | 字段 | 类型 | 说明 |
+| ---- | ---- | ---- | ---- |
+| `subject_mastery` | `id` | VARCHAR(30) | 学科掌握度主键 |
+|  | `user_id` | VARCHAR(30) | 用户 ID |
+|  | `subject` | VARCHAR(100) | 学科名称 |
+|  | `mastery` | DECIMAL(4,2) | 掌握度 0-100 |
+|  | `trend` | VARCHAR(20) | 趋势（上升、持平等） |
+|  | `focus` | TEXT | 建议关注点 |
+| `analytics_overview` | `user_id` | VARCHAR(30) | 关联用户主键，同表主键 |
+|  | `mock_trend` | TEXT | 模考趋势 JSON |
+|  | `time_distribution` | TEXT | 时间分布 JSON |
+|  | `behavior_insight` | TEXT | 学习行为洞察 |
+|  | `updated_at` | TIMESTAMP | 更新时间 |
+| `weak_topics` | `id` | VARCHAR(30) | 弱项主键 |
+|  | `user_id` | VARCHAR(30) | 用户 ID |
+|  | `topic` | VARCHAR(200) | 弱项主题 |
+|  | `error_rate` | VARCHAR(20) | 错误率描述 |
+|  | `suggestion` | TEXT | 改进建议 |
+| `ai_conversations` | `id` | BIGINT UNSIGNED | 自增会话主键 |
+|  | `user_id` | VARCHAR(30) | 用户 ID |
+|  | `question` | TEXT | 用户提问 |
+|  | `answer` | LONGTEXT | AI 回复内容 |
+|  | `created_at` | TIMESTAMP | 会话创建时间 |
+
+脚本末尾同时包含示例数据（专业、课程、资料、题单等），执行一次即可完成基础数据填充，方便前端、小程序联调。【F:server/schema/structure.sql†L1-L249】
