@@ -32,6 +32,10 @@ Page({
     errorMessage: '',
     successMessage: '',
     selectedMajorName: resolveMajorName(createEmptyForm().majorId),
+    loading: false,
+    formVisible: false,
+    formErrorMessage: '',
+    submitting: false,
   },
 
   onShow() {
@@ -43,6 +47,43 @@ Page({
     this.setData({
       courses: savedCourses,
       selectedMajorName: resolveMajorName(currentForm.majorId),
+      formErrorMessage: '',
+      successMessage: '',
+      errorMessage: '',
+    });
+  },
+
+  toggleFormVisibility() {
+    const nextVisible = !this.data.formVisible;
+    if (!nextVisible && this.data.submitting) {
+      return;
+    }
+    if (nextVisible) {
+      this.setData({ formVisible: true, formErrorMessage: '', successMessage: '' });
+      return;
+    }
+
+    const nextForm = createEmptyForm();
+    this.setData({
+      formVisible: false,
+      form: nextForm,
+      selectedMajorName: resolveMajorName(nextForm.majorId),
+      formErrorMessage: '',
+    });
+  },
+
+  cancelForm() {
+    if (this.data.submitting) {
+      return;
+    }
+
+    const nextForm = createEmptyForm();
+    this.setData({
+      formVisible: false,
+      form: nextForm,
+      selectedMajorName: resolveMajorName(nextForm.majorId),
+      formErrorMessage: '',
+      successMessage: '',
     });
   },
 
@@ -60,6 +101,7 @@ Page({
       form: nextForm,
       errorMessage: '',
       successMessage: '',
+      formErrorMessage: '',
     });
   },
 
@@ -72,22 +114,25 @@ Page({
       selectedMajorName: resolveMajorName(nextMajor),
       errorMessage: '',
       successMessage: '',
+      formErrorMessage: '',
     });
   },
 
   submitCourse() {
     const form = this.data.form || createEmptyForm();
     if (!form.title || !String(form.title).trim()) {
-      this.setData({ errorMessage: '请输入课程名称' });
+      this.setData({ formErrorMessage: '请输入课程名称' });
       return;
     }
 
     if (!form.majorId) {
-      this.setData({ errorMessage: '请选择所属专业' });
+      this.setData({ formErrorMessage: '请选择所属专业' });
       return;
     }
 
     const normalizedProgress = Math.min(100, Math.max(0, Number(form.progress) || 0));
+
+    this.setData({ submitting: true, errorMessage: '', successMessage: '', formErrorMessage: '' });
 
     const newCourse = {
       id: `course_${Date.now()}`,
@@ -108,6 +153,9 @@ Page({
       selectedMajorName: resolveMajorName(nextForm.majorId),
       successMessage: '课程已保存，可在列表顶部查看。',
       errorMessage: '',
+      formVisible: false,
+      formErrorMessage: '',
+      submitting: false,
     });
   },
 });

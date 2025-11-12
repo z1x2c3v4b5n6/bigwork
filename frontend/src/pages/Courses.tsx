@@ -3,6 +3,10 @@ import {
   Box,
   Button,
   Chip,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   Divider,
   Grid,
   LinearProgress,
@@ -16,6 +20,7 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
+import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
 import PlayCircleIcon from '@mui/icons-material/PlayCircle';
 import AutoStoriesIcon from '@mui/icons-material/AutoStories';
 import SchoolIcon from '@mui/icons-material/School';
@@ -36,6 +41,7 @@ const Courses = () => {
   const [nextTask, setNextTask] = useState('');
   const [description, setDescription] = useState('');
   const [majorId, setMajorId] = useState('');
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
 
   const {
     data: courses = [],
@@ -66,16 +72,21 @@ const Courses = () => {
   const majors = majorsQuery.data ?? [];
   const majorHelperText = majorsQuery.isError ? '无法加载专业列表，请稍后重试。' : '选择课程所属专业方向';
 
+  const resetForm = () => {
+    setTitle('');
+    setTeacher('');
+    setCategory('公共课');
+    setProgress(0);
+    setNextTask('');
+    setDescription('');
+    setMajorId(user?.majorId ?? majorsQuery.data?.[0]?.id ?? '');
+  };
+
   const createCourseMutation = useMutation({
     mutationFn: learningService.createCourse,
     onSuccess: async () => {
-      setTitle('');
-      setTeacher('');
-      setCategory('公共课');
-      setProgress(0);
-      setNextTask('');
-      setDescription('');
-      setMajorId(user?.majorId ?? majorsQuery.data?.[0]?.id ?? '');
+      resetForm();
+      setCreateDialogOpen(false);
       await queryClient.invalidateQueries({ queryKey: ['learning-courses'] });
     },
     onError: (error) => {
@@ -107,6 +118,22 @@ const Courses = () => {
       description: description.trim() || undefined,
       majorId: majorId || undefined,
     });
+  };
+
+  const handleOpenDialog = () => {
+    setErrorMessage(null);
+    if (!title && !teacher && !description && !nextTask && !majorId) {
+      resetForm();
+    }
+    setCreateDialogOpen(true);
+  };
+
+  const handleCloseDialog = () => {
+    if (createCourseMutation.isPending) {
+      return;
+    }
+    resetForm();
+    setCreateDialogOpen(false);
   };
 
   return (
@@ -211,21 +238,45 @@ const Courses = () => {
         </Grid>
         <Grid item xs={12} md={5}>
           <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid', borderColor: 'divider' }}>
-            <Stack spacing={2} component="form" onSubmit={handleCreateCourse}>
-              <Typography variant="h6" fontWeight={600}>
+            <Stack spacing={2}>
+              <Box>
+                <Typography variant="h6" fontWeight={600}>
+                  课程管理
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  点击按钮打开弹窗表单后新增课程并同步到课程体系。
+                </Typography>
+              </Box>
+              <Button
+                startIcon={<AddCircleOutlineIcon />}
+                variant="contained"
+                onClick={handleOpenDialog}
+                disabled={majorsQuery.isLoading}
+              >
                 新增课程
-              </Typography>
-              <TextField label="课程名称" value={title} onChange={(event) => setTitle(event.target.value)} required />
-              <TextField label="讲师" value={teacher} onChange={(event) => setTeacher(event.target.value)} />
-              <TextField label="课程类型" value={category} onChange={(event) => setCategory(event.target.value)} />
+              </Button>
+            </Stack>
+          </Paper>
+        </Grid>
+      </Grid>
+
+      <Dialog open={createDialogOpen} onClose={handleCloseDialog} fullWidth maxWidth="sm">
+        <Box component="form" onSubmit={handleCreateCourse}>
+          <DialogTitle>新增课程</DialogTitle>
+          <DialogContent dividers>
+            <Stack spacing={2.5}>
+              <TextField label="课程名称" value={title} onChange={(event) => setTitle(event.target.value)} required fullWidth />
+              <TextField label="讲师" value={teacher} onChange={(event) => setTeacher(event.target.value)} fullWidth />
+              <TextField label="课程类型" value={category} onChange={(event) => setCategory(event.target.value)} fullWidth />
               <TextField
                 label="所属专业"
                 value={majorId}
                 onChange={(event) => setMajorId(event.target.value)}
                 select
                 helperText={majorHelperText}
-                disabled={majorsQuery.isLoading}
+                disabled={majorsQuery.isLoading || majors.length === 0}
                 required
+                fullWidth
               >
                 {majors.map((major) => (
                   <MenuItem key={major.id} value={major.id}>
@@ -239,27 +290,35 @@ const Courses = () => {
                 value={progress}
                 inputProps={{ min: 0, max: 100 }}
                 onChange={(event) => setProgress(Number(event.target.value))}
+                fullWidth
               />
               <TextField
                 label="下一步任务"
                 value={nextTask}
                 onChange={(event) => setNextTask(event.target.value)}
                 placeholder="例如：完成第 3 讲课后习题"
+                fullWidth
               />
               <TextField
                 label="备注（可选）"
                 value={description}
                 onChange={(event) => setDescription(event.target.value)}
                 multiline
-                minRows={2}
+                minRows={3}
+                fullWidth
               />
-              <Button type="submit" variant="contained" disabled={createCourseMutation.isPending}>
-                {createCourseMutation.isPending ? '保存中…' : '保存课程'}
-              </Button>
             </Stack>
-          </Paper>
-        </Grid>
-      </Grid>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={handleCloseDialog} disabled={createCourseMutation.isPending}>
+              取消
+            </Button>
+            <Button type="submit" variant="contained" disabled={createCourseMutation.isPending}>
+              {createCourseMutation.isPending ? '保存中…' : '保存课程'}
+            </Button>
+          </DialogActions>
+        </Box>
+      </Dialog>
     </Stack>
   );
 };

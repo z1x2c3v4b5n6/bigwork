@@ -78,6 +78,8 @@ Page({
     successMessage: '',
     loading: false,
     submitting: false,
+    formVisible: false,
+    formErrorMessage: '',
   },
 
   onShow() {
@@ -85,7 +87,7 @@ Page({
   },
 
   async loadSchedule() {
-    this.setData({ loading: true, errorMessage: '', successMessage: '' });
+    this.setData({ loading: true, errorMessage: '', successMessage: '', formErrorMessage: '' });
 
     try {
       await ensureSession();
@@ -111,6 +113,27 @@ Page({
     }
   },
 
+  toggleFormVisibility() {
+    const nextVisible = !this.data.formVisible;
+    if (!nextVisible && this.data.submitting) {
+      return;
+    }
+    if (nextVisible) {
+      this.setData({ formVisible: true, formErrorMessage: '', successMessage: '' });
+      return;
+    }
+
+    this.setData({ formVisible: false, form: createForm(), formErrorMessage: '', successMessage: '' });
+  },
+
+  cancelForm() {
+    if (this.data.submitting) {
+      return;
+    }
+
+    this.setData({ formVisible: false, form: createForm(), formErrorMessage: '', successMessage: '' });
+  },
+
   handleInput(event: WechatMiniprogram.Input) {
     const field = event.currentTarget?.dataset?.field as keyof FormState | undefined;
     if (!field) {
@@ -121,6 +144,7 @@ Page({
       form: { ...this.data.form, [field]: value },
       errorMessage: '',
       successMessage: '',
+      formErrorMessage: '',
     });
   },
 
@@ -134,6 +158,7 @@ Page({
       form: { ...this.data.form, [field]: value },
       errorMessage: '',
       successMessage: '',
+      formErrorMessage: '',
     });
   },
 
@@ -147,18 +172,19 @@ Page({
       form: { ...this.data.form, [field]: value },
       errorMessage: '',
       successMessage: '',
+      formErrorMessage: '',
     });
   },
 
   async createSchedule() {
     const form = this.data.form;
     if (!form.title || !form.title.trim()) {
-      this.setData({ errorMessage: '请输入日程标题' });
+      this.setData({ formErrorMessage: '请输入日程标题' });
       return;
     }
 
     if (!form.startDate || !form.startTime || !form.endDate || !form.endTime) {
-      this.setData({ errorMessage: '请选择开始与结束时间' });
+      this.setData({ formErrorMessage: '请选择开始与结束时间' });
       return;
     }
 
@@ -167,7 +193,7 @@ Page({
       .map((tag) => tag.trim())
       .filter(Boolean);
 
-    this.setData({ submitting: true, errorMessage: '', successMessage: '' });
+    this.setData({ submitting: true, errorMessage: '', successMessage: '', formErrorMessage: '' });
 
     try {
       await apiRequest({
@@ -186,10 +212,11 @@ Page({
       });
 
       await this.loadSchedule();
-      this.setData({ form: createForm(), successMessage: '日程已创建。' });
+      this.setData({ form: createForm(), successMessage: '日程已创建。', formVisible: false, formErrorMessage: '' });
     } catch (error) {
       const apiError = error as ApiError;
-      this.setData({ errorMessage: apiError?.message || '创建日程失败，请稍后重试。' });
+      const message = apiError?.message || '创建日程失败，请稍后重试。';
+      this.setData({ formErrorMessage: message, errorMessage: message });
     } finally {
       this.setData({ submitting: false });
     }

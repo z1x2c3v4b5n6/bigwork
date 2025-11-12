@@ -24,13 +24,22 @@
       </view>
     </block>
     <block wx:else>
-      <view class="empty">暂无日程，欢迎下方创建。</view>
+      <view class="empty">暂无日程，点击下方按钮快速创建。</view>
     </block>
   </view>
 
   <view class="section">
-    <view class="section__title">新增安排</view>
-    <view class="form">
+    <view class="section__toolbar">
+      <view class="section__toolbar-info">
+        <view class="section__title">新增安排</view>
+        <view class="section__subtitle">点击按钮后填写学习日程、地点与提醒。</view>
+      </view>
+      <button class="action-button" bindtap="toggleFormVisibility">
+        {{formVisible ? '收起表单' : '新增安排'}}
+      </button>
+    </view>
+
+    <view class="form" wx:if="{{formVisible}}">
       <input class="input" placeholder="日程标题" value="{{form.title}}" data-field="title" bindinput="handleInput" />
       <input class="input" placeholder="类型（直播课/自习/模拟考试等）" value="{{form.type}}" data-field="type" bindinput="handleInput" />
       <picker mode="date" value="{{form.startDate}}" data-field="startDate" bindchange="handleDateChange">
@@ -48,9 +57,13 @@
       <input class="input" placeholder="地点（可选）" value="{{form.location}}" data-field="location" bindinput="handleInput" />
       <input class="input" placeholder="重点（可选）" value="{{form.focus}}" data-field="focus" bindinput="handleInput" />
       <input class="input" placeholder="标签（逗号分隔）" value="{{form.tags}}" data-field="tags" bindinput="handleInput" />
-      <button class="submit" bindtap="createSchedule" loading="{{submitting}}" disabled="{{submitting}}">保存日程</button>
-      <view class="message message--error" wx:if="{{!loading && errorMessage}}">{{errorMessage}}</view>
-      <view class="message message--success" wx:if="{{successMessage}}">{{successMessage}}</view>
+      <view class="form__actions">
+        <button class="submit" bindtap="createSchedule" loading="{{submitting}}" disabled="{{submitting}}">保存日程</button>
+        <button class="secondary-button" bindtap="cancelForm" type="default" disabled="{{submitting}}">取消</button>
+      </view>
     </view>
+
+    <view class="message message--error" wx:if="{{formErrorMessage}}">{{formErrorMessage}}</view>
+    <view class="message message--success" wx:if="{{successMessage}}">{{successMessage}}</view>
   </view>
 </view>

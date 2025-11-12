@@ -18,6 +18,20 @@
   gap: 24rpx;
 }
 
+.section__toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20rpx;
+  flex-wrap: wrap;
+}
+
+.section__toolbar-info {
+  display: flex;
+  flex-direction: column;
+  gap: 12rpx;
+}
+
 .section__title {
   font-size: 32rpx;
   font-weight: 600;
@@ -105,6 +119,28 @@
   margin-top: 12rpx;
   background: linear-gradient(135deg, #0b6bcb, #3f8cff);
   color: #ffffff;
+  border-radius: 20rpx;
+}
+
+.action-button {
+  background: linear-gradient(135deg, #0b6bcb, #3f8cff);
+  color: #ffffff;
+  border-radius: 999rpx;
+  padding: 20rpx 40rpx;
+  font-size: 28rpx;
+  border: none;
+}
+
+.form__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 16rpx;
+  margin-top: 12rpx;
+}
+
+.secondary-button {
+  background: #e2e8f0;
+  color: #1e293b;
   border-radius: 20rpx;
 }
 

@@ -69,11 +69,41 @@ Page({
     form: createForm(),
     errorMessage: '',
     successMessage: '',
+    loading: false,
+    submitting: false,
+    formVisible: false,
+    formErrorMessage: '',
   },
 
   onShow() {
     const saved = loadFromStorage(SCHEDULE_STORAGE_KEY, scheduleSeed);
-    this.setData({ schedule: normalizeSchedule(saved) });
+    this.setData({
+      schedule: normalizeSchedule(saved),
+      errorMessage: '',
+      successMessage: '',
+      formErrorMessage: '',
+    });
+  },
+
+  toggleFormVisibility() {
+    const nextVisible = !this.data.formVisible;
+    if (!nextVisible && this.data.submitting) {
+      return;
+    }
+    if (nextVisible) {
+      this.setData({ formVisible: true, formErrorMessage: '', successMessage: '' });
+      return;
+    }
+
+    this.setData({ formVisible: false, form: createForm(), formErrorMessage: '', successMessage: '' });
+  },
+
+  cancelForm() {
+    if (this.data.submitting) {
+      return;
+    }
+
+    this.setData({ formVisible: false, form: createForm(), formErrorMessage: '', successMessage: '' });
   },
 
   handleInput(event) {
@@ -87,6 +117,7 @@ Page({
       form: Object.assign({}, this.data.form, { [field]: value }),
       errorMessage: '',
       successMessage: '',
+      formErrorMessage: '',
     });
   },
 
@@ -101,6 +132,7 @@ Page({
       form: Object.assign({}, this.data.form, { [field]: value }),
       errorMessage: '',
       successMessage: '',
+      formErrorMessage: '',
     });
   },
 
@@ -115,18 +147,19 @@ Page({
       form: Object.assign({}, this.data.form, { [field]: value }),
       errorMessage: '',
       successMessage: '',
+      formErrorMessage: '',
     });
   },
 
   createSchedule() {
     const form = this.data.form || {};
     if (!form.title || !String(form.title).trim()) {
-      this.setData({ errorMessage: '请输入日程标题' });
+      this.setData({ formErrorMessage: '请输入日程标题' });
       return;
     }
 
     if (!form.startDate || !form.startTime || !form.endDate || !form.endTime) {
-      this.setData({ errorMessage: '请选择开始与结束时间' });
+      this.setData({ formErrorMessage: '请选择开始与结束时间' });
       return;
     }
 
@@ -134,6 +167,8 @@ Page({
       .split(/[,，\s]+/)
       .map((tag) => tag.trim())
       .filter(Boolean);
+
+    this.setData({ submitting: true, errorMessage: '', successMessage: '', formErrorMessage: '' });
 
     const scheduleItem = {
       id: `schedule_${Date.now()}`,
@@ -154,6 +189,9 @@ Page({
       form: createForm(),
       successMessage: '日程已创建。',
       errorMessage: '',
+      formVisible: false,
+      formErrorMessage: '',
+      submitting: false,
     });
   },
 });
