@@ -1,4 +1,9 @@
 const { getApiConfig } = require('../config.js');
+const {
+  clearStoredCookies,
+  getStoredCookieHeader,
+  storeResponseCookies,
+} = require('./authCookies.js');
 
 const joinUrl = (baseUrl, path) => {
   const trimmedBase = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
@@ -11,17 +16,25 @@ const apiRequest = ({ path, method = 'GET', data, header, timeout }) => {
   const url = joinUrl(baseUrl, path);
 
   return new Promise((resolve, reject) => {
+    const storedCookie = getStoredCookieHeader();
+    const requestHeader = {
+      'Content-Type': 'application/json',
+      ...(header || {}),
+    };
+
+    if (storedCookie && !requestHeader.Cookie && !requestHeader.cookie) {
+      requestHeader.Cookie = storedCookie;
+    }
+
     wx.request({
       url,
       method,
       data,
-      header: {
-        'Content-Type': 'application/json',
-        ...(header || {}),
-      },
+      header: requestHeader,
       timeout: typeof timeout === 'number' ? timeout : defaultTimeout,
       withCredentials: true,
       success: (res) => {
+        storeResponseCookies(res);
         if (res.statusCode >= 200 && res.statusCode < 300) {
           resolve(res.data);
           return;
@@ -31,6 +44,9 @@ const apiRequest = ({ path, method = 'GET', data, header, timeout }) => {
         );
         error.statusCode = res.statusCode;
         error.data = res.data;
+        if (res.statusCode === 401) {
+          clearStoredCookies();
+        }
         reject(error);
       },
       fail: (networkError) => {
