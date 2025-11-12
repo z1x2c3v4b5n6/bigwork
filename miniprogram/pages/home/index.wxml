@@ -3,12 +3,20 @@
     <view class="hero__title">你好，{{snapshot.userName}}</view>
     <view class="hero__subtitle">以下是你本周的学习进度与推荐动作。</view>
     <view class="hero__quick-nav">
-      <button class="hero__btn" size="mini" data-page="advisor" bindtap="navigateToPage">院校推荐</button>
-      <button class="hero__btn" size="mini" data-page="analytics" bindtap="navigateToPage">学习分析</button>
-      <button class="hero__btn" size="mini" data-page="forum" bindtap="navigateToPage">考研论坛</button>
-      <button class="hero__btn" size="mini" data-page="admin" bindtap="navigateToPage">后台管理</button>
-      <button class="hero__btn hero__btn--accent" size="mini" data-page="checkin" bindtap="navigateToPage">今日打卡</button>
-      <button class="hero__btn hero__btn--accent" size="mini" data-page="ai" bindtap="navigateToPage">AI 助手</button>
+      <block wx:for="{{quickLinks}}" wx:key="id">
+        <view
+          class="hero__quick-card {{item.variant ? 'hero__quick-card--' + item.variant : ''}}"
+          data-page="{{item.page}}"
+          data-open-type="{{item.openType}}"
+          bindtap="navigateToPage"
+        >
+          <view class="hero__quick-icon" wx:if="{{item.icon}}">{{item.icon}}</view>
+          <view class="hero__quick-text">
+            <text class="hero__quick-label">{{item.label}}</text>
+            <text class="hero__quick-caption" wx:if="{{item.caption}}">{{item.caption}}</text>
+          </view>
+        </view>
+      </block>
     </view>
   </view>
 

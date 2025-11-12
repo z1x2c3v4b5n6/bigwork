@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 var resources_1 = require("../../data/resources");
 Page({
     data: {
-        guides: resources_1.englishReviewGuides,
+        materials: resources_1.professionalMaterials,
+        majors: resources_1.majorRecommendations,
     },
 });
