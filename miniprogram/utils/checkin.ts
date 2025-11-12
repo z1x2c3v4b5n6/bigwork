@@ -21,6 +21,14 @@ interface CachedTaskState {
   task: DailyTask;
 }
 
+interface DailyTaskApiResponse {
+  task?: DailyTask | DailyTaskSeed | null;
+  streak?: number;
+  completedToday?: boolean;
+  lastCompletedDate?: string | null;
+  totalCompletedDays?: number;
+}
+
 const CHECKIN_STATE_KEY = 'studyCheckinState';
 const CHECKIN_TASK_KEY = 'studyCheckinTask';
 
@@ -90,19 +98,62 @@ const saveCachedTask = (task: DailyTask, today: string) => {
   saveToStorage(CHECKIN_TASK_KEY, cache);
 };
 
-const fetchTaskFromApi = async (): Promise<DailyTask> => {
+const syncStateFromServer = (
+  today: string,
+  payload: DailyTaskApiResponse | null,
+  fallbackState: CheckinStorageState,
+): CheckinStorageState => {
+  if (!payload) {
+    return fallbackState;
+  }
+
+  const nextState: CheckinStorageState = {
+    lastCompletedDate: fallbackState.lastCompletedDate,
+    lastEvaluatedDate: today,
+    streak: fallbackState.streak,
+  };
+
+  const streakFromServer =
+    typeof payload.streak === 'number' && Number.isFinite(payload.streak)
+      ? Math.max(0, Math.floor(payload.streak))
+      : null;
+
+  const completedToday = Boolean(payload.completedToday);
+  const serverLastDate =
+    typeof payload.lastCompletedDate === 'string' && payload.lastCompletedDate.length === 10
+      ? payload.lastCompletedDate
+      : null;
+
+  if (streakFromServer !== null) {
+    nextState.streak = streakFromServer;
+  }
+
+  if (completedToday) {
+    nextState.lastCompletedDate = today;
+  } else if (serverLastDate) {
+    nextState.lastCompletedDate = serverLastDate;
+  }
+
+  setStoredState(nextState);
+  return nextState;
+};
+
+const fetchTaskFromApi = async (today: string): Promise<{ task: DailyTask; state: CheckinStorageState }> => {
+  const stateBeforeSync = ensureEvaluatedState(getStoredState(), today);
+
   try {
-    const response = await apiRequest<{ task: DailyTask | DailyTaskSeed }>({
+    const response = await apiRequest<DailyTaskApiResponse>({
       path: '/learning/daily-task',
     });
-    if (response?.task) {
-      return normalizeTask(response.task);
-    }
+    const task = response?.task ? normalizeTask(response.task) : normalizeTask(dailyTaskSeed);
+    const syncedState = syncStateFromServer(today, response ?? null, stateBeforeSync);
+    return { task, state: syncedState };
   } catch (error) {
     const apiError = error as ApiError;
     console.warn('[checkin] 获取今日任务失败，将使用本地兜底数据。', apiError?.message ?? error);
+    const fallbackTask = normalizeTask(dailyTaskSeed);
+    return { task: fallbackTask, state: stateBeforeSync };
   }
-  return normalizeTask(dailyTaskSeed);
 };
 
 export interface CheckinInitializationResult {
@@ -113,11 +164,13 @@ export interface CheckinInitializationResult {
 
 export const initializeDailyTask = async (): Promise<CheckinInitializationResult> => {
   const today = getToday();
-  const state = ensureEvaluatedState(getStoredState(), today);
+  let state = ensureEvaluatedState(getStoredState(), today);
   let task = loadCachedTask(today);
 
   if (!task) {
-    task = await fetchTaskFromApi();
+    const remote = await fetchTaskFromApi(today);
+    task = remote.task;
+    state = remote.state;
     saveCachedTask(task, today);
   }
 
@@ -128,17 +181,23 @@ export const initializeDailyTask = async (): Promise<CheckinInitializationResult
   };
 };
 
-export const markTaskCompletedToday = (task: DailyTask): CheckinStorageState => {
+export const markTaskCompletedToday = (
+  task: DailyTask,
+  overrideStreak?: number,
+): CheckinStorageState => {
   const today = getToday();
   const yesterday = getYesterday();
   const state = getStoredState();
-  let streak = state.streak;
 
-  if (state.lastCompletedDate === today) {
+  if (state.lastCompletedDate === today && overrideStreak === undefined) {
     return state;
   }
 
-  if (state.lastCompletedDate === yesterday) {
+  let streak = state.streak;
+
+  if (typeof overrideStreak === 'number' && Number.isFinite(overrideStreak)) {
+    streak = Math.max(0, Math.floor(overrideStreak));
+  } else if (state.lastCompletedDate === yesterday) {
     streak += 1;
   } else {
     streak = 1;
@@ -156,8 +215,9 @@ export const markTaskCompletedToday = (task: DailyTask): CheckinStorageState => 
 
 export const reloadDailyTask = async (): Promise<CheckinInitializationResult> => {
   const today = getToday();
-  const state = ensureEvaluatedState(getStoredState(), today);
-  const task = await fetchTaskFromApi();
+  const remote = await fetchTaskFromApi(today);
+  const state = remote.state;
+  const task = remote.task;
   saveCachedTask(task, today);
   return {
     task,

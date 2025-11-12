@@ -85,12 +85,20 @@ Page({
 
     try {
       await ensureSession();
-      await apiRequest({
+      const response = await apiRequest<{
+        streak?: number;
+        completedToday?: boolean;
+        lastCompletedDate?: string | null;
+      }>({
         path: '/learning/daily-task/complete',
         method: 'POST',
         data: { taskId: task.id },
       });
-      const nextState = markTaskCompletedToday(task);
+      const overrideStreak =
+        typeof response?.streak === 'number' && Number.isFinite(response.streak)
+          ? Math.max(0, Math.floor(response.streak))
+          : undefined;
+      const nextState = markTaskCompletedToday(task, overrideStreak);
       this.setData({
         status: { task, completedToday: true, streak: nextState.streak },
         posterTempPath: '',

@@ -435,6 +435,99 @@ export const scheduleSeed = () => [
   },
 ];
 
+export const dailyLearningTasksSeed = () => {
+  const today = dayjs().startOf('day');
+  return [
+    {
+      id: 'daily_task_minus2',
+      task_date: today.subtract(2, 'day').format('YYYY-MM-DD'),
+      title: '算法错题整理',
+      description: '复盘 408 图论错题并完成 12 道巩固题，整理常见失误原因。',
+      target_text: '图论巩固 12 题',
+      estimated_minutes: 50,
+    },
+    {
+      id: 'daily_task_minus1',
+      task_date: today.subtract(1, 'day').format('YYYY-MM-DD'),
+      title: '英语写作限时演练',
+      description: '使用最新真题完成一篇小作文与一篇大作文，重点关注段落衔接。',
+      target_text: '写作演练 2 篇',
+      estimated_minutes: 45,
+    },
+    {
+      id: 'daily_task_today',
+      task_date: today.format('YYYY-MM-DD'),
+      title: '复试口语模拟',
+      description: '录制 5 分钟全英文自我介绍，并准备 3 个导师追问的回答要点。',
+      target_text: '完成口语模拟 1 次',
+      estimated_minutes: 40,
+    },
+  ];
+};
+
+export const dailyTaskCompletionsSeed = () => {
+  const today = dayjs();
+  return [
+    {
+      task_id: 'daily_task_minus2',
+      user_id: 'user_student_1',
+      completed_at: today.subtract(2, 'day').hour(21).minute(5).second(0).toISOString(),
+    },
+    {
+      task_id: 'daily_task_minus1',
+      user_id: 'user_student_1',
+      completed_at: today.subtract(1, 'day').hour(20).minute(30).second(0).toISOString(),
+    },
+    {
+      task_id: 'daily_task_today',
+      user_id: 'user_student_1',
+      completed_at: today.hour(8).minute(15).second(0).toISOString(),
+    },
+    {
+      task_id: 'daily_task_minus2',
+      user_id: 'user_admin_1',
+      completed_at: today.subtract(2, 'day').hour(19).minute(40).second(0).toISOString(),
+    },
+    {
+      task_id: 'daily_task_minus1',
+      user_id: 'user_admin_1',
+      completed_at: today.subtract(1, 'day').hour(22).minute(10).second(0).toISOString(),
+    },
+  ];
+};
+
+export const wrongQuestionsSeed = [
+  {
+    id: 'wrong_algo_union_find',
+    user_id: 'user_student_1',
+    question: '并查集按秩合并时，如何保证路径压缩后的时间复杂度仍为近乎常数？',
+    answer: '路径压缩配合按秩合并，保证树高趋近于常数，因此查询与合并均为 α(n)。',
+    analysis:
+      '记得在 find 操作中递归回溯时直接指向根节点，同时维护 rank 数组避免退化成链表。',
+    created_at: dayjs().subtract(4, 'day').toISOString(),
+    updated_at: dayjs().subtract(3, 'day').toISOString(),
+  },
+  {
+    id: 'wrong_english_template',
+    user_id: 'user_student_1',
+    question: '英语大作文是否可以直接套模板？如何提升段落衔接？',
+    answer: '模板只能作为骨架，需结合题目素材替换亮点句式，并使用连接词保持逻辑顺畅。',
+    analysis:
+      '建议准备 3 套开头与结尾模板，正文段结合题干信息重写论据，适当加入从句增强学术感。',
+    created_at: dayjs().subtract(2, 'day').toISOString(),
+    updated_at: dayjs().subtract(1, 'day').toISOString(),
+  },
+  {
+    id: 'wrong_math_series',
+    user_id: 'user_admin_1',
+    question: '级数敛散性判定中，比较判别法与极限比较判别法的使用顺序是什么？',
+    answer: '先尝试与常见的 p 级数或等比级数比较，若直接比较困难可转为极限比较判别法。',
+    analysis: '注意选择同阶无穷小函数进行比较，避免使用发散到无穷大的函数造成误判。',
+    created_at: dayjs().subtract(5, 'day').toISOString(),
+    updated_at: dayjs().subtract(5, 'day').toISOString(),
+  },
+];
+
 export const forumTopicsSeed = [
   {
     id: 'topic_ai_training',
@@ -487,6 +580,16 @@ export const forumLikesSeed = [
   { topic_id: 'topic_ai_training', user_id: 'user_student_1' },
   { topic_id: 'topic_ai_training', user_id: 'user_admin_1' },
   { topic_id: 'topic_material_share', user_id: 'user_student_1' },
+];
+
+export const aiConversationsSeed = [
+  {
+    user_id: 'user_student_1',
+    question: '英语作文模板有哪些？',
+    answer:
+      '建议准备“总分总”三段式结构：引入背景并提出观点；主体段分点展开并举例；结尾段呼应主题并给出展望或建议。',
+    created_at: dayjs().subtract(1, 'day').toISOString(),
+  },
 ];
 
 export const subjectMasterySeed = [

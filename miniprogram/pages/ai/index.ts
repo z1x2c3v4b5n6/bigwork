@@ -60,7 +60,7 @@ Page({
 
     try {
       const response = await apiRequest<{ answer: string }>({
-        path: '/api/ai/ask',
+        path: '/ai/ask',
         method: 'POST',
         data: { question },
       });
