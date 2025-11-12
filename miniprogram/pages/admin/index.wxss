@@ -72,6 +72,38 @@
   padding: 24rpx;
   display: flex;
   flex-direction: column;
+  gap: 24rpx;
+}
+
+.panel--loading,
+.panel--error {
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  min-height: 200rpx;
+  font-size: 26rpx;
+  color: #4d5b73;
+}
+
+.panel--error {
+  color: #b91c1c;
+}
+
+.panel-group .section {
+  background: #f8fbff;
+  border-radius: 20rpx;
+  padding: 24rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 20rpx;
+  border: 1rpx solid #dbe5f4;
+}
+
+.section__header,
+.section__toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   gap: 20rpx;
   border: 1rpx solid #dbe5f4;
 }
