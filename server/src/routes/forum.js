@@ -492,10 +492,12 @@ router.get('/topics', async (req, res) => {
         const postTopicColumn = qualifyColumn('fp', postConfig.topicId);
         const postTableName = quoteIdentifier(postConfig.tableName);
         const replyRows = await query(
-          `SELECT ${postTopicColumn} AS topic_id, COUNT(*) AS total`
-             FROM ${postTableName} fp
+          `
+            SELECT ${postTopicColumn} AS topic_id, COUNT(*) AS total
+            FROM ${postTableName} fp
             WHERE ${postTopicColumn} IN (${clause})
-            GROUP BY ${postTopicColumn}`,
+            GROUP BY ${postTopicColumn}
+          `,
           params,
         );
         replyCountMap = new Map(
@@ -514,10 +516,12 @@ router.get('/topics', async (req, res) => {
         const likeTopicColumn = qualifyColumn('fl', likeConfig.topicId);
         const likeTableName = quoteIdentifier(likeConfig.tableName);
         const likeRows = await query(
-          `SELECT ${likeTopicColumn} AS topic_id, COUNT(*) AS total`
-             FROM ${likeTableName} fl
+          `
+            SELECT ${likeTopicColumn} AS topic_id, COUNT(*) AS total
+            FROM ${likeTableName} fl
             WHERE ${likeTopicColumn} IN (${clause})
-            GROUP BY ${likeTopicColumn}`,
+            GROUP BY ${likeTopicColumn}
+          `,
           params,
         );
         likeCountMap = new Map(
@@ -537,10 +541,12 @@ router.get('/topics', async (req, res) => {
         const likedTableName = quoteIdentifier(likeConfig.tableName);
         const userIdColumn = qualifyColumn('fl', likeConfig.userId);
         const likedRows = await query(
-          `SELECT ${likedTopicColumn} AS topic_id`
-             FROM ${likedTableName} fl
+          `
+            SELECT ${likedTopicColumn} AS topic_id
+            FROM ${likedTableName} fl
             WHERE ${userIdColumn} = :userId
-              AND ${likedTopicColumn} IN (${clause})`,
+              AND ${likedTopicColumn} IN (${clause})
+          `,
           { ...params, userId: currentUserId },
         );
         likedSet = new Set(
