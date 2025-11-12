@@ -119,6 +119,18 @@ CREATE TABLE IF NOT EXISTS `practice_attempts` (
   CONSTRAINT `fk_practice_attempts_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+CREATE TABLE IF NOT EXISTS `wrong_questions` (
+  `id` VARCHAR(60) NOT NULL,
+  `user_id` VARCHAR(30) NOT NULL,
+  `question` TEXT NOT NULL,
+  `answer` TEXT,
+  `analysis` TEXT,
+  `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  CONSTRAINT `fk_wrong_questions_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 CREATE TABLE IF NOT EXISTS `schedule_events` (
   `id` VARCHAR(30) NOT NULL,
   `user_id` VARCHAR(30) NOT NULL,
@@ -132,6 +144,32 @@ CREATE TABLE IF NOT EXISTS `schedule_events` (
   `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   CONSTRAINT `fk_schedule_events_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS `daily_learning_tasks` (
+  `id` VARCHAR(40) NOT NULL,
+  `task_date` DATE NOT NULL,
+  `title` VARCHAR(200) NOT NULL,
+  `description` TEXT,
+  `target_text` VARCHAR(200) DEFAULT NULL,
+  `estimated_minutes` INT DEFAULT 45,
+  `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uniq_daily_task_date` (`task_date`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS `daily_task_completions` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `task_id` VARCHAR(40) NOT NULL,
+  `user_id` VARCHAR(30) NOT NULL,
+  `completed_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uniq_task_user` (`task_id`, `user_id`),
+  CONSTRAINT `fk_daily_task_completions_task` FOREIGN KEY (`task_id`) REFERENCES `daily_learning_tasks` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_daily_task_completions_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS `forum_topics` (
@@ -195,6 +233,17 @@ CREATE TABLE IF NOT EXISTS `weak_topics` (
   `suggestion` TEXT,
   PRIMARY KEY (`id`),
   CONSTRAINT `fk_weak_topics_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS `ai_conversations` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `user_id` VARCHAR(30) NOT NULL,
+  `question` TEXT NOT NULL,
+  `answer` LONGTEXT NOT NULL,
+  `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_ai_conversations_user` (`user_id`),
+  CONSTRAINT `fk_ai_conversations_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ------------------------------------------------------------

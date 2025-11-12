@@ -41,11 +41,23 @@
   color: #ffffff;
 }
 
+.hero__btn--accent {
+  background: rgba(250, 204, 21, 0.24);
+  color: #0b1f33;
+  font-weight: 600;
+}
+
 .section {
   background: #ffffff;
   border-radius: 24rpx;
   padding: 28rpx;
   box-shadow: 0 16rpx 36rpx rgba(15, 23, 42, 0.06);
+}
+
+.section--toolkit {
+  background: linear-gradient(135deg, rgba(15, 23, 42, 0.9), rgba(15, 118, 110, 0.85));
+  color: #f8fafc;
+  border: 1rpx solid rgba(94, 234, 212, 0.3);
 }
 
 .section__title {
@@ -181,6 +193,42 @@
   font-size: 26rpx;
   line-height: 1.6;
   color: #334155;
+}
+
+.section--toolkit .section__title {
+  color: #facc15;
+}
+
+.tool-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280rpx, 1fr));
+  gap: 20rpx;
+}
+
+.tool-card {
+  background: rgba(15, 23, 42, 0.6);
+  border-radius: 24rpx;
+  padding: 24rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 12rpx;
+  border: 1rpx solid rgba(45, 212, 191, 0.45);
+  color: #e2e8f0;
+}
+
+.tool-card__icon {
+  font-size: 40rpx;
+}
+
+.tool-card__title {
+  font-size: 30rpx;
+  font-weight: 600;
+}
+
+.tool-card__desc {
+  font-size: 24rpx;
+  color: rgba(226, 232, 240, 0.8);
+  line-height: 1.5;
 }
 
 .empty {

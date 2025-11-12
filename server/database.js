@@ -11,9 +11,13 @@ import {
   practiceQuestionsSeed,
   practiceAttemptsSeed,
   scheduleSeed,
+  dailyLearningTasksSeed,
+  dailyTaskCompletionsSeed,
+  wrongQuestionsSeed,
   forumTopicsSeed,
   forumCommentsSeed,
   forumLikesSeed,
+  aiConversationsSeed,
   subjectMasterySeed,
   analyticsOverviewSeed,
   weakTopicsSeed,
@@ -182,6 +186,47 @@ const createTables = async () => {
   `);
 
   await runQuery(`
+    CREATE TABLE IF NOT EXISTS wrong_questions (
+      id VARCHAR(60) PRIMARY KEY,
+      user_id VARCHAR(30) NOT NULL,
+      question TEXT NOT NULL,
+      answer TEXT,
+      analysis TEXT,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  `);
+
+  await runQuery(`
+    CREATE TABLE IF NOT EXISTS daily_learning_tasks (
+      id VARCHAR(40) PRIMARY KEY,
+      task_date DATE NOT NULL,
+      title VARCHAR(200) NOT NULL,
+      description TEXT,
+      target_text VARCHAR(200),
+      estimated_minutes INT DEFAULT 45,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      UNIQUE KEY uniq_daily_task_date (task_date)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  `);
+
+  await runQuery(`
+    CREATE TABLE IF NOT EXISTS daily_task_completions (
+      id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+      task_id VARCHAR(40) NOT NULL,
+      user_id VARCHAR(30) NOT NULL,
+      completed_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      UNIQUE KEY uniq_task_user (task_id, user_id),
+      FOREIGN KEY (task_id) REFERENCES daily_learning_tasks(id) ON DELETE CASCADE,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  `);
+
+  await runQuery(`
     CREATE TABLE IF NOT EXISTS schedule_events (
       id VARCHAR(30) PRIMARY KEY,
       user_id VARCHAR(30) NOT NULL,
@@ -262,6 +307,18 @@ const createTables = async () => {
       topic VARCHAR(200) NOT NULL,
       error_rate VARCHAR(20),
       suggestion TEXT,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  `);
+
+  await runQuery(`
+    CREATE TABLE IF NOT EXISTS ai_conversations (
+      id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+      user_id VARCHAR(30) NOT NULL,
+      question TEXT NOT NULL,
+      answer LONGTEXT NOT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      KEY idx_ai_conversations_user (user_id),
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `);
@@ -358,6 +415,28 @@ const seedDatabase = async () => {
     }
   }
 
+  const [{ count: dailyTaskCount }] = await runQuery('SELECT COUNT(*) as count FROM daily_learning_tasks');
+  if (dailyTaskCount === 0) {
+    for (const task of dailyLearningTasksSeed()) {
+      await runQuery(
+        `INSERT INTO daily_learning_tasks (id, task_date, title, description, target_text, estimated_minutes)
+         VALUES (:id, :task_date, :title, :description, :target_text, :estimated_minutes)`,
+        task,
+      );
+    }
+  }
+
+  const [{ count: completionCount }] = await runQuery('SELECT COUNT(*) as count FROM daily_task_completions');
+  if (completionCount === 0) {
+    for (const completion of dailyTaskCompletionsSeed()) {
+      await runQuery(
+        `INSERT INTO daily_task_completions (task_id, user_id, completed_at)
+         VALUES (:task_id, :user_id, :completed_at)`,
+        completion,
+      );
+    }
+  }
+
   const [{ count: topicCount }] = await runQuery('SELECT COUNT(*) as count FROM forum_topics');
   if (topicCount === 0) {
     for (const topic of forumTopicsSeed) {
@@ -381,6 +460,17 @@ const seedDatabase = async () => {
     }
   }
 
+  const [{ count: wrongQuestionCount }] = await runQuery('SELECT COUNT(*) as count FROM wrong_questions');
+  if (wrongQuestionCount === 0) {
+    for (const wrong of wrongQuestionsSeed) {
+      await runQuery(
+        `INSERT INTO wrong_questions (id, user_id, question, answer, analysis, created_at, updated_at)
+         VALUES (:id, :user_id, :question, :answer, :analysis, :created_at, :updated_at)`,
+        wrong,
+      );
+    }
+  }
+
   const [{ count: masteryCount }] = await runQuery('SELECT COUNT(*) as count FROM subject_mastery');
   if (masteryCount === 0) {
     for (const mastery of subjectMasterySeed) {
@@ -399,6 +489,17 @@ const seedDatabase = async () => {
         `INSERT INTO analytics_overview (user_id, mock_trend, time_distribution, behavior_insight)
          VALUES (:user_id, :mock_trend, :time_distribution, :behavior_insight)`,
         overview,
+      );
+    }
+  }
+
+  const [{ count: aiCount }] = await runQuery('SELECT COUNT(*) as count FROM ai_conversations');
+  if (aiCount === 0) {
+    for (const conversation of aiConversationsSeed) {
+      await runQuery(
+        `INSERT INTO ai_conversations (user_id, question, answer, created_at)
+         VALUES (:user_id, :question, :answer, :created_at)`,
+        conversation,
       );
     }
   }

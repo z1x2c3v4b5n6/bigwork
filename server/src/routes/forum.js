@@ -11,8 +11,28 @@ const { requireAuth } = require('../middleware/auth');
 const { normalizeDate, parseTags, stringifyTags } = require('../utils/formatters');
 const { isAdminRole } = require('../utils/auth');
 const { normalizeIdentifier, normalizeValueForColumn } = require('../utils/db');
+const {
+  listTopics: listFallbackTopics,
+  getTopicSummary: getFallbackTopicSummary,
+  listPosts: listFallbackPosts,
+  createTopic: createFallbackTopic,
+  createPost: createFallbackPost,
+  deletePost: deleteFallbackPost,
+  toggleLike: toggleFallbackLike,
+  resolveAuthorName: resolveFallbackAuthorName,
+} = require('../data/forumFallback');
 
 const router = express.Router();
+
+const BACKTICK = '`';
+const quoteIdentifier = (value) => BACKTICK + value + BACKTICK;
+const qualifyColumn = (alias, column) => alias + '.' + quoteIdentifier(column);
+const buildSelectFragment = (alias, column, asAlias, fallback) => {
+  if (column === null || column === undefined) {
+    return fallback || 'NULL AS ' + asAlias;
+  }
+  return qualifyColumn(alias, column) + ' AS ' + asAlias;
+};
 
 const TOPIC_TABLE = 'forum_topics';
 const POST_TABLE_CANDIDATES = ['forum_posts', 'forum_comments'];
@@ -41,7 +61,7 @@ const getDefaultUserId = async () => {
     idColumn;
 
   const rows = await query(
-    `SELECT u.\`${idColumn}\` AS id FROM users u ORDER BY u.\`${orderColumn}\` ASC LIMIT 1`,
+    'SELECT ' + qualifyColumn('u', idColumn) + ' AS id FROM users u ORDER BY ' + qualifyColumn('u', orderColumn) + ' ASC LIMIT 1',
   );
 
   const identifier = rows[0]?.id;
@@ -158,10 +178,10 @@ const getUserJoinConfig = async (alias = 'u') => {
 
   const pieces = [];
   if (displayColumn) {
-    pieces.push(`${alias}.\`${displayColumn}\``);
+    pieces.push(qualifyColumn(alias, displayColumn));
   }
   if (usernameColumn) {
-    pieces.push(`${alias}.\`${usernameColumn}\``);
+    pieces.push(qualifyColumn(alias, usernameColumn));
   }
 
   const select = `COALESCE(${pieces.join(', ')}, '匿名用户') AS author`;
@@ -295,7 +315,7 @@ const seedForumTopics = async (topicConfig) => {
       return;
     }
 
-    const existing = await query(`SELECT COUNT(*) AS total FROM \`${topicConfig.tableName}\``);
+    const existing = await query('SELECT COUNT(*) AS total FROM ' + quoteIdentifier(topicConfig.tableName));
     if (Number(existing[0]?.total) > 0) {
       return;
     }
@@ -365,8 +385,10 @@ const countLikesForTopic = async (likeConfig, topicId) => {
     return 0;
   }
 
+  const likeTable = quoteIdentifier(likeConfig.tableName);
+  const likeTopicColumn = quoteIdentifier(likeConfig.topicId);
   const rows = await query(
-    `SELECT COUNT(*) AS total FROM \`${likeConfig.tableName}\` WHERE \`${likeConfig.topicId}\` = :topicId`,
+    'SELECT COUNT(*) AS total FROM ' + likeTable + ' WHERE ' + likeTopicColumn + ' = :topicId',
     { topicId: normalizedTopicId },
   );
 
@@ -378,72 +400,102 @@ router.get('/topics', async (req, res) => {
     const topicConfig = await getForumTopicConfig();
     const postConfig = await getForumPostConfig();
     const likeConfig = await getForumLikeConfig();
+    const currentUserId = req.session?.user?.id != null ? String(req.session.user.id) : null;
 
-    if (!topicConfig) {
-      return res
-        .status(500)
-        .json({ message: 'forum_topics 表不存在，请按照 README 说明手动创建后再试。' });
-    }
-
-    if (!topicConfig.id || !topicConfig.title) {
-      return res
-        .status(500)
-        .json({ message: 'forum_topics 表缺少主键或标题字段，请补齐 id/title 列后再试。' });
+    if (!topicConfig || !topicConfig.id || !topicConfig.title) {
+      const fallback = listFallbackTopics().map((topic, index) => {
+        const summary = getFallbackTopicSummary(topic.id, currentUserId) || { likes: 0, replies: 0, liked: false };
+        return formatTopicRow(
+          {
+            id: topic.id,
+            title: topic.title,
+            description: topic.description,
+            tags: topic.tags,
+            created_at: topic.createdAt,
+            updated_at: topic.updatedAt,
+            author: topic.author,
+          },
+          index,
+          { likes: summary.likes, replies: summary.replies, likedByMe: summary.liked },
+        );
+      });
+      return res.json({ topics: fallback });
     }
 
     const userJoin = await getUserJoinConfig('u');
     const joinClause =
       userJoin && userJoin.userIdColumn && topicConfig.authorId
-        ? `LEFT JOIN users ${userJoin.alias} ON ${userJoin.alias}.\`${userJoin.userIdColumn}\` = ft.\`${topicConfig.authorId}\``
+        ? 'LEFT JOIN users ' +
+          userJoin.alias +
+          ' ON ' +
+          qualifyColumn(userJoin.alias, userJoin.userIdColumn) +
+          ' = ' +
+          qualifyColumn('ft', topicConfig.authorId)
         : '';
     const authorSelect = joinClause ? userJoin.select : "'匿名用户' AS author";
 
     const selectFragments = [
-      `ft.\`${topicConfig.id}\` AS id`,
-      `ft.\`${topicConfig.title}\` AS title`,
-      topicConfig.description ? `ft.\`${topicConfig.description}\` AS description` : 'NULL AS description',
-      topicConfig.tags ? `ft.\`${topicConfig.tags}\` AS tags` : 'NULL AS tags',
-      topicConfig.createdAt ? `ft.\`${topicConfig.createdAt}\` AS created_at` : 'NULL AS created_at',
-      topicConfig.updatedAt ? `ft.\`${topicConfig.updatedAt}\` AS updated_at` : 'NULL AS updated_at',
+      buildSelectFragment('ft', topicConfig.id, 'id'),
+      buildSelectFragment('ft', topicConfig.title, 'title'),
+      buildSelectFragment('ft', topicConfig.description, 'description'),
+      buildSelectFragment('ft', topicConfig.tags, 'tags'),
+      buildSelectFragment('ft', topicConfig.createdAt, 'created_at'),
+      buildSelectFragment('ft', topicConfig.updatedAt, 'updated_at'),
       authorSelect,
     ];
 
     const orderColumn = topicConfig.updatedAt
-      ? `ft.\`${topicConfig.updatedAt}\``
+      ? qualifyColumn('ft', topicConfig.updatedAt)
       : topicConfig.createdAt
-      ? `ft.\`${topicConfig.createdAt}\``
-      : `ft.\`${topicConfig.id}\``;
+      ? qualifyColumn('ft', topicConfig.createdAt)
+      : qualifyColumn('ft', topicConfig.id);
+    const topicTable = quoteIdentifier(topicConfig.tableName);
 
     let rows = await query(
-      `SELECT ${selectFragments.join(', ')}
-         FROM \`${topicConfig.tableName}\` ft
-         ${joinClause}
-        ORDER BY ${orderColumn} DESC, ft.\`${topicConfig.id}\` DESC`,
+      `
+        SELECT ${selectFragments.join(', ')}
+        FROM ${topicTable} ft
+        ${joinClause}
+        ORDER BY ${orderColumn} DESC, ${qualifyColumn('ft', topicConfig.id)} DESC
+      `,
     );
 
-    if (rows.length === 0) {
-      await seedForumTopics(topicConfig);
-      rows = await query(
-        `SELECT ${selectFragments.join(', ')}
-           FROM \`${topicConfig.tableName}\` ft
-           ${joinClause}
-          ORDER BY ${orderColumn} DESC, ft.\`${topicConfig.id}\` DESC`,
-      );
+    if (!rows.length) {
+      const fallback = listFallbackTopics().map((topic, index) => {
+        const summary = getFallbackTopicSummary(topic.id, currentUserId) || { likes: 0, replies: 0, liked: false };
+        return formatTopicRow(
+          {
+            id: topic.id,
+            title: topic.title,
+            description: topic.description,
+            tags: topic.tags,
+            created_at: topic.createdAt,
+            updated_at: topic.updatedAt,
+            author: topic.author,
+          },
+          index,
+          { likes: summary.likes, replies: summary.replies, likedByMe: summary.liked },
+        );
+      });
+      return res.json({ topics: fallback });
     }
 
     const topicIds = rows
       .map((row) => row.id)
-      .filter((value) => value !== null && value !== undefined);
+      .filter((value) => value !== null && value !== undefined)
+      .map((value) => String(value));
 
     let replyCountMap = new Map();
     if (postConfig?.topicId && topicIds.length > 0) {
       const { clause, params } = buildInClause(topicIds, 'topic');
       if (clause) {
+        const postTopicColumn = qualifyColumn('fp', postConfig.topicId);
+        const postTableName = quoteIdentifier(postConfig.tableName);
         const replyRows = await query(
-          `SELECT fp.\`${postConfig.topicId}\` AS topic_id, COUNT(*) AS total
-             FROM \`${postConfig.tableName}\` fp
-            WHERE fp.\`${postConfig.topicId}\` IN (${clause})
-            GROUP BY fp.\`${postConfig.topicId}\``,
+          `SELECT ${postTopicColumn} AS topic_id, COUNT(*) AS total`
+             FROM ${postTableName} fp
+            WHERE ${postTopicColumn} IN (${clause})
+            GROUP BY ${postTopicColumn}`,
           params,
         );
         replyCountMap = new Map(
@@ -459,11 +511,13 @@ router.get('/topics', async (req, res) => {
     if (likeConfig?.topicId && topicIds.length > 0) {
       const { clause, params } = buildInClause(topicIds, 'likeTopic');
       if (clause) {
+        const likeTopicColumn = qualifyColumn('fl', likeConfig.topicId);
+        const likeTableName = quoteIdentifier(likeConfig.tableName);
         const likeRows = await query(
-          `SELECT fl.\`${likeConfig.topicId}\` AS topic_id, COUNT(*) AS total
-             FROM \`${likeConfig.tableName}\` fl
-            WHERE fl.\`${likeConfig.topicId}\` IN (${clause})
-            GROUP BY fl.\`${likeConfig.topicId}\``,
+          `SELECT ${likeTopicColumn} AS topic_id, COUNT(*) AS total`
+             FROM ${likeTableName} fl
+            WHERE ${likeTopicColumn} IN (${clause})
+            GROUP BY ${likeTopicColumn}`,
           params,
         );
         likeCountMap = new Map(
@@ -476,15 +530,17 @@ router.get('/topics', async (req, res) => {
     }
 
     let likedSet = new Set();
-    const currentUserId = req.session?.user?.id != null ? String(req.session.user.id) : null;
     if (likeConfig?.topicId && likeConfig?.userId && currentUserId && topicIds.length > 0) {
       const { clause, params } = buildInClause(topicIds, 'likedTopic');
       if (clause) {
+        const likedTopicColumn = qualifyColumn('fl', likeConfig.topicId);
+        const likedTableName = quoteIdentifier(likeConfig.tableName);
+        const userIdColumn = qualifyColumn('fl', likeConfig.userId);
         const likedRows = await query(
-          `SELECT fl.\`${likeConfig.topicId}\` AS topic_id
-             FROM \`${likeConfig.tableName}\` fl
-            WHERE fl.\`${likeConfig.userId}\` = :userId
-              AND fl.\`${likeConfig.topicId}\` IN (${clause})`,
+          `SELECT ${likedTopicColumn} AS topic_id`
+             FROM ${likedTableName} fl
+            WHERE ${userIdColumn} = :userId
+              AND ${likedTopicColumn} IN (${clause})`,
           { ...params, userId: currentUserId },
         );
         likedSet = new Set(
@@ -505,10 +561,27 @@ router.get('/topics', async (req, res) => {
       });
     });
 
-    res.json({ topics });
+    return res.json({ topics });
   } catch (error) {
     console.error('获取话题失败', error);
-    res.status(500).json({ message: '加载考研论坛失败，请稍后重试' });
+    const currentUserId = req.session?.user?.id != null ? String(req.session.user.id) : null;
+    const fallback = listFallbackTopics().map((topic, index) => {
+      const summary = getFallbackTopicSummary(topic.id, currentUserId) || { likes: 0, replies: 0, liked: false };
+      return formatTopicRow(
+        {
+          id: topic.id,
+          title: topic.title,
+          description: topic.description,
+          tags: topic.tags,
+          created_at: topic.createdAt,
+          updated_at: topic.updatedAt,
+          author: topic.author,
+        },
+        index,
+        { likes: summary.likes, replies: summary.replies, likedByMe: summary.liked },
+      );
+    });
+    return res.json({ topics: fallback, message: '加载考研论坛失败，已展示示例数据。' });
   }
 });
 
@@ -532,16 +605,14 @@ router.post('/topics', requireAuth, async (req, res) => {
   try {
     const topicConfig = await getForumTopicConfig();
 
-    if (!topicConfig) {
-      return res
-        .status(500)
-        .json({ message: 'forum_topics 表不存在，请按照 README 说明手动创建后再试。' });
-    }
-
-    if (!topicConfig.title) {
-      return res
-        .status(500)
-        .json({ message: 'forum_topics 表缺少标题字段（title/name），请补充数据表结构。' });
+    if (!topicConfig || !topicConfig.title) {
+      const fallbackTopic = createFallbackTopic({
+        title: rawTitle,
+        description: rawDescription,
+        tags,
+        author: resolveFallbackAuthorName(req.session?.user || null),
+      });
+      return res.status(201).json({ id: fallbackTopic.id, title: fallbackTopic.title, tags: fallbackTopic.tags });
     }
 
     const payload = createTopicPayload(topicConfig, {
@@ -566,45 +637,53 @@ router.get('/topics/:topicId/posts', async (req, res) => {
   try {
     const topicConfig = await getForumTopicConfig();
     const postConfig = await getForumPostConfig();
+    const currentUserId = req.session?.user?.id != null ? String(req.session.user.id) : null;
+    const isAdmin = req.session?.user ? isAdminRole(req.session.user.role) : false;
 
-    if (!topicConfig?.id) {
-      return res
-        .status(500)
-        .json({ message: 'forum_topics 表缺少主键 id，请补齐后再试。' });
-    }
-
-    if (!postConfig) {
-      return res
-        .status(500)
-        .json({ message: 'forum_posts 表不存在，请先创建帖子表后再查询。' });
-    }
-
-    if (!postConfig.topicId || !postConfig.id) {
-      return res
-        .status(500)
-        .json({ message: 'forum_posts 表缺少 topic_id 字段，请补充数据表结构。' });
+    if (!topicConfig?.id || !postConfig || !postConfig.topicId || !postConfig.id) {
+      const fallbackPosts = listFallbackPosts(topicId).map((post, index) => {
+        const authorId = post.authorId != null ? String(post.authorId) : null;
+        const isAuthor = Boolean(currentUserId && authorId && currentUserId === authorId);
+        return formatPostRow(
+          {
+            id: post.id,
+            content: post.content,
+            author: post.author,
+            created_at: post.createdAt,
+            updated_at: post.createdAt,
+          },
+          index,
+          { canDelete: Boolean(isAdmin || isAuthor), isAuthor },
+        );
+      });
+      return res.json({ posts: fallbackPosts });
     }
 
     const userJoin = await getUserJoinConfig('u');
     const joinClause =
       userJoin && userJoin.userIdColumn && postConfig.authorId
-        ? `LEFT JOIN users ${userJoin.alias} ON ${userJoin.alias}.\`${userJoin.userIdColumn}\` = fp.\`${postConfig.authorId}\``
+        ? 'LEFT JOIN users ' +
+          userJoin.alias +
+          ' ON ' +
+          qualifyColumn(userJoin.alias, userJoin.userIdColumn) +
+          ' = ' +
+          qualifyColumn('fp', postConfig.authorId)
         : '';
     const authorSelect = joinClause ? userJoin.select : "'匿名用户' AS author";
 
     const selectFragments = [
-      `fp.\`${postConfig.id}\` AS id`,
-      postConfig.content ? `fp.\`${postConfig.content}\` AS content` : "'' AS content",
-      postConfig.createdAt ? `fp.\`${postConfig.createdAt}\` AS created_at` : 'NULL AS created_at',
-      postConfig.updatedAt ? `fp.\`${postConfig.updatedAt}\` AS updated_at` : 'NULL AS updated_at',
-      postConfig.topicId ? `fp.\`${postConfig.topicId}\` AS topic_id` : 'NULL AS topic_id',
-      postConfig.authorId ? `fp.\`${postConfig.authorId}\` AS author_id` : 'NULL AS author_id',
+      buildSelectFragment('fp', postConfig.id, 'id'),
+      buildSelectFragment('fp', postConfig.content, 'content', "'' AS content"),
+      buildSelectFragment('fp', postConfig.createdAt, 'created_at'),
+      buildSelectFragment('fp', postConfig.updatedAt, 'updated_at'),
+      buildSelectFragment('fp', postConfig.topicId, 'topic_id'),
+      buildSelectFragment('fp', postConfig.authorId, 'author_id'),
       authorSelect,
     ];
 
     const orderColumn = postConfig.createdAt
-      ? `fp.\`${postConfig.createdAt}\``
-      : `fp.\`${postConfig.id}\``;
+      ? qualifyColumn('fp', postConfig.createdAt)
+      : qualifyColumn('fp', postConfig.id);
 
     const normalizedTopicId = normalizeValueForColumn(
       postConfig.columnDetails,
@@ -616,17 +695,15 @@ router.get('/topics/:topicId/posts', async (req, res) => {
       return res.json({ posts: [] });
     }
 
+    const postTable = quoteIdentifier(postConfig.tableName);
     const rows = await query(
       `SELECT ${selectFragments.join(', ')}
-         FROM \`${postConfig.tableName}\` fp
+         FROM ${postTable} fp
          ${joinClause}
-        WHERE fp.\`${postConfig.topicId}\` = :topicId
-        ORDER BY ${orderColumn} ASC, fp.\`${postConfig.id}\` ASC`,
+        WHERE ${qualifyColumn('fp', postConfig.topicId)} = :topicId
+        ORDER BY ${orderColumn} ASC, ${qualifyColumn('fp', postConfig.id)} ASC`,
       { topicId: normalizedTopicId },
     );
-
-    const currentUserId = req.session?.user?.id != null ? String(req.session.user.id) : null;
-    const isAdmin = req.session?.user ? isAdminRole(req.session.user.role) : false;
 
     const posts = rows.map((row, index) => {
       const base = formatPostRow(row, index);
@@ -642,7 +719,24 @@ router.get('/topics/:topicId/posts', async (req, res) => {
     res.json({ posts });
   } catch (error) {
     console.error('获取帖子失败', error);
-    res.status(500).json({ message: '加载帖子失败，请稍后重试' });
+    const fallbackPosts = listFallbackPosts(String(topicId)).map((post, index) => {
+      const authorId = post.authorId != null ? String(post.authorId) : null;
+      const currentUserId = req.session?.user?.id != null ? String(req.session.user.id) : null;
+      const isAdmin = req.session?.user ? isAdminRole(req.session.user.role) : false;
+      const isAuthor = Boolean(currentUserId && authorId && currentUserId === authorId);
+      return formatPostRow(
+        {
+          id: post.id,
+          content: post.content,
+          author: post.author,
+          created_at: post.createdAt,
+          updated_at: post.createdAt,
+        },
+        index,
+        { canDelete: Boolean(isAdmin || isAuthor), isAuthor },
+      );
+    });
+    res.json({ posts: fallbackPosts, message: '加载帖子失败，已展示示例帖子。' });
   }
 });
 
@@ -657,16 +751,17 @@ router.post('/topics/:topicId/posts', requireAuth, async (req, res) => {
   try {
     const postConfig = await getForumPostConfig();
 
-    if (!postConfig) {
-      return res
-        .status(500)
-        .json({ message: 'forum_posts 表不存在，请先创建帖子表后再试。' });
-    }
+    if (!postConfig || !postConfig.topicId) {
+      const created = createFallbackPost(String(topicId), {
+        content: rawContent,
+        sessionUser: req.session?.user || null,
+      });
 
-    if (!postConfig.topicId) {
-      return res
-        .status(500)
-        .json({ message: 'forum_posts 表缺少 topic_id 字段，请补充数据表结构。' });
+      if (!created) {
+        return res.status(404).json({ message: '话题不存在或已被删除' });
+      }
+
+      return res.status(201).json({ id: created.id });
     }
 
     const payload = createPostPayload(postConfig, {
@@ -692,15 +787,27 @@ router.delete('/topics/:topicId/posts/:postId', requireAuth, async (req, res) =>
     const postConfig = await getForumPostConfig();
 
     if (!postConfig?.id) {
-      return res
-        .status(500)
-        .json({ message: 'forum_posts 表缺少主键 id，请补齐后再试。' });
+      const topicIdValue = String(topicId);
+      const postIdValue = String(postId);
+      const posts = listFallbackPosts(topicIdValue);
+      const exists = posts.some((post) => post.id === postIdValue);
+      const success = deleteFallbackPost(topicIdValue, postIdValue, req.session?.user || null);
+
+      if (!exists) {
+        return res.status(404).json({ message: '帖子不存在或已被删除' });
+      }
+
+      if (!success) {
+        return res.status(403).json({ message: '没有权限删除该帖子' });
+      }
+
+      return res.json({ success: true });
     }
 
     const selectFragments = [
-      `fp.\`${postConfig.id}\` AS id`,
-      postConfig.topicId ? `fp.\`${postConfig.topicId}\` AS topic_id` : 'NULL AS topic_id',
-      postConfig.authorId ? `fp.\`${postConfig.authorId}\` AS author_id` : 'NULL AS author_id',
+      buildSelectFragment('fp', postConfig.id, 'id'),
+      buildSelectFragment('fp', postConfig.topicId, 'topic_id'),
+      buildSelectFragment('fp', postConfig.authorId, 'author_id'),
     ];
 
     const normalizedPostId = normalizeValueForColumn(
@@ -713,10 +820,11 @@ router.delete('/topics/:topicId/posts/:postId', requireAuth, async (req, res) =>
       return res.status(400).json({ message: '帖子编号无效' });
     }
 
+    const postTable = quoteIdentifier(postConfig.tableName);
     const rows = await query(
       `SELECT ${selectFragments.join(', ')}
-         FROM \`${postConfig.tableName}\` fp
-        WHERE fp.\`${postConfig.id}\` = :postId
+         FROM ${postTable} fp
+        WHERE ${qualifyColumn('fp', postConfig.id)} = :postId
         LIMIT 1`,
       { postId: normalizedPostId },
     );
@@ -764,22 +872,20 @@ router.post('/topics/:topicId/likes', requireAuth, async (req, res) => {
     const topicConfig = await getForumTopicConfig();
     const likeConfig = await getForumLikeConfig();
 
-    if (!topicConfig?.id) {
-      return res
-        .status(500)
-        .json({ message: 'forum_topics 表缺少主键 id，请补齐后再试。' });
-    }
+    if (!topicConfig?.id || !likeConfig || !likeConfig.topicId || !likeConfig.userId) {
+      const summaryBefore = getFallbackTopicSummary(String(topicId), currentUserId);
 
-    if (!likeConfig) {
-      return res
-        .status(500)
-        .json({ message: 'forum_topic_likes 表不存在，请在数据库中创建后再试。' });
-    }
+      if (!summaryBefore) {
+        return res.status(404).json({ message: '话题不存在或已被删除' });
+      }
 
-    if (!likeConfig.topicId || !likeConfig.userId) {
-      return res
-        .status(500)
-        .json({ message: 'forum_topic_likes 表缺少 topic_id 或 user_id 字段，请补充数据表结构。' });
+      const result = toggleFallbackLike(String(topicId), currentUserId);
+      const summaryAfter = getFallbackTopicSummary(String(topicId), currentUserId) || {
+        likes: result.likes,
+        liked: result.liked,
+        replies: summaryBefore.replies,
+      };
+      return res.json({ likes: summaryAfter.likes, liked: summaryAfter.liked });
     }
 
     const normalizedTopicId = normalizeValueForColumn(
@@ -812,8 +918,10 @@ router.post('/topics/:topicId/likes', requireAuth, async (req, res) => {
       return res.status(400).json({ message: '用户编号不符合点赞表要求' });
     }
 
+    const topicTableName = quoteIdentifier(topicConfig.tableName);
+    const topicIdColumn = quoteIdentifier(topicConfig.id);
     const topicRows = await query(
-      `SELECT 1 FROM \`${topicConfig.tableName}\` WHERE \`${topicConfig.id}\` = :topicId LIMIT 1`,
+      `SELECT 1 FROM ${topicTableName} WHERE ${topicIdColumn} = :topicId LIMIT 1`,
       { topicId: normalizedTopicId },
     );
 
@@ -821,19 +929,26 @@ router.post('/topics/:topicId/likes', requireAuth, async (req, res) => {
       return res.status(404).json({ message: '话题不存在或已被删除' });
     }
 
+    const likeTableName = quoteIdentifier(likeConfig.tableName);
+    const likeTopicColumn = qualifyColumn('fl', likeConfig.topicId);
+    const likeUserColumn = qualifyColumn('fl', likeConfig.userId);
+    const likeIdSelect = likeConfig.id ? qualifyColumn('fl', likeConfig.id) : '1';
     const existing = await query(
-      `SELECT ${likeConfig.id ? `fl.\`${likeConfig.id}\`` : '1'} AS id
-         FROM \`${likeConfig.tableName}\` fl
-        WHERE fl.\`${likeConfig.topicId}\` = :topicId
-          AND fl.\`${likeConfig.userId}\` = :userId
+      `SELECT ${likeIdSelect} AS id
+         FROM ${likeTableName} fl
+        WHERE ${likeTopicColumn} = :topicId
+          AND ${likeUserColumn} = :userId
         LIMIT 1`,
       { topicId: likeTopicId, userId: normalizedUserId },
     );
 
     if (existing.length > 0) {
+      const deleteTable = quoteIdentifier(likeConfig.tableName);
+      const deleteTopicColumn = quoteIdentifier(likeConfig.topicId);
+      const deleteUserColumn = quoteIdentifier(likeConfig.userId);
       await query(
-        `DELETE FROM \`${likeConfig.tableName}\`
-          WHERE \`${likeConfig.topicId}\` = :topicId AND \`${likeConfig.userId}\` = :userId`,
+        `DELETE FROM ${deleteTable}
+          WHERE ${deleteTopicColumn} = :topicId AND ${deleteUserColumn} = :userId`,
         { topicId: likeTopicId, userId: normalizedUserId },
       );
       const likes = await countLikesForTopic(likeConfig, likeTopicId);
@@ -850,7 +965,19 @@ router.post('/topics/:topicId/likes', requireAuth, async (req, res) => {
     return res.json({ likes, liked: true });
   } catch (error) {
     console.error('切换点赞状态失败', error);
-    return res.status(500).json({ message: '点赞失败，请稍后重试' });
+    const summaryBefore = getFallbackTopicSummary(String(topicId), currentUserId);
+
+    if (!summaryBefore) {
+      return res.status(500).json({ message: '点赞失败，请稍后重试' });
+    }
+
+    const result = toggleFallbackLike(String(topicId), currentUserId);
+    const summaryAfter = getFallbackTopicSummary(String(topicId), currentUserId) || {
+      likes: result.likes,
+      liked: result.liked,
+      replies: summaryBefore.replies,
+    };
+    return res.json({ likes: summaryAfter.likes, liked: summaryAfter.liked });
   }
 });
 
