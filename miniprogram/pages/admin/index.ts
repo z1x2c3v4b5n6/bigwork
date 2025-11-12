@@ -15,7 +15,41 @@ import {
   adminStudentProgressSeed,
   adminUsersSeed,
 } from '../../data/admin';
-import { apiRequest, type ApiError } from '../../utils/api';
+import {
+  createAdminUser,
+  createCourse,
+  createMajor,
+  createMaterial,
+  deleteAdminUser,
+  deleteCourse,
+  deleteForumPost,
+  deleteForumTopic,
+  deleteMajor,
+  deleteMaterial,
+  fetchAdminDashboard,
+  fetchAdminSettings,
+  fetchAdminStatistics,
+  fetchAdminUsers,
+  fetchCourses,
+  fetchForumPosts,
+  fetchForumTopics,
+  fetchMajors,
+  fetchMaterials,
+  searchAdminData,
+  updateAdminSettings,
+  updateAdminUser,
+  type AdminSearchResult,
+  type AdminUser,
+  type AuditLogRow,
+  type CourseRecord,
+  type ForumPost,
+  type ForumTopic,
+  type MajorRecord,
+  type MaterialRecord,
+  type StatisticsOverview,
+  type StudentProgressRow,
+} from '../../services/admin';
+import { type ApiError } from '../../utils/api';
 import { ensureSession } from '../../utils/session';
 
 type AdminTab =
@@ -30,56 +64,6 @@ type AdminTab =
   | 'statistics';
 
 type MetricCard = { id: string; label: string; value: number };
-
-type StudentProgressRow = {
-  id: number;
-  name: string;
-  university: string;
-  studyHours: number;
-  completion: number;
-};
-
-type AuditLogRow = {
-  id: number;
-  title: string;
-  description: string;
-  actor?: string;
-  created_at?: string | null;
-};
-
-type AdminUser = {
-  id: number;
-  username: string;
-  displayName: string;
-  role: string;
-  email: string | null;
-  created_at?: string | null;
-};
-
-type MajorRecord = {
-  id: number;
-  name: string;
-  description: string | null;
-};
-
-type CourseRecord = {
-  id: number;
-  title: string;
-  teacher: string | null;
-  credit: number | null;
-  description: string | null;
-  majorId: number | null;
-  majorName?: string | null;
-};
-
-type MaterialRecord = {
-  id: number;
-  title: string;
-  description: string | null;
-  fileUrl: string | null;
-  courseId: number | null;
-  courseTitle?: string | null;
-};
 
 type MobileFieldNote = {
   id: string;
@@ -98,40 +82,6 @@ type MobileToolkitInsight = {
   id: string;
   title: string;
   description: string;
-};
-
-type ForumTopic = {
-  id: number;
-  title: string;
-  description: string | null;
-  created_at?: string | null;
-  updated_at?: string | null;
-};
-
-type ForumPost = {
-  id: number;
-  content: string;
-  author?: string;
-  created_at?: string | null;
-  updated_at?: string | null;
-};
-
-type StatisticsOverview = {
-  totalUsers: number;
-  totalMajors: number;
-  totalCourses: number;
-  totalMaterials: number;
-  totalPracticeSets: number;
-  totalForumPosts: number;
-  lastUpdatedAt: string | null;
-};
-
-type AdminSearchResult = {
-  users: AdminUser[];
-  majors: MajorRecord[];
-  courses: CourseRecord[];
-  materials: MaterialRecord[];
-  forumTopics: { id: number; title: string; description: string | null }[];
 };
 
 type UserForm = {
@@ -685,15 +635,8 @@ Page({
     });
 
     try {
-      const response = await apiRequest<{
-        metrics?: Partial<Record<string, number>>;
-        studentProgress?: StudentProgressRow[];
-        auditLogs?: AuditLogRow[];
-        administrators?: string[];
-        securityNote?: string;
-      }>({ path: '/admin/dashboard' });
-
-      const metrics = response.metrics ?? {};
+      const dashboard = await fetchAdminDashboard();
+      const metrics = dashboard.metrics ?? { activeStudents: 0, tasksCompletedToday: 0, followUpsPending: 0, systemAlerts: 0 };
       const metricsCards: MetricCard[] = [
         { id: 'activeStudents', label: '活跃学员', value: metrics.activeStudents ?? 0 },
         { id: 'tasksCompletedToday', label: '今日完成任务', value: metrics.tasksCompletedToday ?? 0 },
@@ -703,10 +646,10 @@ Page({
 
       this.setData({
         metricsCards,
-        studentProgress: Array.isArray(response.studentProgress) ? response.studentProgress : [],
-        auditLogs: Array.isArray(response.auditLogs) ? response.auditLogs : [],
-        administrators: Array.isArray(response.administrators) ? response.administrators : [],
-        dashboardNote: response.securityNote || '',
+        studentProgress: Array.isArray(dashboard.studentProgress) ? dashboard.studentProgress : [],
+        auditLogs: Array.isArray(dashboard.auditLogs) ? dashboard.auditLogs : [],
+        administrators: Array.isArray(dashboard.administrators) ? dashboard.administrators : [],
+        dashboardNote: dashboard.securityNote || '',
         'loadedTabs.overview': true,
       });
       this.refreshMobileToolkitInsights();
@@ -738,8 +681,8 @@ Page({
     });
 
     try {
-      const response = await apiRequest<{ settings?: Record<string, string> }>({ path: '/admin/settings' });
-      const form = createSettingsForm(response?.settings ?? {});
+      const settings = await fetchAdminSettings();
+      const form = createSettingsForm(settings);
       this.setData({
         settingsForm: form,
         'loadedTabs.settings': true,
@@ -792,16 +735,10 @@ Page({
     });
 
     try {
-      await apiRequest({
-        path: '/admin/settings',
-        method: 'PUT',
-        data: {
-          settings: {
-            platform_name: platformName,
-            support_email: supportEmail,
-            security_note: securityNote,
-          },
-        },
+      await updateAdminSettings({
+        platform_name: platformName,
+        support_email: supportEmail,
+        security_note: securityNote,
       });
       this.setData({ settingsMessage: '设置已保存。' });
       wx.showToast({ title: '已保存', icon: 'success' });
@@ -817,9 +754,9 @@ Page({
     this.setData({ 'sectionLoading.users': true, 'sectionErrors.users': '' });
 
     try {
-      const response = await apiRequest<{ users?: AdminUser[] }>({ path: '/admin/users' });
+      const users = await fetchAdminUsers();
       this.setData({
-        users: Array.isArray(response.users) ? response.users : [],
+        users,
         'loadedTabs.users': true,
       });
     } catch (error) {
@@ -893,16 +830,12 @@ Page({
     this.setData({ userSubmitting: true, userFormError: '' });
 
     try {
-      await apiRequest({
-        path: '/admin/users',
-        method: 'POST',
-        data: {
-          username: form.username.trim(),
-          password: form.password.trim(),
-          displayName: form.displayName.trim(),
-          email: form.email.trim() || undefined,
-          role: form.role,
-        },
+      await createAdminUser({
+        username: form.username.trim(),
+        password: form.password.trim(),
+        displayName: form.displayName.trim(),
+        email: form.email.trim() || undefined,
+        role: form.role,
       });
       wx.showToast({ title: '已创建', icon: 'success' });
       this.closeUserForm();
@@ -930,7 +863,7 @@ Page({
     this.setData({ updatingUserId: id });
 
     try {
-      await apiRequest({ path: `/admin/users/${id}`, method: 'PUT', data: { role } });
+      await updateAdminUser(id, { role });
       this.setData({
         users: this.data.users.map((user) => (user.id === id ? { ...user, role } : user)),
       });
@@ -961,7 +894,7 @@ Page({
     }
 
     try {
-      await apiRequest({ path: `/admin/users/${id}`, method: 'DELETE' });
+      await deleteAdminUser(id);
       wx.showToast({ title: '已删除', icon: 'success' });
       await this.loadUsers();
     } catch (error) {
@@ -973,8 +906,7 @@ Page({
     this.setData({ 'sectionLoading.majors': true, 'sectionErrors.majors': '' });
 
     try {
-      const response = await apiRequest<{ majors?: MajorRecord[] }>({ path: '/admin/majors' });
-      const majors = Array.isArray(response.majors) ? response.majors : [];
+      const majors = await fetchMajors();
       this.setData({
         majors,
         'loadedTabs.majors': true,
@@ -1035,13 +967,9 @@ Page({
     this.setData({ majorSubmitting: true, majorFormError: '' });
 
     try {
-      await apiRequest({
-        path: '/admin/majors',
-        method: 'POST',
-        data: {
-          name: form.name.trim(),
-          description: form.description.trim() || undefined,
-        },
+      await createMajor({
+        name: form.name.trim(),
+        description: form.description.trim() || undefined,
       });
       wx.showToast({ title: '已创建', icon: 'success' });
       this.closeMajorForm();
@@ -1072,7 +1000,7 @@ Page({
     }
 
     try {
-      await apiRequest({ path: `/admin/majors/${id}`, method: 'DELETE' });
+      await deleteMajor(id);
       wx.showToast({ title: '已删除', icon: 'success' });
       await this.loadMajors();
       if (this.data.loadedTabs.courses) {
@@ -1111,8 +1039,7 @@ Page({
         await this.loadMajors();
       }
 
-      const response = await apiRequest<{ courses?: CourseRecord[] }>({ path: '/admin/courses' });
-      const courses = Array.isArray(response.courses) ? response.courses : [];
+      const courses = await fetchCourses();
       this.setData({
         courses,
         coursesForMaterials: courses,
@@ -1211,16 +1138,13 @@ Page({
     this.setData({ courseSubmitting: true, courseFormError: '' });
 
     try {
-      await apiRequest({
-        path: '/admin/courses',
-        method: 'POST',
-        data: {
-          title: form.title.trim(),
-          teacher: form.teacher.trim() || undefined,
-          credit: creditValue,
-          description: form.description.trim() || undefined,
-          majorId: form.majorId,
-        },
+      const majorIdNumber = Number(form.majorId);
+      await createCourse({
+        title: form.title.trim(),
+        teacher: form.teacher.trim() || undefined,
+        credit: creditValue,
+        description: form.description.trim() || undefined,
+        majorId: Number.isNaN(majorIdNumber) ? undefined : majorIdNumber,
       });
       wx.showToast({ title: '已创建', icon: 'success' });
       this.closeCourseForm();
@@ -1251,7 +1175,7 @@ Page({
     }
 
     try {
-      await apiRequest({ path: `/admin/courses/${id}`, method: 'DELETE' });
+      await deleteCourse(id);
       wx.showToast({ title: '已删除', icon: 'success' });
       await this.loadCourses();
     } catch (error) {
@@ -1287,9 +1211,9 @@ Page({
         await this.loadCourses();
       }
 
-      const response = await apiRequest<{ materials?: MaterialRecord[] }>({ path: '/admin/materials' });
+      const materials = await fetchMaterials();
       this.setData({
-        materials: Array.isArray(response.materials) ? response.materials : [],
+        materials,
         'loadedTabs.materials': true,
       });
     } catch (error) {
@@ -1372,15 +1296,13 @@ Page({
     this.setData({ materialSubmitting: true, materialFormError: '' });
 
     try {
-      await apiRequest({
-        path: '/admin/materials',
-        method: 'POST',
-        data: {
-          title: form.title.trim(),
-          description: form.description.trim() || undefined,
-          fileUrl: form.fileUrl.trim() || undefined,
-          courseId: form.courseId || undefined,
-        },
+      const courseIdNumber = form.courseId ? Number(form.courseId) : undefined;
+      await createMaterial({
+        title: form.title.trim(),
+        description: form.description.trim() || undefined,
+        fileUrl: form.fileUrl.trim() || undefined,
+        courseId:
+          courseIdNumber !== undefined && !Number.isNaN(courseIdNumber) ? courseIdNumber : undefined,
       });
       wx.showToast({ title: '已创建', icon: 'success' });
       this.closeMaterialForm();
@@ -1411,7 +1333,7 @@ Page({
     }
 
     try {
-      await apiRequest({ path: `/admin/materials/${id}`, method: 'DELETE' });
+      await deleteMaterial(id);
       wx.showToast({ title: '已删除', icon: 'success' });
       await this.loadMaterials();
     } catch (error) {
@@ -1423,8 +1345,7 @@ Page({
     this.setData({ 'sectionLoading.forum': true, 'sectionErrors.forum': '', forumPostsError: '' });
 
     try {
-      const response = await apiRequest<{ topics?: ForumTopic[] }>({ path: '/admin/forum/topics' });
-      const topics = Array.isArray(response.topics) ? response.topics : [];
+      const topics = await fetchForumTopics();
       let selectedTopicId = this.data.selectedTopicId;
       if (!selectedTopicId && topics.length > 0) {
         selectedTopicId = String(topics[0].id);
@@ -1464,10 +1385,8 @@ Page({
     this.setData({ forumPostsLoading: true, forumPostsError: '' });
 
     try {
-      const response = await apiRequest<{ posts?: ForumPost[] }>({
-        path: `/admin/forum/topics/${topicId}/posts`,
-      });
-      this.setData({ forumPosts: Array.isArray(response.posts) ? response.posts : [] });
+      const posts = await fetchForumPosts(topicId);
+      this.setData({ forumPosts: posts });
     } catch (error) {
       const message = getErrorMessage(error, '无法加载帖子列表。');
       if (isUnauthorizedError(error)) {
@@ -1510,7 +1429,7 @@ Page({
     }
 
     try {
-      await apiRequest({ path: `/admin/forum/topics/${topicId}`, method: 'DELETE' });
+      await deleteForumTopic(topicId);
       wx.showToast({ title: '已删除', icon: 'success' });
       await this.loadForum();
     } catch (error) {
@@ -1537,7 +1456,7 @@ Page({
     }
 
     try {
-      await apiRequest({ path: `/admin/forum/posts/${postId}`, method: 'DELETE' });
+      await deleteForumPost(postId);
       wx.showToast({ title: '已删除', icon: 'success' });
       await this.loadForumPosts(topicId);
       await this.loadForum();
@@ -1849,8 +1768,8 @@ Page({
     this.setData({ 'sectionLoading.statistics': true, 'sectionErrors.statistics': '' });
 
     try {
-      const response = await apiRequest<StatisticsOverview>({ path: '/admin/statistics/overview' });
-      this.setData({ statistics: response, 'loadedTabs.statistics': true });
+      const statistics = await fetchAdminStatistics();
+      this.setData({ statistics, 'loadedTabs.statistics': true });
     } catch (error) {
       const message = getErrorMessage(error, '无法加载统计信息。');
       if (isUnauthorizedError(error)) {
@@ -1894,18 +1813,8 @@ Page({
     this.setData({ statisticsSearchLoading: true, statisticsSearchError: '' });
 
     try {
-      const result = await apiRequest<AdminSearchResult>({
-        path: '/admin/statistics/search',
-        data: { keyword },
-      });
-      const sanitized: AdminSearchResult = {
-        users: Array.isArray(result?.users) ? result.users : [],
-        majors: Array.isArray(result?.majors) ? result.majors : [],
-        courses: Array.isArray(result?.courses) ? result.courses : [],
-        materials: Array.isArray(result?.materials) ? result.materials : [],
-        forumTopics: Array.isArray(result?.forumTopics) ? result.forumTopics : [],
-      };
-      this.setData({ statisticsSearchResult: sanitized });
+      const result = await searchAdminData(keyword);
+      this.setData({ statisticsSearchResult: result });
     } catch (error) {
       this.setData({
         statisticsSearchError: getErrorMessage(error, '查询失败，请稍后再试。'),
