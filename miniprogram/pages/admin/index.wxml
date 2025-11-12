@@ -1,43 +1,635 @@
-<view class="page">
-  <view class="section">
-    <view class="section__title">后台管理总览</view>
-    <view class="section__subtitle">掌握课程、题库、用户数据与外部资讯入口。</view>
-    <view class="metric-grid">
-      <block wx:for="{{metrics}}" wx:key="id">
-        <view class="metric-card">
-          <view class="metric-card__value">{{item.value}}</view>
-          <view class="metric-card__label">{{item.label}}</view>
+
+<view class="admin-page">
+  <view class="admin-tabs">
+    <block wx:for="{{tabs}}" wx:key="id">
+      <view
+        class="admin-tabs__item {{activeTab === item.id ? 'is-active' : ''}}"
+        data-tab="{{item.id}}"
+        bindtap="switchTab"
+      >
+        {{item.label}}
+      </view>
+    </block>
+  </view>
+
+  <view wx:if="{{globalError}}" class="alert alert--error">{{globalError}}</view>
+
+  <view wx:if="{{activeTab === 'overview'}}">
+    <view wx:if="{{sectionLoading.overview}}" class="panel panel--loading">正在加载后台概览…</view>
+    <view wx:elif="{{sectionErrors.overview}}" class="panel panel--error">
+      <text>{{sectionErrors.overview}}</text>
+      <button size="mini" data-tab="overview" bindtap="retrySection">重试</button>
+    </view>
+    <view wx:else class="panel-group">
+      <view class="section">
+        <view class="section__header">
+          <view class="section__title">核心指标</view>
         </view>
-      </block>
+        <view class="metric-grid">
+          <block wx:for="{{metricsCards}}" wx:key="id">
+            <view class="metric-card">
+              <view class="metric-card__value">{{item.value}}</view>
+              <view class="metric-card__label">{{item.label}}</view>
+            </view>
+          </block>
+        </view>
+      </view>
+
+      <view class="section">
+        <view class="section__header">
+          <view class="section__title">学员进度追踪</view>
+        </view>
+        <view wx:if="{{studentProgress.length === 0}}" class="empty">暂无进度数据。</view>
+        <view wx:else class="list list--progress">
+          <block wx:for="{{studentProgress}}" wx:key="id">
+            <view class="list-item">
+              <view class="list-item__title">{{item.name}}</view>
+              <view class="list-item__subtitle">{{item.university}}</view>
+              <view class="list-item__meta">周学习 {{item.studyHours}} 小时 · 完成度 {{item.completion}}%</view>
+            </view>
+          </block>
+        </view>
+      </view>
+
+      <view class="section">
+        <view class="section__header">
+          <view class="section__title">操作日志</view>
+        </view>
+        <view wx:if="{{auditLogs.length === 0}}" class="empty">暂无日志记录。</view>
+        <view wx:else class="list">
+          <block wx:for="{{auditLogs}}" wx:key="id">
+            <view class="list-item">
+              <view class="list-item__title">{{item.title}}</view>
+              <view class="list-item__subtitle">{{item.description}}</view>
+              <view class="list-item__meta">{{item.actor || '系统'}} · {{item.created_at || '刚刚'}}</view>
+            </view>
+          </block>
+        </view>
+      </view>
+
+      <view class="section">
+        <view class="section__header">
+          <view class="section__title">常用外部链接</view>
+        </view>
+        <view class="site-grid">
+          <block wx:for="{{referenceSites}}" wx:key="url">
+            <view class="site-card">
+              <view class="site-card__title">{{item.name}}</view>
+              <view class="site-card__description">{{item.description}}</view>
+              <view class="site-card__actions">
+                <button size="mini" data-url="{{item.url}}" bindtap="copyLink">复制链接</button>
+              </view>
+            </view>
+          </block>
+        </view>
+      </view>
+
+      <view wx:if="{{dashboardNote}}" class="note">{{dashboardNote}}</view>
     </view>
   </view>
 
-  <view class="section">
-    <view class="section__title">常用院校资讯网站</view>
-    <view class="site-list">
-      <block wx:for="{{referenceSites}}" wx:key="url">
-        <view class="site-card">
-          <view class="site-card__title">{{item.name}}</view>
-          <view class="site-card__description">{{item.description}}</view>
-          <view class="site-card__actions">
-            <button class="site-card__btn" size="mini" data-url="{{item.url}}" bindtap="copyLink">复制链接</button>
-            <navigator class="site-card__link" url="{{item.url}}" target="miniProgram">打开</navigator>
+  <view wx:elif="{{activeTab === 'settings'}}">
+    <view wx:if="{{sectionLoading.settings}}" class="panel panel--loading">正在加载基础信息…</view>
+    <view wx:elif="{{sectionErrors.settings}}" class="panel panel--error">
+      <text>{{sectionErrors.settings}}</text>
+      <button size="mini" data-tab="settings" bindtap="retrySection">重试</button>
+    </view>
+    <view wx:else class="panel">
+      <view class="section">
+        <view class="section__toolbar">
+          <view class="section__info">
+            <view class="section__title">平台基础信息</view>
+            <view class="section__subtitle">同步控制台展示的名称、联系邮箱与安全提示。</view>
           </view>
         </view>
-      </block>
+
+        <view wx:if="{{settingsFormError}}" class="form-message form-message--error">{{settingsFormError}}</view>
+        <view wx:if="{{settingsMessage}}" class="form-message form-message--success">{{settingsMessage}}</view>
+
+        <view class="form-grid">
+          <view class="form-field">
+            <view class="form-field__label">平台名称</view>
+            <input
+              class="form-field__input"
+              value="{{settingsForm.platform_name}}"
+              placeholder="请输入平台名称"
+              data-field="platform_name"
+              bindinput="handleSettingsInput"
+            />
+          </view>
+          <view class="form-field">
+            <view class="form-field__label">联系邮箱（可选）</view>
+            <input
+              class="form-field__input"
+              value="{{settingsForm.support_email}}"
+              placeholder="请输入联系邮箱"
+              data-field="support_email"
+              bindinput="handleSettingsInput"
+            />
+          </view>
+          <view class="form-field form-field--full">
+            <view class="form-field__label">安全提示</view>
+            <textarea
+              class="form-field__textarea"
+              value="{{settingsForm.security_note}}"
+              placeholder="请输入要展示的安全提醒"
+              data-field="security_note"
+              bindinput="handleSettingsInput"
+            ></textarea>
+          </view>
+        </view>
+
+        <view class="form-actions">
+          <button
+            class="primary-button"
+            bindtap="submitSettings"
+            loading="{{settingsSubmitting}}"
+            disabled="{{settingsSubmitting}}"
+          >
+            {{settingsSubmitting ? '保存中…' : '保存设置'}}
+          </button>
+        </view>
+      </view>
     </view>
   </view>
 
-  <view class="section">
-    <view class="section__title">待办事项</view>
-    <view class="task-list">
-      <block wx:for="{{tasks}}" wx:key="id">
-        <view class="task-card">
-          <view class="task-card__title">{{item.title}}</view>
-          <view class="task-card__meta">负责人：{{item.assignee}} · 状态：{{item.status}}</view>
-          <view class="task-card__time">最近更新：{{item.updatedAt}}</view>
+  <view wx:elif="{{activeTab === 'users'}}">
+    <view wx:if="{{sectionLoading.users}}" class="panel panel--loading">正在加载用户…</view>
+    <view wx:elif="{{sectionErrors.users}}" class="panel panel--error">
+      <text>{{sectionErrors.users}}</text>
+      <button size="mini" data-tab="users" bindtap="retrySection">重试</button>
+    </view>
+    <view wx:else class="panel">
+      <view class="section">
+        <view class="section__toolbar">
+          <view class="section__info">
+            <view class="section__title">用户管理</view>
+            <view class="section__subtitle">集中管理后台管理员与学员账号。</view>
+          </view>
+          <button class="primary-button" size="mini" bindtap="openUserForm">新增用户</button>
         </view>
-      </block>
+        <view wx:if="{{users.length === 0}}" class="empty">暂无用户数据。</view>
+        <view wx:else class="table">
+          <block wx:for="{{users}}" wx:key="id">
+            <view class="table-row">
+              <view class="table-cell table-cell--grow">
+                <view class="table-title">{{item.displayName || item.username}}</view>
+                <view class="table-subtitle">{{item.email || '未填邮箱'}}</view>
+              </view>
+              <view class="table-cell table-cell--role">
+                <picker
+                  mode="selector"
+                  range="{{roleOptions}}"
+                  range-key="label"
+                  value="{{item.role === 'admin' ? 1 : 0}}"
+                  data-id="{{item.id}}"
+                  bindchange="handleUserRoleChange"
+                >
+                  <view class="picker-value">{{item.role === 'admin' ? '管理员' : '学员'}}</view>
+                </picker>
+              </view>
+              <view class="table-cell table-cell--actions">
+                <button size="mini" type="warn" data-id="{{item.id}}" data-name="{{item.displayName || item.username}}" bindtap="confirmDeleteUser">删除</button>
+              </view>
+            </view>
+          </block>
+        </view>
+      </view>
+    </view>
+
+    <view wx:if="{{userFormVisible}}" class="dialog">
+      <view class="dialog__mask" bindtap="closeUserForm"></view>
+      <view class="dialog__panel">
+        <view class="dialog__title">新增用户</view>
+        <view class="dialog__body">
+          <view wx:if="{{userFormError}}" class="form-message form-message--error">{{userFormError}}</view>
+          <view class="form-field">
+            <view class="form-field__label">用户名</view>
+            <input class="form-field__input" value="{{userForm.username}}" data-field="username" bindinput="handleUserInput" placeholder="请输入用户名" />
+          </view>
+          <view class="form-field">
+            <view class="form-field__label">姓名</view>
+            <input class="form-field__input" value="{{userForm.displayName}}" data-field="displayName" bindinput="handleUserInput" placeholder="请输入姓名" />
+          </view>
+          <view class="form-field">
+            <view class="form-field__label">密码</view>
+            <input class="form-field__input" password value="{{userForm.password}}" data-field="password" bindinput="handleUserInput" placeholder="请输入密码" />
+          </view>
+          <view class="form-field">
+            <view class="form-field__label">邮箱（可选）</view>
+            <input class="form-field__input" value="{{userForm.email}}" data-field="email" bindinput="handleUserInput" placeholder="请输入邮箱" />
+          </view>
+          <view class="form-field">
+            <view class="form-field__label">角色</view>
+            <picker mode="selector" range="{{roleOptions}}" range-key="label" value="{{userRoleIndex}}" bindchange="handleUserRolePicker">
+              <view class="picker-value">{{roleOptions[userRoleIndex].label}}</view>
+            </picker>
+          </view>
+        </view>
+        <view class="dialog__footer">
+          <button class="dialog__btn" bindtap="closeUserForm" disabled="{{userSubmitting}}">取消</button>
+          <button class="dialog__btn dialog__btn--primary" bindtap="submitUserForm" loading="{{userSubmitting}}" disabled="{{userSubmitting}}">保存</button>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <view wx:elif="{{activeTab === 'majors'}}">
+    <view wx:if="{{sectionLoading.majors}}" class="panel panel--loading">正在加载专业…</view>
+    <view wx:elif="{{sectionErrors.majors}}" class="panel panel--error">
+      <text>{{sectionErrors.majors}}</text>
+      <button size="mini" data-tab="majors" bindtap="retrySection">重试</button>
+    </view>
+    <view wx:else class="panel">
+      <view class="section">
+        <view class="section__toolbar">
+          <view class="section__info">
+            <view class="section__title">专业管理</view>
+            <view class="section__subtitle">维护开设专业及其简介。</view>
+          </view>
+          <button class="primary-button" size="mini" bindtap="openMajorForm">新增专业</button>
+        </view>
+        <view wx:if="{{majors.length === 0}}" class="empty">暂无专业信息。</view>
+        <view wx:else class="list">
+          <block wx:for="{{majors}}" wx:key="id">
+            <view class="list-item">
+              <view class="list-item__title">{{item.name}}</view>
+              <view class="list-item__subtitle">{{item.description || '暂无描述'}}</view>
+              <view class="list-item__actions">
+                <button size="mini" type="warn" data-id="{{item.id}}" data-name="{{item.name}}" bindtap="confirmDeleteMajor">删除</button>
+              </view>
+            </view>
+          </block>
+        </view>
+      </view>
+    </view>
+
+    <view wx:if="{{majorFormVisible}}" class="dialog">
+      <view class="dialog__mask" bindtap="closeMajorForm"></view>
+      <view class="dialog__panel">
+        <view class="dialog__title">新增专业</view>
+        <view class="dialog__body">
+          <view wx:if="{{majorFormError}}" class="form-message form-message--error">{{majorFormError}}</view>
+          <view class="form-field">
+            <view class="form-field__label">专业名称</view>
+            <input class="form-field__input" value="{{majorForm.name}}" data-field="name" bindinput="handleMajorInput" placeholder="请输入专业名称" />
+          </view>
+          <view class="form-field">
+            <view class="form-field__label">专业简介</view>
+            <textarea class="form-field__textarea" value="{{majorForm.description}}" data-field="description" bindinput="handleMajorInput" placeholder="请输入简介（可选）"></textarea>
+          </view>
+        </view>
+        <view class="dialog__footer">
+          <button class="dialog__btn" bindtap="closeMajorForm" disabled="{{majorSubmitting}}">取消</button>
+          <button class="dialog__btn dialog__btn--primary" bindtap="submitMajorForm" loading="{{majorSubmitting}}" disabled="{{majorSubmitting}}">保存</button>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <view wx:elif="{{activeTab === 'courses'}}">
+    <view wx:if="{{sectionLoading.courses}}" class="panel panel--loading">正在加载课程…</view>
+    <view wx:elif="{{sectionErrors.courses}}" class="panel panel--error">
+      <text>{{sectionErrors.courses}}</text>
+      <button size="mini" data-tab="courses" bindtap="retrySection">重试</button>
+    </view>
+    <view wx:else class="panel">
+      <view class="section">
+        <view class="section__toolbar">
+          <view class="section__info">
+            <view class="section__title">课程管理</view>
+            <view class="section__subtitle">录入课程并关联所属专业。</view>
+          </view>
+          <button class="primary-button" size="mini" bindtap="openCourseForm">新增课程</button>
+        </view>
+        <view wx:if="{{courses.length === 0}}" class="empty">暂无课程数据。</view>
+        <view wx:else class="list">
+          <block wx:for="{{courses}}" wx:key="id">
+            <view class="list-item list-item--course">
+              <view class="list-item__title">{{item.title}}</view>
+              <view class="list-item__subtitle">授课教师：{{item.teacher || '待定'}}</view>
+              <view class="list-item__meta">所属专业：{{item.majorName || '未关联'}} · 学分：{{item.credit !== null ? item.credit : '—'}}</view>
+              <view class="list-item__description">{{item.description || '暂无课程简介。'}}</view>
+              <view class="list-item__actions">
+                <button size="mini" type="warn" data-id="{{item.id}}" data-name="{{item.title}}" bindtap="confirmDeleteCourse">删除</button>
+              </view>
+            </view>
+          </block>
+        </view>
+      </view>
+    </view>
+
+    <view wx:if="{{courseFormVisible}}" class="dialog">
+      <view class="dialog__mask" bindtap="closeCourseForm"></view>
+      <view class="dialog__panel">
+        <view class="dialog__title">新增课程</view>
+        <view class="dialog__body">
+          <view wx:if="{{courseFormError}}" class="form-message form-message--error">{{courseFormError}}</view>
+          <view class="form-field">
+            <view class="form-field__label">课程名称</view>
+            <input class="form-field__input" value="{{courseForm.title}}" data-field="title" bindinput="handleCourseInput" placeholder="请输入课程名称" />
+          </view>
+          <view class="form-field">
+            <view class="form-field__label">授课教师</view>
+            <input class="form-field__input" value="{{courseForm.teacher}}" data-field="teacher" bindinput="handleCourseInput" placeholder="请输入授课教师" />
+          </view>
+          <view class="form-field">
+            <view class="form-field__label">学分</view>
+            <input class="form-field__input" type="number" value="{{courseForm.credit}}" data-field="credit" bindinput="handleCourseInput" placeholder="请输入学分（可选）" />
+          </view>
+          <view class="form-field">
+            <view class="form-field__label">所属专业</view>
+            <picker mode="selector" range="{{majorsForCourses}}" range-key="name" value="{{courseFormMajorIndex}}" bindchange="handleCourseMajorChange">
+              <view class="picker-value">
+                {{majorsForCourses.length > 0 ? majorsForCourses[courseFormMajorIndex].name : '暂无可选专业'}}
+              </view>
+            </picker>
+          </view>
+          <view class="form-field">
+            <view class="form-field__label">课程简介</view>
+            <textarea class="form-field__textarea" value="{{courseForm.description}}" data-field="description" bindinput="handleCourseInput" placeholder="请输入课程简介（可选）"></textarea>
+          </view>
+        </view>
+        <view class="dialog__footer">
+          <button class="dialog__btn" bindtap="closeCourseForm" disabled="{{courseSubmitting}}">取消</button>
+          <button class="dialog__btn dialog__btn--primary" bindtap="submitCourseForm" loading="{{courseSubmitting}}" disabled="{{courseSubmitting}}">保存</button>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <view wx:elif="{{activeTab === 'materials'}}">
+    <view wx:if="{{sectionLoading.materials}}" class="panel panel--loading">正在加载资料…</view>
+    <view wx:elif="{{sectionErrors.materials}}" class="panel panel--error">
+      <text>{{sectionErrors.materials}}</text>
+      <button size="mini" data-tab="materials" bindtap="retrySection">重试</button>
+    </view>
+    <view wx:else class="panel">
+      <view class="section">
+        <view class="section__toolbar">
+          <view class="section__info">
+            <view class="section__title">学习资料</view>
+            <view class="section__subtitle">上传或登记复习资料并关联课程。</view>
+          </view>
+          <button class="primary-button" size="mini" bindtap="openMaterialForm">新增资料</button>
+        </view>
+        <view wx:if="{{materials.length === 0}}" class="empty">暂无资料数据。</view>
+        <view wx:else class="list">
+          <block wx:for="{{materials}}" wx:key="id">
+            <view class="list-item list-item--material">
+              <view class="list-item__title">{{item.title}}</view>
+              <view class="list-item__subtitle">关联课程：{{item.courseTitle || '未关联'}}</view>
+              <view class="list-item__description">{{item.description || '暂无资料描述。'}}</view>
+              <view class="list-item__meta">
+                <text wx:if="{{item.fileUrl}}">链接：{{item.fileUrl}}</text>
+                <text wx:else>未提供链接</text>
+              </view>
+              <view class="list-item__actions">
+                <button wx:if="{{item.fileUrl}}" size="mini" data-url="{{item.fileUrl}}" bindtap="copyLink">复制链接</button>
+                <button size="mini" type="warn" data-id="{{item.id}}" data-name="{{item.title}}" bindtap="confirmDeleteMaterial">删除</button>
+              </view>
+            </view>
+          </block>
+        </view>
+      </view>
+    </view>
+
+    <view wx:if="{{materialFormVisible}}" class="dialog">
+      <view class="dialog__mask" bindtap="closeMaterialForm"></view>
+      <view class="dialog__panel">
+        <view class="dialog__title">新增资料</view>
+        <view class="dialog__body">
+          <view wx:if="{{materialFormError}}" class="form-message form-message--error">{{materialFormError}}</view>
+          <view class="form-field">
+            <view class="form-field__label">资料标题</view>
+            <input class="form-field__input" value="{{materialForm.title}}" data-field="title" bindinput="handleMaterialInput" placeholder="请输入资料标题" />
+          </view>
+          <view class="form-field">
+            <view class="form-field__label">资料描述</view>
+            <textarea class="form-field__textarea" value="{{materialForm.description}}" data-field="description" bindinput="handleMaterialInput" placeholder="请输入资料描述（可选）"></textarea>
+          </view>
+          <view class="form-field">
+            <view class="form-field__label">关联课程</view>
+            <picker mode="selector" range="{{coursesForMaterials}}" range-key="title" value="{{materialFormCourseIndex}}" bindchange="handleMaterialCourseChange">
+              <view class="picker-value">
+                {{coursesForMaterials.length > 0 ? coursesForMaterials[materialFormCourseIndex].title : '暂无可选课程'}}
+              </view>
+            </picker>
+          </view>
+          <view class="form-field">
+            <view class="form-field__label">资料链接</view>
+            <input class="form-field__input" value="{{materialForm.fileUrl}}" data-field="fileUrl" bindinput="handleMaterialInput" placeholder="请输入文件链接（可选）" />
+          </view>
+        </view>
+        <view class="dialog__footer">
+          <button class="dialog__btn" bindtap="closeMaterialForm" disabled="{{materialSubmitting}}">取消</button>
+          <button class="dialog__btn dialog__btn--primary" bindtap="submitMaterialForm" loading="{{materialSubmitting}}" disabled="{{materialSubmitting}}">保存</button>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <view wx:elif="{{activeTab === 'forum'}}">
+    <view wx:if="{{sectionLoading.forum}}" class="panel panel--loading">正在加载论坛数据…</view>
+    <view wx:elif="{{sectionErrors.forum}}" class="panel panel--error">
+      <text>{{sectionErrors.forum}}</text>
+      <button size="mini" data-tab="forum" bindtap="retrySection">重试</button>
+    </view>
+    <view wx:else class="panel panel--split">
+      <view class="panel-column">
+        <view class="section__toolbar">
+          <view class="section__info">
+            <view class="section__title">论坛话题</view>
+            <view class="section__subtitle">选择话题查看帖子内容。</view>
+          </view>
+        </view>
+        <view class="list">
+          <block wx:for="{{forumTopics}}" wx:key="id">
+            <view
+              class="list-item list-item--topic {{selectedTopicId === String(item.id) ? 'is-active' : ''}}"
+              data-id="{{String(item.id)}}"
+              data-name="{{item.title}}"
+              bindtap="handleSelectTopic"
+            >
+              <view class="list-item__title">{{item.title}}</view>
+              <view class="list-item__subtitle">{{item.description || '暂无描述'}}</view>
+              <view class="list-item__meta">更新时间：{{item.updated_at || item.created_at || '未知'}}</view>
+              <view class="list-item__actions">
+                <button size="mini" type="warn" data-id="{{item.id}}" data-name="{{item.title}}" bindtap="confirmDeleteTopic">删除</button>
+              </view>
+            </view>
+          </block>
+          <view wx:if="{{forumTopics.length === 0}}" class="empty">暂无论坛话题。</view>
+        </view>
+      </view>
+      <view class="panel-column panel-column--grow">
+        <view class="section__toolbar">
+          <view class="section__info">
+            <view class="section__title">帖子内容</view>
+            <view class="section__subtitle">{{selectedTopicId ? '可删除不合规发言。' : '请选择话题。'}}</view>
+          </view>
+        </view>
+        <view wx:if="{{forumPostsLoading}}" class="panel panel--loading">正在加载帖子…</view>
+        <view wx:elif="{{forumPostsError}}" class="panel panel--error">{{forumPostsError}}</view>
+        <view wx:elif="{{!selectedTopicId}}" class="empty">请先选择一个话题。</view>
+        <view wx:else>
+          <view wx:if="{{forumPosts.length === 0}}" class="empty">该话题暂无帖子。</view>
+          <view wx:else class="list list--posts">
+            <block wx:for="{{forumPosts}}" wx:key="id">
+              <view class="list-item list-item--post">
+                <view class="list-item__title">{{item.content}}</view>
+                <view class="list-item__meta">{{item.author || '匿名'}} · {{item.updated_at || item.created_at || '刚刚'}}</view>
+                <view class="list-item__actions">
+                  <button size="mini" type="warn" data-id="{{item.id}}" bindtap="confirmDeletePost">删除</button>
+                </view>
+              </view>
+            </block>
+          </view>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <view wx:elif="{{activeTab === 'statistics'}}">
+    <view wx:if="{{sectionLoading.statistics}}" class="panel panel--loading">正在加载统计信息…</view>
+    <view wx:elif="{{sectionErrors.statistics}}" class="panel panel--error">
+      <text>{{sectionErrors.statistics}}</text>
+      <button size="mini" data-tab="statistics" bindtap="retrySection">重试</button>
+    </view>
+    <view wx:else class="panel">
+      <view class="section">
+        <view class="section__header">
+          <view class="section__title">核心指标总览</view>
+        </view>
+        <view wx:if="{{!statistics}}" class="empty">暂无统计数据。</view>
+        <view wx:else class="metric-grid metric-grid--statistics">
+          <view class="metric-card">
+            <view class="metric-card__value">{{statistics.totalUsers}}</view>
+            <view class="metric-card__label">注册用户</view>
+          </view>
+          <view class="metric-card">
+            <view class="metric-card__value">{{statistics.totalMajors}}</view>
+            <view class="metric-card__label">开设专业</view>
+          </view>
+          <view class="metric-card">
+            <view class="metric-card__value">{{statistics.totalCourses}}</view>
+            <view class="metric-card__label">课程数量</view>
+          </view>
+          <view class="metric-card">
+            <view class="metric-card__value">{{statistics.totalMaterials}}</view>
+            <view class="metric-card__label">学习资料</view>
+          </view>
+          <view class="metric-card">
+            <view class="metric-card__value">{{statistics.totalPracticeSets}}</view>
+            <view class="metric-card__label">题单数量</view>
+          </view>
+          <view class="metric-card">
+            <view class="metric-card__value">{{statistics.totalForumPosts}}</view>
+            <view class="metric-card__label">论坛帖子</view>
+          </view>
+        </view>
+        <view wx:if="{{statistics && statistics.lastUpdatedAt}}" class="note">最近更新时间：{{statistics.lastUpdatedAt}}</view>
+      </view>
+
+      <view class="section">
+        <view class="section__toolbar">
+          <view class="section__info">
+            <view class="section__title">跨模块关键字检索</view>
+            <view class="section__subtitle">输入关键词，可同时检索用户、课程、资料与论坛话题。</view>
+          </view>
+        </view>
+
+        <view class="statistics-search">
+          <view class="form-field">
+            <view class="form-field__label">检索关键词</view>
+            <input
+              class="form-field__input"
+              value="{{statisticsSearchKeyword}}"
+              placeholder="请输入名称、邮箱或话题关键词"
+              bindinput="handleStatisticsKeywordInput"
+            />
+          </view>
+          <view class="statistics-search__actions">
+            <button
+              class="primary-button"
+              size="mini"
+              bindtap="submitStatisticsSearch"
+              loading="{{statisticsSearchLoading}}"
+              disabled="{{statisticsSearchLoading}}"
+            >
+              {{statisticsSearchLoading ? '查询中…' : '开始查询'}}
+            </button>
+            <button
+              class="secondary-button"
+              size="mini"
+              bindtap="clearStatisticsSearch"
+              disabled="{{statisticsSearchLoading}}"
+            >
+              清除
+            </button>
+          </view>
+        </view>
+
+        <view wx:if="{{statisticsSearchError}}" class="form-message form-message--error">{{statisticsSearchError}}</view>
+
+        <view wx:if="{{statisticsSearchResult}}" class="statistics-result">
+          <view class="statistics-result__group">
+            <view class="statistics-result__title">用户匹配（{{statisticsSearchResult.users.length}}）</view>
+            <view wx:if="{{statisticsSearchResult.users.length}}" class="statistics-result__items">
+              <block wx:for="{{statisticsSearchResult.users}}" wx:key="id">
+                <text class="statistics-result__chip">{{item.displayName || item.username}}</text>
+              </block>
+            </view>
+            <view wx:else class="statistics-result__items statistics-result__items--empty">暂无匹配</view>
+          </view>
+          <view class="statistics-result__group">
+            <view class="statistics-result__title">专业匹配（{{statisticsSearchResult.majors.length}}）</view>
+            <view wx:if="{{statisticsSearchResult.majors.length}}" class="statistics-result__items">
+              <block wx:for="{{statisticsSearchResult.majors}}" wx:key="id">
+                <text class="statistics-result__chip">{{item.name}}</text>
+              </block>
+            </view>
+            <view wx:else class="statistics-result__items statistics-result__items--empty">暂无匹配</view>
+          </view>
+          <view class="statistics-result__group">
+            <view class="statistics-result__title">课程匹配（{{statisticsSearchResult.courses.length}}）</view>
+            <view wx:if="{{statisticsSearchResult.courses.length}}" class="statistics-result__items">
+              <block wx:for="{{statisticsSearchResult.courses}}" wx:key="id">
+                <text class="statistics-result__chip">{{item.title}}</text>
+              </block>
+            </view>
+            <view wx:else class="statistics-result__items statistics-result__items--empty">暂无匹配</view>
+          </view>
+          <view class="statistics-result__group">
+            <view class="statistics-result__title">资料匹配（{{statisticsSearchResult.materials.length}}）</view>
+            <view wx:if="{{statisticsSearchResult.materials.length}}" class="statistics-result__items">
+              <block wx:for="{{statisticsSearchResult.materials}}" wx:key="id">
+                <text class="statistics-result__chip">{{item.title}}</text>
+              </block>
+            </view>
+            <view wx:else class="statistics-result__items statistics-result__items--empty">暂无匹配</view>
+          </view>
+          <view class="statistics-result__group">
+            <view class="statistics-result__title">论坛话题匹配（{{statisticsSearchResult.forumTopics.length}}）</view>
+            <view wx:if="{{statisticsSearchResult.forumTopics.length}}" class="statistics-result__items">
+              <block wx:for="{{statisticsSearchResult.forumTopics}}" wx:key="id">
+                <text class="statistics-result__chip">{{item.title}}</text>
+              </block>
+            </view>
+            <view wx:else class="statistics-result__items statistics-result__items--empty">暂无匹配</view>
+          </view>
+        </view>
+
+        <view
+          wx:elif="{{!statisticsSearchLoading && !statisticsSearchError}}"
+          class="statistics-result statistics-result--placeholder"
+        >
+          <view class="statistics-result__title">提示</view>
+          <view class="statistics-result__items">
+            输入关键词后点击“开始查询”，即可同步检索学员、专业、课程与论坛数据。
+          </view>
+        </view>
+      </view>
     </view>
   </view>
 </view>
