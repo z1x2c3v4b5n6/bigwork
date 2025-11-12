@@ -3,6 +3,10 @@ import {
   Box,
   Button,
   Chip,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   Divider,
   Grid,
   LinearProgress,
@@ -11,6 +15,7 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
+import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import practiceService, { PracticeQuestion, PracticeSetSummary } from '../services/practiceService';
@@ -26,6 +31,8 @@ const Practice = () => {
   const [questionTags, setQuestionTags] = useState('');
   const [questionExplanation, setQuestionExplanation] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [setDialogOpen, setSetDialogOpen] = useState(false);
+  const [questionDialogOpen, setQuestionDialogOpen] = useState(false);
 
   const {
     data: sets = [],
@@ -42,6 +49,12 @@ const Practice = () => {
       setSelectedSetId(sets[0].id);
     }
   }, [sets, selectedSetId]);
+
+  useEffect(() => {
+    if (selectedSetId === null) {
+      setQuestionDialogOpen(false);
+    }
+  }, [selectedSetId]);
 
   const selectedSet = useMemo(
     () => sets.find((set) => set.id === selectedSetId) ?? null,
@@ -65,6 +78,7 @@ const Practice = () => {
       setSetTitle('');
       setSetDescription('');
       setSetTags('');
+      setSetDialogOpen(false);
       await queryClient.invalidateQueries({ queryKey: ['practice-sets'] });
     },
     onError: (error) => {
@@ -87,6 +101,7 @@ const Practice = () => {
       setQuestionExplanation('');
       await queryClient.invalidateQueries({ queryKey: ['practice-questions', selectedSetId] });
       await queryClient.invalidateQueries({ queryKey: ['practice-sets'] });
+      setQuestionDialogOpen(false);
     },
     onError: (error) => {
       const message = error instanceof Error ? error.message : '录入题目失败，请稍后再试';
@@ -142,6 +157,41 @@ const Practice = () => {
     });
   };
 
+  const openSetDialog = () => {
+    setErrorMessage(null);
+    setSetDialogOpen(true);
+  };
+
+  const closeSetDialog = () => {
+    if (createSetMutation.isPending) {
+      return;
+    }
+    setSetDialogOpen(false);
+    setSetTitle('');
+    setSetDescription('');
+    setSetTags('');
+  };
+
+  const openQuestionDialog = () => {
+    if (selectedSetId === null) {
+      setErrorMessage('请先选择题单');
+      return;
+    }
+    setErrorMessage(null);
+    setQuestionDialogOpen(true);
+  };
+
+  const closeQuestionDialog = () => {
+    if (createQuestionMutation.isPending) {
+      return;
+    }
+    setQuestionDialogOpen(false);
+    setQuestionText('');
+    setAnswerText('');
+    setQuestionTags('');
+    setQuestionExplanation('');
+  };
+
   return (
     <Stack spacing={4}>
       {(setsLoading || createSetMutation.isPending || createQuestionMutation.isPending) && (
@@ -169,14 +219,29 @@ const Practice = () => {
         <Grid item xs={12} lg={4}>
           <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid', borderColor: 'divider', height: '100%' }}>
             <Stack spacing={2} sx={{ height: '100%' }}>
-              <Box>
-                <Typography variant="h6" fontWeight={600}>
-                  题单列表
-                </Typography>
-                <Typography variant="body2" color="text.secondary" mt={0.5}>
-                  点击查看题目详情并继续添加练习内容。
-                </Typography>
-              </Box>
+              <Stack
+                direction={{ xs: 'column', sm: 'row' }}
+                spacing={2}
+                alignItems={{ xs: 'flex-start', sm: 'center' }}
+                justifyContent="space-between"
+              >
+                <Box>
+                  <Typography variant="h6" fontWeight={600}>
+                    题单列表
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary" mt={0.5}>
+                    点击查看题目详情并继续添加练习内容。
+                  </Typography>
+                </Box>
+                <Button
+                  startIcon={<AddCircleOutlineIcon />}
+                  variant="contained"
+                  onClick={openSetDialog}
+                  size="small"
+                >
+                  新建题单
+                </Button>
+              </Stack>
               <Divider />
               <Stack spacing={1.5} sx={{ flexGrow: 1, overflow: 'auto' }}>
                 {sets.length === 0 ? (
@@ -219,30 +284,6 @@ const Practice = () => {
                   ))
                 )}
               </Stack>
-              <Box component="form" onSubmit={handleCreateSet}>
-                <Stack spacing={1.5}>
-                  <Typography variant="subtitle2" color="text.secondary">
-                    新建题单
-                  </Typography>
-                  <TextField label="题单标题" value={setTitle} onChange={(event) => setSetTitle(event.target.value)} required />
-                  <TextField
-                    label="题单描述（可选）"
-                    value={setDescription}
-                    onChange={(event) => setSetDescription(event.target.value)}
-                    multiline
-                    minRows={2}
-                  />
-                  <TextField
-                    label="标签（逗号分隔）"
-                    value={setTags}
-                    onChange={(event) => setSetTags(event.target.value)}
-                    helperText="例如：高数, 线性代数"
-                  />
-                  <Button type="submit" variant="contained" disabled={createSetMutation.isPending}>
-                    {createSetMutation.isPending ? '创建中…' : '保存题单'}
-                  </Button>
-                </Stack>
-              </Box>
             </Stack>
           </Paper>
         </Grid>
@@ -250,18 +291,37 @@ const Practice = () => {
           <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid', borderColor: 'divider', minHeight: 520 }}>
             <Stack spacing={3} sx={{ height: '100%' }}>
               <Box>
-                <Typography variant="h6" fontWeight={600}>
-                  {selectedSet ? selectedSet.title : '选择题单查看题目'}
-                </Typography>
-                {selectedSet ? (
-                  <Typography variant="body2" color="text.secondary" mt={0.5}>
-                    {selectedSet.description || '暂无题单描述，可在左侧修改。'}
-                  </Typography>
-                ) : (
-                  <Typography variant="body2" color="text.secondary" mt={0.5}>
-                    从左侧选择题单以查看题目列表或录入新题目。
-                  </Typography>
-                )}
+                <Stack spacing={1.5}>
+                  <Stack
+                    direction={{ xs: 'column', sm: 'row' }}
+                    spacing={2}
+                    justifyContent="space-between"
+                    alignItems={{ xs: 'flex-start', sm: 'center' }}
+                  >
+                    <Typography variant="h6" fontWeight={600}>
+                      {selectedSet ? selectedSet.title : '选择题单查看题目'}
+                    </Typography>
+                    <Button
+                      startIcon={<AddCircleOutlineIcon />}
+                      variant="contained"
+                      color="secondary"
+                      onClick={openQuestionDialog}
+                      disabled={selectedSetId === null}
+                      size="small"
+                    >
+                      录入题目
+                    </Button>
+                  </Stack>
+                  {selectedSet ? (
+                    <Typography variant="body2" color="text.secondary" mt={0.5}>
+                      {selectedSet.description || '暂无题单描述，可在左侧修改。'}
+                    </Typography>
+                  ) : (
+                    <Typography variant="body2" color="text.secondary" mt={0.5}>
+                      从左侧选择题单以查看题目列表或录入新题目。
+                    </Typography>
+                  )}
+                </Stack>
                 {questionsError ? (
                   <Alert severity="error" sx={{ mt: 2 }} action={<Button color="inherit" onClick={() => refetchQuestions()}>重试</Button>}>
                     无法加载题目列表。
@@ -305,55 +365,100 @@ const Practice = () => {
                   ))
                 )}
               </Stack>
-              <Box component="form" onSubmit={handleCreateQuestion}>
-                <Stack spacing={1.5}>
-                  <Typography variant="subtitle2" color="text.secondary">
-                    录入新题目
-                  </Typography>
-                  <TextField
-                    label="题干"
-                    value={questionText}
-                    onChange={(event) => setQuestionText(event.target.value)}
-                    multiline
-                    minRows={3}
-                    disabled={selectedSetId === null}
-                  />
-                  <TextField
-                    label="标准答案（可选）"
-                    value={answerText}
-                    onChange={(event) => setAnswerText(event.target.value)}
-                    multiline
-                    minRows={2}
-                    disabled={selectedSetId === null}
-                  />
-                  <TextField
-                    label="解题思路（可选）"
-                    value={questionExplanation}
-                    onChange={(event) => setQuestionExplanation(event.target.value)}
-                    multiline
-                    minRows={2}
-                    disabled={selectedSetId === null}
-                  />
-                  <TextField
-                    label="标签（逗号分隔）"
-                    value={questionTags}
-                    onChange={(event) => setQuestionTags(event.target.value)}
-                    helperText="例如：概率论, 高频错题"
-                    disabled={selectedSetId === null}
-                  />
-                  <Button
-                    type="submit"
-                    variant="contained"
-                    disabled={createQuestionMutation.isPending || selectedSetId === null}
-                  >
-                    {createQuestionMutation.isPending ? '保存中…' : '添加题目'}
-                  </Button>
-                </Stack>
-              </Box>
             </Stack>
           </Paper>
         </Grid>
       </Grid>
+
+      <Dialog open={setDialogOpen} onClose={closeSetDialog} fullWidth maxWidth="sm">
+        <Box component="form" onSubmit={handleCreateSet}>
+          <DialogTitle>新建题单</DialogTitle>
+          <DialogContent dividers>
+            <Stack spacing={2.5}>
+              <TextField
+                label="题单标题"
+                value={setTitle}
+                onChange={(event) => setSetTitle(event.target.value)}
+                required
+                fullWidth
+              />
+              <TextField
+                label="题单描述（可选）"
+                value={setDescription}
+                onChange={(event) => setSetDescription(event.target.value)}
+                multiline
+                minRows={3}
+                fullWidth
+              />
+              <TextField
+                label="标签（逗号分隔）"
+                value={setTags}
+                onChange={(event) => setSetTags(event.target.value)}
+                helperText="例如：高数, 线性代数"
+                fullWidth
+              />
+            </Stack>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={closeSetDialog} disabled={createSetMutation.isPending}>
+              取消
+            </Button>
+            <Button type="submit" variant="contained" disabled={createSetMutation.isPending}>
+              {createSetMutation.isPending ? '创建中…' : '保存题单'}
+            </Button>
+          </DialogActions>
+        </Box>
+      </Dialog>
+
+      <Dialog open={questionDialogOpen} onClose={closeQuestionDialog} fullWidth maxWidth="sm">
+        <Box component="form" onSubmit={handleCreateQuestion}>
+          <DialogTitle>录入新题目</DialogTitle>
+          <DialogContent dividers>
+            <Stack spacing={2.5}>
+              <TextField
+                label="题干"
+                value={questionText}
+                onChange={(event) => setQuestionText(event.target.value)}
+                multiline
+                minRows={3}
+                required
+                fullWidth
+              />
+              <TextField
+                label="标准答案（可选）"
+                value={answerText}
+                onChange={(event) => setAnswerText(event.target.value)}
+                multiline
+                minRows={2}
+                fullWidth
+              />
+              <TextField
+                label="解题思路（可选）"
+                value={questionExplanation}
+                onChange={(event) => setQuestionExplanation(event.target.value)}
+                multiline
+                minRows={2}
+                fullWidth
+              />
+              <TextField
+                label="标签（逗号分隔）"
+                value={questionTags}
+                onChange={(event) => setQuestionTags(event.target.value)}
+                helperText="例如：概率论, 高频错题"
+                fullWidth
+              />
+            </Stack>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={closeQuestionDialog} disabled={createQuestionMutation.isPending}>
+              取消
+            </Button>
+            <Button type="submit" variant="contained" disabled={createQuestionMutation.isPending || selectedSetId === null}>
+              {createQuestionMutation.isPending ? '保存中…' : '添加题目'}
+            </Button>
+          </DialogActions>
+        </Box>
+      </Dialog>
     </Stack>
   );
 };

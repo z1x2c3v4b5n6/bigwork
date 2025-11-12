@@ -3,6 +3,10 @@ import {
   Box,
   Button,
   Chip,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   Divider,
   Grid,
   IconButton,
@@ -22,6 +26,7 @@ import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutline';
 import ThumbUpAltOutlinedIcon from '@mui/icons-material/ThumbUpAltOutlined';
 import ThumbUpAltIcon from '@mui/icons-material/ThumbUpAlt';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
+import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
 import forumService, { ForumComment, ForumTopic } from '../services/forumService';
 
 const formatDateTime = (value: string | null | undefined) => {
@@ -44,6 +49,8 @@ const Forum = () => {
   const [topicDescription, setTopicDescription] = useState('');
   const [postContent, setPostContent] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [topicDialogOpen, setTopicDialogOpen] = useState(false);
+  const [postDialogOpen, setPostDialogOpen] = useState(false);
 
   const {
     data: topics = [],
@@ -82,11 +89,18 @@ const Forum = () => {
     }
   }, [topics, selectedTopicId]);
 
+  useEffect(() => {
+    if (selectedTopicId === null) {
+      setPostDialogOpen(false);
+    }
+  }, [selectedTopicId]);
+
   const createTopicMutation = useMutation({
     mutationFn: forumService.createForumTopic,
     onSuccess: async (topic) => {
       setTopicTitle('');
       setTopicDescription('');
+      setTopicDialogOpen(false);
       await queryClient.invalidateQueries({ queryKey: ['forum-topics'] });
       if (topic?.id) {
         setSelectedTopicId(topic.id);
@@ -106,6 +120,7 @@ const Forum = () => {
         await queryClient.invalidateQueries({ queryKey: ['forum-posts', selectedTopicId] });
       }
       await queryClient.invalidateQueries({ queryKey: ['forum-topics'] });
+      setPostDialogOpen(false);
     },
     onError: (error) => {
       const message = error instanceof Error ? error.message : '发送帖子失败，请稍后再试';
@@ -173,6 +188,37 @@ const Forum = () => {
     await createPostMutation.mutateAsync({ content: postContent.trim() });
   };
 
+  const openTopicDialog = () => {
+    setErrorMessage(null);
+    setTopicDialogOpen(true);
+  };
+
+  const closeTopicDialog = () => {
+    if (createTopicMutation.isPending) {
+      return;
+    }
+    setTopicDialogOpen(false);
+    setTopicTitle('');
+    setTopicDescription('');
+  };
+
+  const openPostDialog = () => {
+    if (selectedTopicId === null) {
+      setErrorMessage('请先选择一个话题');
+      return;
+    }
+    setErrorMessage(null);
+    setPostDialogOpen(true);
+  };
+
+  const closePostDialog = () => {
+    if (createPostMutation.isPending) {
+      return;
+    }
+    setPostDialogOpen(false);
+    setPostContent('');
+  };
+
   const handleToggleLike = async () => {
     if (selectedTopicId === null) {
       setErrorMessage('请先选择一个话题');
@@ -214,16 +260,34 @@ const Forum = () => {
         <Grid item xs={12} md={4}>
           <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid', borderColor: 'divider', height: '100%' }}>
             <Stack spacing={2} sx={{ height: '100%' }}>
-              <Box>
-                <Typography variant="h6" fontWeight={600}>
-                  话题列表
-                </Typography>
-                {topicsError ? (
-                  <Alert severity="error" sx={{ mt: 2 }} action={<Button color="inherit" onClick={() => refetchTopics()}>重试</Button>}>
-                    无法加载话题，请检查后端接口。
-                  </Alert>
-                ) : null}
-              </Box>
+              <Stack
+                direction={{ xs: 'column', sm: 'row' }}
+                spacing={2}
+                alignItems={{ xs: 'flex-start', sm: 'center' }}
+                justifyContent="space-between"
+              >
+                <Box>
+                  <Typography variant="h6" fontWeight={600}>
+                    话题列表
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary" mt={0.5}>
+                    查看热门讨论并快速切换到需要回复的话题。
+                  </Typography>
+                </Box>
+                <Button
+                  startIcon={<AddCircleOutlineIcon />}
+                  variant="contained"
+                  onClick={openTopicDialog}
+                  size="small"
+                >
+                  发布话题
+                </Button>
+              </Stack>
+              {topicsError ? (
+                <Alert severity="error" action={<Button color="inherit" onClick={() => refetchTopics()}>重试</Button>}>
+                  无法加载话题，请检查后端接口。
+                </Alert>
+              ) : null}
               <Divider />
               <List sx={{ flexGrow: 1, overflow: 'auto' }}>
                 {topicsLoading ? (
@@ -273,29 +337,6 @@ const Forum = () => {
                   ))
                 )}
               </List>
-              <Box component="form" onSubmit={handleCreateTopic}>
-                <Stack spacing={1.5}>
-                  <Typography variant="subtitle2" color="text.secondary">
-                    新建话题
-                  </Typography>
-                  <TextField
-                    label="话题标题"
-                    value={topicTitle}
-                    onChange={(event) => setTopicTitle(event.target.value)}
-                    required
-                  />
-                  <TextField
-                    label="话题描述（可选）"
-                    value={topicDescription}
-                    onChange={(event) => setTopicDescription(event.target.value)}
-                    multiline
-                    minRows={2}
-                  />
-                  <Button type="submit" variant="contained" disabled={createTopicMutation.isPending}>
-                    {createTopicMutation.isPending ? '创建中…' : '发布话题'}
-                  </Button>
-                </Stack>
-              </Box>
             </Stack>
           </Paper>
         </Grid>
@@ -303,10 +344,27 @@ const Forum = () => {
           <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid', borderColor: 'divider', minHeight: 520 }}>
             <Stack spacing={3} sx={{ height: '100%' }}>
               <Box>
-                <Stack spacing={1}>
-                  <Typography variant="h6" fontWeight={600}>
-                    {selectedTopic ? selectedTopic.title : '请选择一个话题'}
-                  </Typography>
+                <Stack spacing={1.5}>
+                  <Stack
+                    direction={{ xs: 'column', sm: 'row' }}
+                    spacing={2}
+                    justifyContent="space-between"
+                    alignItems={{ xs: 'flex-start', sm: 'center' }}
+                  >
+                    <Typography variant="h6" fontWeight={600}>
+                      {selectedTopic ? selectedTopic.title : '请选择一个话题'}
+                    </Typography>
+                    <Button
+                      startIcon={<AddCircleOutlineIcon />}
+                      variant="contained"
+                      color="secondary"
+                      onClick={openPostDialog}
+                      disabled={selectedTopicId === null}
+                      size="small"
+                    >
+                      发布回复
+                    </Button>
+                  </Stack>
                   {selectedTopic ? (
                     <>
                       <Typography variant="body2" color="text.secondary">
@@ -397,32 +455,67 @@ const Forum = () => {
                   ))
                 )}
               </Stack>
-              <Box component="form" onSubmit={handleCreatePost}>
-                <Stack spacing={1.5}>
-                  <Typography variant="subtitle2" color="text.secondary">
-                    发表回复
-                  </Typography>
-                  <TextField
-                    label="帖子内容"
-                    value={postContent}
-                    onChange={(event) => setPostContent(event.target.value)}
-                    multiline
-                    minRows={3}
-                    disabled={selectedTopicId === null}
-                  />
-                  <Button
-                    type="submit"
-                    variant="contained"
-                    disabled={createPostMutation.isPending || selectedTopicId === null}
-                  >
-                    {createPostMutation.isPending ? '发送中…' : '发送'}
-                  </Button>
-                </Stack>
-              </Box>
             </Stack>
           </Paper>
         </Grid>
       </Grid>
+      <Dialog open={topicDialogOpen} onClose={closeTopicDialog} fullWidth maxWidth="sm">
+        <Box component="form" onSubmit={handleCreateTopic}>
+          <DialogTitle>发布话题</DialogTitle>
+          <DialogContent dividers>
+            <Stack spacing={2.5}>
+              <TextField
+                label="话题标题"
+                value={topicTitle}
+                onChange={(event) => setTopicTitle(event.target.value)}
+                required
+                fullWidth
+              />
+              <TextField
+                label="话题描述（可选）"
+                value={topicDescription}
+                onChange={(event) => setTopicDescription(event.target.value)}
+                multiline
+                minRows={3}
+                fullWidth
+              />
+            </Stack>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={closeTopicDialog} disabled={createTopicMutation.isPending}>
+              取消
+            </Button>
+            <Button type="submit" variant="contained" disabled={createTopicMutation.isPending}>
+              {createTopicMutation.isPending ? '创建中…' : '发布话题'}
+            </Button>
+          </DialogActions>
+        </Box>
+      </Dialog>
+
+      <Dialog open={postDialogOpen} onClose={closePostDialog} fullWidth maxWidth="sm">
+        <Box component="form" onSubmit={handleCreatePost}>
+          <DialogTitle>发布回复</DialogTitle>
+          <DialogContent dividers>
+            <TextField
+              label="帖子内容"
+              value={postContent}
+              onChange={(event) => setPostContent(event.target.value)}
+              multiline
+              minRows={4}
+              required
+              fullWidth
+            />
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={closePostDialog} disabled={createPostMutation.isPending}>
+              取消
+            </Button>
+            <Button type="submit" variant="contained" disabled={createPostMutation.isPending || selectedTopicId === null}>
+              {createPostMutation.isPending ? '发送中…' : '发布回复'}
+            </Button>
+          </DialogActions>
+        </Box>
+      </Dialog>
     </Stack>
   );
 };
