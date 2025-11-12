@@ -235,11 +235,13 @@ const loadDailyTaskForDate = async (targetDate) => {
   const orderColumn = config.updatedAt || config.createdAt || config.id;
 
   const rows = await query(
-    `SELECT ${selectFragments.join(', ')}`
-       FROM \\`${config.table}\` t
-      WHERE DATE(t.\`${dateColumn}\`) = :target
-      ORDER BY t.\`${orderColumn || config.id}\` DESC
-      LIMIT 1`,
+    `
+    SELECT ${selectFragments.join(', ')}
+    FROM \`${config.table}\` t
+    WHERE DATE(t.\`${dateColumn}\`) = :target
+    ORDER BY t.\`${orderColumn || config.id}\` DESC
+    LIMIT 1
+    `,
     { target: today },
   );
 
@@ -247,10 +249,12 @@ const loadDailyTaskForDate = async (targetDate) => {
 
   if (!row) {
     const fallbackRows = await query(
-      `SELECT ${selectFragments.join(', ')}`
-         FROM \\`${config.table}\` t
-        ORDER BY t.\`${orderColumn || config.id}\` DESC
-        LIMIT 1`,
+      `
+      SELECT ${selectFragments.join(', ')}
+      FROM \`${config.table}\` t
+      ORDER BY t.\`${orderColumn || config.id}\` DESC
+      LIMIT 1
+      `,
     );
 
     row = fallbackRows[0];
@@ -280,10 +284,12 @@ const loadUserDailyStats = async (userId, today) => {
   }
 
   const rows = await query(
-    `SELECT DATE(c.\`${completionConfig.completedAt}\`) AS completed_date`
-       FROM \\`${completionConfig.table}\` c
-      WHERE c.\`${completionConfig.userId}\` = :userId
-      ORDER BY c.\`${completionConfig.completedAt}\` ASC`,
+    `
+    SELECT DATE(c.\`${completionConfig.completedAt}\`) AS completed_date
+    FROM \`${completionConfig.table}\` c
+    WHERE c.\`${completionConfig.userId}\` = :userId
+    ORDER BY c.\`${completionConfig.completedAt}\` ASC
+    `,
     { userId: normalizedUserId },
   );
 
@@ -369,20 +375,22 @@ const buildLeaderboard = async (scope = 'global', sessionUser = null) => {
   ];
 
   let joinTask = '';
-  let minutesExpression = 'SUM(45) AS total_minutes';
+  const minutesAlias = 'total_minutes';
+  let minutesExpression = `SUM(45) AS ${minutesAlias}`;
 
   const taskConfig = await getDailyTaskConfig();
 
   if (taskConfig && taskConfig.id && completionConfig.taskId) {
     joinTask = `LEFT JOIN \`${taskConfig.table}\` t ON t.\`${taskConfig.id}\` = c.\`${completionConfig.taskId}\``;
     minutesExpression = taskConfig.estimatedMinutes
-      ? `SUM(COALESCE(t.\`${taskConfig.estimatedMinutes}\`, 45)) AS total_minutes`
-      : 'SUM(45) AS total_minutes';
+      ? `SUM(COALESCE(t.\`${taskConfig.estimatedMinutes}\`, 45)) AS ${minutesAlias}`
+      : `SUM(45) AS ${minutesAlias}`;
   }
 
   selectFragments.push(minutesExpression);
 
   const whereClauses = [];
+  const havingClauses = ['active_days > 0', `${minutesAlias} > 0`];
   const params = {};
 
   if (scope === 'campus' && majorColumn) {
@@ -397,16 +405,20 @@ const buildLeaderboard = async (scope = 'global', sessionUser = null) => {
   }
 
   const whereSql = whereClauses.length ? `WHERE ${whereClauses.join(' AND ')}` : '';
+  const havingSql = havingClauses.length ? `HAVING ${havingClauses.join(' AND ')}` : '';
 
   const rows = await query(
-    `SELECT ${selectFragments.join(', ')}`
-       FROM \`${completionConfig.table}\` c
-       JOIN users u ON u.\`${userIdColumn}\` = c.\`${completionConfig.userId}\`
-       ${joinTask}
-       ${whereSql}
-      GROUP BY u.\`${userIdColumn}\`
-      ORDER BY active_days DESC, last_completed_at DESC
-      LIMIT 20`,
+    `
+    SELECT ${selectFragments.join(', ')}
+    FROM \`${completionConfig.table}\` c
+    JOIN users u ON u.\`${userIdColumn}\` = c.\`${completionConfig.userId}\`
+    ${joinTask}
+    ${whereSql}
+    GROUP BY u.\`${userIdColumn}\`
+    ${havingSql}
+    ORDER BY active_days DESC, last_completed_at DESC
+    LIMIT 20
+    `,
     params,
   );
 
@@ -420,11 +432,13 @@ const buildLeaderboard = async (scope = 'global', sessionUser = null) => {
 
   if (clause) {
     const dateRows = await query(
-      `SELECT c.\`${completionConfig.userId}\` AS user_id,
-              DATE(c.\`${completionConfig.completedAt}\`) AS completed_date`
-         FROM \`${completionConfig.table}\` c
-        WHERE c.\`${completionConfig.userId}\` IN (${clause})
-        ORDER BY c.\`${completionConfig.userId}\`, c.\`${completionConfig.completedAt}\` ASC`,
+      `
+      SELECT c.\`${completionConfig.userId}\` AS user_id,
+             DATE(c.\`${completionConfig.completedAt}\`) AS completed_date
+      FROM \`${completionConfig.table}\` c
+      WHERE c.\`${completionConfig.userId}\` IN (${clause})
+      ORDER BY c.\`${completionConfig.userId}\`, c.\`${completionConfig.completedAt}\` ASC
+      `,
       inParams,
     );
 

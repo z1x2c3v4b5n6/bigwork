@@ -72,11 +72,22 @@ export const syncWrongBook = async (): Promise<WrongBookSyncResult> => {
 
   try {
     if (pending.length > 0) {
-      await apiRequest({
+      const uploadResult = await apiRequest<{
+        success?: boolean;
+        synced?: number;
+        message?: string;
+      }>({
         path: '/practice/wrong-questions/bulk',
         method: 'POST',
         data: { questions: pending.map(({ synced, ...rest }) => rest) },
       });
+
+      if (uploadResult?.success === false && uploadResult.message) {
+        const uploadError: ApiError = new Error(uploadResult.message);
+        uploadError.statusCode = 0;
+        throw uploadError;
+      }
+
       markItemsAsSynced(pending.map((item) => item.id));
     }
 

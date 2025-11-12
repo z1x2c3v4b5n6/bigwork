@@ -330,4 +330,11 @@ Page({
       this.setData({ saving: false });
     }
   },
+
+  navigateToAdmin() {
+    wx.navigateTo({ url: '/pages/admin/index' }).catch((error) => {
+      console.warn('进入后台管理失败', error);
+      wx.showToast({ title: '无法打开后台管理', icon: 'none' });
+    });
+  },
 });

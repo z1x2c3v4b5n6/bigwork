@@ -1,5 +1,20 @@
 
-import { adminReferenceSites } from '../../data/admin';
+import {
+  adminAdministratorsSeed,
+  adminAuditLogSeed,
+  adminCoursesSeed,
+  adminDashboardNote,
+  adminForumPostsSeed,
+  adminForumTopicsSeed,
+  adminMajorsSeed,
+  adminMaterialsSeed,
+  adminMetricsSeed,
+  adminReferenceSites,
+  adminSettingsSeed,
+  adminStatisticsSeed,
+  adminStudentProgressSeed,
+  adminUsersSeed,
+} from '../../data/admin';
 import { apiRequest, type ApiError } from '../../utils/api';
 import { ensureSession } from '../../utils/session';
 
@@ -229,6 +244,90 @@ const getErrorMessage = (error: unknown, fallback: string): string => {
 
 const FIELD_NOTES_STORAGE_KEY = 'adminFieldNotes';
 
+const cloneMetricCards = (): MetricCard[] => adminMetricsSeed.map((item) => ({ ...item }));
+
+const cloneStudentProgress = (): StudentProgressRow[] =>
+  adminStudentProgressSeed.map((item) => ({ ...item }));
+
+const cloneAuditLogs = (): AuditLogRow[] =>
+  adminAuditLogSeed.map((item) => ({
+    id: item.id,
+    title: item.title,
+    description: item.description,
+    actor: item.actor,
+    created_at: item.createdAt,
+  }));
+
+const cloneAdministrators = (): string[] => adminAdministratorsSeed.slice();
+
+const cloneUsers = (): AdminUser[] =>
+  adminUsersSeed.map((item) => ({
+    id: item.id,
+    username: item.username,
+    displayName: item.displayName,
+    role: item.role,
+    email: item.email,
+    created_at: item.createdAt,
+  }));
+
+const cloneMajors = (): MajorRecord[] =>
+  adminMajorsSeed.map((item) => ({
+    id: item.id,
+    name: item.name,
+    description: item.description,
+  }));
+
+const cloneCourses = (): CourseRecord[] =>
+  adminCoursesSeed.map((item) => ({
+    id: item.id,
+    title: item.title,
+    description: item.description,
+    teacher: item.teacher,
+    credit: item.credit,
+    majorId: item.majorId,
+    majorName: item.majorName,
+    courseTitle: item.title,
+  }));
+
+const cloneMaterials = (): MaterialRecord[] =>
+  adminMaterialsSeed.map((item) => ({
+    id: item.id,
+    title: item.title,
+    description: item.description,
+    fileUrl: item.fileUrl,
+    courseId: item.courseId,
+    courseTitle: item.courseTitle,
+  }));
+
+const cloneForumTopics = (): ForumTopic[] =>
+  adminForumTopicsSeed.map((item) => ({
+    id: item.id,
+    title: item.title,
+    description: item.description,
+    created_at: item.createdAt,
+    updated_at: item.updatedAt,
+  }));
+
+const cloneForumPosts = (topicId: string): ForumPost[] => {
+  const numericId = Number(topicId);
+  const posts = adminForumPostsSeed[numericId] || [];
+  return posts.map((post) => ({
+    id: post.id,
+    content: post.content,
+    author: post.author,
+    created_at: post.createdAt,
+    updated_at: post.createdAt,
+  }));
+};
+
+const cloneStatistics = (): StatisticsOverview => ({ ...adminStatisticsSeed });
+
+const isUnauthorizedError = (error: unknown): boolean => {
+  const apiError = error as ApiError | undefined;
+  const statusCode = apiError?.statusCode;
+  return statusCode === 401 || statusCode === 403;
+};
+
 const formatDateTime = (input?: string | number | Date) => {
   const date = input ? new Date(input) : new Date();
   if (Number.isNaN(date.getTime())) {
@@ -423,10 +522,113 @@ Page({
         globalError: message,
         'sectionLoading.overview': false,
       });
+      this.applyOverviewFallback(`${adminDashboardNote} 若需查看实时数据，请使用管理员账号登录。`);
       return;
     }
 
     await this.loadOverview();
+  },
+
+  async _getData() {
+    if (!this.data.loadedTabs.overview) {
+      await this.loadOverview();
+    }
+
+    return {
+      metricsCards: this.data.metricsCards,
+      studentProgress: this.data.studentProgress,
+      auditLogs: this.data.auditLogs,
+      administrators: this.data.administrators,
+      dashboardNote: this.data.dashboardNote,
+      loadedTabs: { ...this.data.loadedTabs },
+    };
+  },
+
+  applyOverviewFallback(note?: string) {
+    const metricsCards = cloneMetricCards();
+    this.setData({
+      metricsCards,
+      studentProgress: cloneStudentProgress(),
+      auditLogs: cloneAuditLogs(),
+      administrators: cloneAdministrators(),
+      dashboardNote: note ?? adminDashboardNote,
+      'loadedTabs.overview': true,
+      'sectionErrors.overview': '',
+    });
+    this.refreshMobileToolkitInsights();
+  },
+
+  applySettingsFallback() {
+    this.setData({
+      settingsForm: createSettingsForm(adminSettingsSeed),
+      'loadedTabs.settings': true,
+      settingsFormError: '',
+    });
+  },
+
+  applyUsersFallback() {
+    this.setData({
+      users: cloneUsers(),
+      'loadedTabs.users': true,
+      'sectionErrors.users': '',
+    });
+  },
+
+  applyMajorsFallback() {
+    const majors = cloneMajors();
+    this.setData({
+      majors,
+      'loadedTabs.majors': true,
+      'sectionErrors.majors': '',
+    });
+    this.syncCourseFormMajor(majors);
+  },
+
+  applyCoursesFallback() {
+    const courses = cloneCourses();
+    this.setData({
+      courses,
+      coursesForMaterials: courses,
+      'loadedTabs.courses': true,
+      'sectionErrors.courses': '',
+    });
+    this.syncMaterialFormCourse(courses);
+  },
+
+  applyMaterialsFallback() {
+    const materials = cloneMaterials();
+    this.setData({
+      materials,
+      'loadedTabs.materials': true,
+      'sectionErrors.materials': '',
+    });
+  },
+
+  applyForumFallback() {
+    const topics = cloneForumTopics();
+    const nextTopicId = topics.length > 0 ? String(topics[0].id) : '';
+    this.setData({
+      forumTopics: topics,
+      selectedTopicId: nextTopicId,
+      forumPosts: nextTopicId ? cloneForumPosts(nextTopicId) : [],
+      'loadedTabs.forum': true,
+      'sectionErrors.forum': '',
+    });
+  },
+
+  applyForumPostsFallback(topicId: string) {
+    this.setData({
+      forumPosts: cloneForumPosts(topicId),
+      forumPostsError: '',
+    });
+  },
+
+  applyStatisticsFallback() {
+    this.setData({
+      statistics: cloneStatistics(),
+      'loadedTabs.statistics': true,
+      'sectionErrors.statistics': '',
+    });
   },
 
   switchTab(event: WechatMiniprogram.BaseEvent) {
@@ -509,9 +711,19 @@ Page({
       });
       this.refreshMobileToolkitInsights();
     } catch (error) {
-      this.setData({
-        'sectionErrors.overview': getErrorMessage(error, '无法加载后台概览数据，请稍后重试。'),
-      });
+      const message = getErrorMessage(error, '无法加载后台概览数据，请稍后重试。');
+      if (!this.data.loadedTabs.overview) {
+        const note = isUnauthorizedError(error)
+          ? `${adminDashboardNote} 若需查看实时数据，请使用管理员账号登录。`
+          : `${adminDashboardNote} 当前为示例数据展示，稍后重试可获取实时数据。`;
+        this.applyOverviewFallback(note);
+      }
+
+      if (isUnauthorizedError(error)) {
+        this.setData({ globalError: message, 'sectionErrors.overview': '' });
+      } else {
+        this.setData({ 'sectionErrors.overview': message });
+      }
     } finally {
       this.setData({ 'sectionLoading.overview': false });
     }
@@ -533,7 +745,13 @@ Page({
         'loadedTabs.settings': true,
       });
     } catch (error) {
-      this.setData({ 'sectionErrors.settings': getErrorMessage(error, '无法加载平台基础信息。') });
+      const message = getErrorMessage(error, '无法加载平台基础信息。');
+      if (isUnauthorizedError(error)) {
+        this.applySettingsFallback();
+        this.setData({ globalError: message });
+      } else {
+        this.setData({ 'sectionErrors.settings': message });
+      }
     } finally {
       this.setData({ 'sectionLoading.settings': false });
     }
@@ -605,7 +823,13 @@ Page({
         'loadedTabs.users': true,
       });
     } catch (error) {
-      this.setData({ 'sectionErrors.users': getErrorMessage(error, '无法加载用户列表。') });
+      const message = getErrorMessage(error, '无法加载用户列表。');
+      if (isUnauthorizedError(error)) {
+        this.applyUsersFallback();
+        this.setData({ globalError: message });
+      } else {
+        this.setData({ 'sectionErrors.users': message });
+      }
     } finally {
       this.setData({ 'sectionLoading.users': false });
     }
@@ -757,7 +981,13 @@ Page({
       });
       this.syncCourseFormMajor(majors);
     } catch (error) {
-      this.setData({ 'sectionErrors.majors': getErrorMessage(error, '无法加载专业信息。') });
+      const message = getErrorMessage(error, '无法加载专业信息。');
+      if (isUnauthorizedError(error)) {
+        this.applyMajorsFallback();
+        this.setData({ globalError: message });
+      } else {
+        this.setData({ 'sectionErrors.majors': message });
+      }
     } finally {
       this.setData({ 'sectionLoading.majors': false });
     }
@@ -890,7 +1120,16 @@ Page({
       });
       this.syncMaterialFormCourse(courses);
     } catch (error) {
-      this.setData({ 'sectionErrors.courses': getErrorMessage(error, '无法加载课程列表。') });
+      const message = getErrorMessage(error, '无法加载课程列表。');
+      if (isUnauthorizedError(error)) {
+        if (!this.data.loadedTabs.majors) {
+          this.applyMajorsFallback();
+        }
+        this.applyCoursesFallback();
+        this.setData({ globalError: message });
+      } else {
+        this.setData({ 'sectionErrors.courses': message });
+      }
     } finally {
       this.setData({ 'sectionLoading.courses': false });
     }
@@ -1054,7 +1293,16 @@ Page({
         'loadedTabs.materials': true,
       });
     } catch (error) {
-      this.setData({ 'sectionErrors.materials': getErrorMessage(error, '无法加载资料列表。') });
+      const message = getErrorMessage(error, '无法加载资料列表。');
+      if (isUnauthorizedError(error)) {
+        if (!this.data.loadedTabs.courses) {
+          this.applyCoursesFallback();
+        }
+        this.applyMaterialsFallback();
+        this.setData({ globalError: message });
+      } else {
+        this.setData({ 'sectionErrors.materials': message });
+      }
     } finally {
       this.setData({ 'sectionLoading.materials': false });
     }
@@ -1195,7 +1443,13 @@ Page({
         await this.loadForumPosts(selectedTopicId);
       }
     } catch (error) {
-      this.setData({ 'sectionErrors.forum': getErrorMessage(error, '无法加载论坛数据。') });
+      const message = getErrorMessage(error, '无法加载论坛数据。');
+      if (isUnauthorizedError(error)) {
+        this.applyForumFallback();
+        this.setData({ globalError: message });
+      } else {
+        this.setData({ 'sectionErrors.forum': message });
+      }
     } finally {
       this.setData({ 'sectionLoading.forum': false });
     }
@@ -1215,7 +1469,13 @@ Page({
       });
       this.setData({ forumPosts: Array.isArray(response.posts) ? response.posts : [] });
     } catch (error) {
-      this.setData({ forumPostsError: getErrorMessage(error, '无法加载帖子列表。'), forumPosts: [] });
+      const message = getErrorMessage(error, '无法加载帖子列表。');
+      if (isUnauthorizedError(error)) {
+        this.applyForumPostsFallback(topicId);
+        this.setData({ globalError: message, forumPostsError: '' });
+      } else {
+        this.setData({ forumPostsError: message, forumPosts: [] });
+      }
     } finally {
       this.setData({ forumPostsLoading: false });
     }
@@ -1592,7 +1852,13 @@ Page({
       const response = await apiRequest<StatisticsOverview>({ path: '/admin/statistics/overview' });
       this.setData({ statistics: response, 'loadedTabs.statistics': true });
     } catch (error) {
-      this.setData({ 'sectionErrors.statistics': getErrorMessage(error, '无法加载统计信息。') });
+      const message = getErrorMessage(error, '无法加载统计信息。');
+      if (isUnauthorizedError(error)) {
+        this.applyStatisticsFallback();
+        this.setData({ globalError: message });
+      } else {
+        this.setData({ 'sectionErrors.statistics': message });
+      }
     } finally {
       this.setData({ 'sectionLoading.statistics': false });
     }
