@@ -375,20 +375,22 @@ const buildLeaderboard = async (scope = 'global', sessionUser = null) => {
   ];
 
   let joinTask = '';
-  let minutesExpression = 'SUM(45) AS total_minutes';
+  const minutesAlias = 'total_minutes';
+  let minutesExpression = `SUM(45) AS ${minutesAlias}`;
 
   const taskConfig = await getDailyTaskConfig();
 
   if (taskConfig && taskConfig.id && completionConfig.taskId) {
     joinTask = `LEFT JOIN \`${taskConfig.table}\` t ON t.\`${taskConfig.id}\` = c.\`${completionConfig.taskId}\``;
     minutesExpression = taskConfig.estimatedMinutes
-      ? `SUM(COALESCE(t.\`${taskConfig.estimatedMinutes}\`, 45)) AS total_minutes`
-      : 'SUM(45) AS total_minutes';
+      ? `SUM(COALESCE(t.\`${taskConfig.estimatedMinutes}\`, 45)) AS ${minutesAlias}`
+      : `SUM(45) AS ${minutesAlias}`;
   }
 
   selectFragments.push(minutesExpression);
 
   const whereClauses = [];
+  const havingClauses = ['active_days > 0', `${minutesAlias} > 0`];
   const params = {};
 
   if (scope === 'campus' && majorColumn) {
@@ -403,6 +405,7 @@ const buildLeaderboard = async (scope = 'global', sessionUser = null) => {
   }
 
   const whereSql = whereClauses.length ? `WHERE ${whereClauses.join(' AND ')}` : '';
+  const havingSql = havingClauses.length ? `HAVING ${havingClauses.join(' AND ')}` : '';
 
   const rows = await query(
     `
@@ -412,6 +415,7 @@ const buildLeaderboard = async (scope = 'global', sessionUser = null) => {
     ${joinTask}
     ${whereSql}
     GROUP BY u.\`${userIdColumn}\`
+    ${havingSql}
     ORDER BY active_days DESC, last_completed_at DESC
     LIMIT 20
     `,

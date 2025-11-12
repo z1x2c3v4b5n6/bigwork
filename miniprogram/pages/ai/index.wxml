@@ -4,12 +4,93 @@
     <view class="hero__subtitle">随时提问复习难点，获取针对性的学习建议。</view>
   </view>
 
+  <view class="message message--info" wx:if="{{overviewLoading}}">正在获取你的学习推荐…</view>
+  <view class="message message--error" wx:elif="{{overviewError}}">{{overviewError}}</view>
+
+  <view class="section" wx:if="{{suggestions.length}}">
+    <view class="section__header">
+      <view class="section__title">推荐提问</view>
+      <view class="section__subtitle">一键追问常见瓶颈，AI 会结合课程与资料给出建议。</view>
+    </view>
+    <view class="suggestion-grid">
+      <block wx:for="{{suggestions}}" wx:key="id">
+        <view class="suggestion-card">
+          <view class="suggestion-card__title">{{item.title}}</view>
+          <view class="suggestion-card__description">{{item.description}}</view>
+          <button
+            class="suggestion-card__action"
+            size="mini"
+            data-question="{{item.sampleQuestion}}"
+            bindtap="applySuggestion"
+          >
+            追问：{{item.sampleQuestion}}
+          </button>
+        </view>
+      </block>
+    </view>
+  </view>
+
+  <view class="section" wx:if="{{recommendedCourses.length || recommendedMaterials.length}}">
+    <view class="section__header">
+      <view class="section__title">学习推荐</view>
+      <view class="section__subtitle">基于近期提问，推荐匹配的课程与复习资料。</view>
+    </view>
+    <view class="recommendation-group" wx:if="{{recommendedCourses.length}}">
+      <view class="recommendation-group__title">课程</view>
+      <view class="recommendation-list">
+        <block wx:for="{{recommendedCourses}}" wx:key="title">
+          <view class="recommendation-item">
+            <view class="recommendation-item__title">{{item.title}}</view>
+            <view class="recommendation-item__meta">{{item.teacher}}</view>
+            <view class="recommendation-item__description">{{item.highlight}}</view>
+          </view>
+        </block>
+      </view>
+    </view>
+    <view class="recommendation-group" wx:if="{{recommendedMaterials.length}}">
+      <view class="recommendation-group__title">资料</view>
+      <view class="recommendation-list">
+        <block wx:for="{{recommendedMaterials}}" wx:key="title">
+          <view class="recommendation-item">
+            <view class="recommendation-item__title">{{item.title}}</view>
+            <view class="recommendation-item__meta">{{item.type}}</view>
+            <view class="recommendation-item__description">{{item.description}}</view>
+            <button
+              wx:if="{{item.url}}"
+              class="recommendation-item__link"
+              size="mini"
+              data-url="{{item.url}}"
+              bindtap="copyLink"
+            >
+              复制资料链接
+            </button>
+          </view>
+        </block>
+      </view>
+    </view>
+  </view>
+
+  <view class="section" wx:if="{{recentConversations.length}}">
+    <view class="section__header">
+      <view class="section__title">最近提问</view>
+      <view class="section__subtitle">点击可快速再次追问。</view>
+    </view>
+    <view class="history-list">
+      <block wx:for="{{recentConversations}}" wx:key="id">
+        <view class="history-item" data-question="{{item.question}}" bindtap="applySuggestion">
+          <view class="history-item__question">{{item.question}}</view>
+          <view class="history-item__meta" wx:if="{{item.createdAtText}}">{{item.createdAtText}}</view>
+        </view>
+      </block>
+    </view>
+  </view>
+
   <view class="message message--error" wx:if="{{errorMessage}}">{{errorMessage}}</view>
 
   <scroll-view scroll-y="true" class="conversation" scroll-with-animation="true" enable-flex="true">
     <block wx:for="{{messages}}" wx:key="id">
       <view class="bubble {{item.role === 'user' ? 'bubble--user' : 'bubble--assistant'}}">
-        <view class="bubble__role">{{item.role === 'user' ? '我' : 'AI'}} · {{item.createdAt}}</view>
+        <view class="bubble__role">{{item.role === 'user' ? '我' : 'AI'}} · {{item.createdAtText}}</view>
         <view class="bubble__content">{{item.content}}</view>
         <button
           wx:if="{{item.role === 'user'}}"
