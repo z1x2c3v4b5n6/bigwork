@@ -1,5 +1,5 @@
 <view class="page">
-  <scroll-view class="scroll" scroll-y>
+  <scroll-view class="scroll" scroll-y enable-flex="true">
     <view class="card" wx:for="{{materials}}" wx:key="id" wx:for-item="material">
       <view class="card-title">{{material.title}}</view>
       <view class="card-desc">{{material.major}}</view>

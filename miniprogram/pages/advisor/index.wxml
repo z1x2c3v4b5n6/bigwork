@@ -1,5 +1,5 @@
 <view class="advisor-page">
-  <scroll-view class="advisor-scroll" scroll-y>
+  <scroll-view class="advisor-scroll" scroll-y enable-flex="true">
     <view class="form-card">
       <view class="form-group">
         <text class="group-label">初试总分</text>

@@ -429,6 +429,21 @@ Page({
     await this.loadOverview();
   },
 
+  async _getData() {
+    if (!this.data.loadedTabs.overview) {
+      await this.loadOverview();
+    }
+
+    return {
+      metricsCards: this.data.metricsCards,
+      studentProgress: this.data.studentProgress,
+      auditLogs: this.data.auditLogs,
+      administrators: this.data.administrators,
+      dashboardNote: this.data.dashboardNote,
+      loadedTabs: { ...this.data.loadedTabs },
+    };
+  },
+
   switchTab(event: WechatMiniprogram.BaseEvent) {
     const tab = event.currentTarget?.dataset?.tab as AdminTab | undefined;
     if (!tab || tab === this.data.activeTab) {
