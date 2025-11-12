@@ -434,10 +434,12 @@ router.get('/topics', async (req, res) => {
       : `ft.\`${topicConfig.id}\``;
 
     let rows = await query(
-      `SELECT ${selectFragments.join(', ')}`
-         FROM \`${topicConfig.tableName}\` ft
-         ${joinClause}
-        ORDER BY ${orderColumn} DESC, ft.\`${topicConfig.id}\` DESC`,
+      `
+        SELECT ${selectFragments.join(', ')}
+        FROM \`${topicConfig.tableName}\` ft
+        ${joinClause}
+        ORDER BY ${orderColumn} DESC, ft.\`${topicConfig.id}\` DESC
+      `,
     );
 
     if (!rows.length) {
