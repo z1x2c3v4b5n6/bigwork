@@ -52,7 +52,7 @@ Page({
 
     try {
       const response = await apiRequest({
-        path: '/api/ai/ask',
+        path: '/ai/ask',
         method: 'POST',
         data: { question },
       });

@@ -11,6 +11,12 @@ const { normalizeDate, parseTags, stringifyTags, toMySqlDateTime } = require('..
 const { normalizeIdentifier, normalizeValueForColumn } = require('../utils/db');
 const { getDefaultMajorId } = require('../utils/majors');
 const { buildRecommendationResponse } = require('../utils/universityAdvisor');
+const {
+  getFallbackTaskForDate,
+  recordFallbackCompletion,
+  getFallbackCompletionDates,
+  getFallbackLeaderboard,
+} = require('../data/learningFallback');
 
 const router = express.Router();
 
@@ -199,17 +205,21 @@ const mapDailyTaskRow = (row) => ({
 });
 
 const loadDailyTaskForDate = async (targetDate) => {
-  const today = formatDateOnly(targetDate);
+  const today = formatDateOnly(targetDate) || formatDateOnly(new Date());
   const config = await getDailyTaskConfig();
 
-  if (!today || !config || !config.id) {
-    return null;
+  if (!today) {
+    return getFallbackTaskForDate(targetDate);
+  }
+
+  if (!config || !config.id) {
+    return getFallbackTaskForDate(today);
   }
 
   const dateColumn = config.date || config.createdAt || config.updatedAt;
 
   if (!dateColumn) {
-    return null;
+    return getFallbackTaskForDate(today);
   }
 
   const selectFragments = [
@@ -225,8 +235,8 @@ const loadDailyTaskForDate = async (targetDate) => {
   const orderColumn = config.updatedAt || config.createdAt || config.id;
 
   const rows = await query(
-    `SELECT ${selectFragments.join(', ')}
-       FROM \`${config.table}\` t
+    `SELECT ${selectFragments.join(', ')}`
+       FROM \\`${config.table}\` t
       WHERE DATE(t.\`${dateColumn}\`) = :target
       ORDER BY t.\`${orderColumn || config.id}\` DESC
       LIMIT 1`,
@@ -237,8 +247,8 @@ const loadDailyTaskForDate = async (targetDate) => {
 
   if (!row) {
     const fallbackRows = await query(
-      `SELECT ${selectFragments.join(', ')}
-         FROM \`${config.table}\` t
+      `SELECT ${selectFragments.join(', ')}`
+         FROM \\`${config.table}\` t
         ORDER BY t.\`${orderColumn || config.id}\` DESC
         LIMIT 1`,
     );
@@ -246,7 +256,7 @@ const loadDailyTaskForDate = async (targetDate) => {
     row = fallbackRows[0];
   }
 
-  return row ? mapDailyTaskRow(row) : null;
+  return row ? mapDailyTaskRow(row) : getFallbackTaskForDate(today);
 };
 
 const loadUserDailyStats = async (userId, today) => {
@@ -256,16 +266,22 @@ const loadUserDailyStats = async (userId, today) => {
     return { streak: 0, completedToday: false, lastCompletedDate: null, totalCompletedDays: 0 };
   }
 
-  const completionConfig = await getDailyTaskCompletionConfig();
+  const normalizedUserId = normalizeIdentifier(userId);
 
-  if (!completionConfig || !completionConfig.userId || !completionConfig.completedAt) {
+  if (!normalizedUserId) {
     return { streak: 0, completedToday: false, lastCompletedDate: null, totalCompletedDays: 0 };
   }
 
-  const normalizedUserId = normalizeIdentifier(userId);
+  const completionConfig = await getDailyTaskCompletionConfig();
+
+  if (!completionConfig || !completionConfig.userId || !completionConfig.completedAt) {
+    const fallbackDates = getFallbackCompletionDates(normalizedUserId);
+    return computeStreakFromDates(fallbackDates, todayString);
+  }
+
   const rows = await query(
-    `SELECT DATE(c.\`${completionConfig.completedAt}\`) AS completed_date
-       FROM \`${completionConfig.table}\` c
+    `SELECT DATE(c.\`${completionConfig.completedAt}\`) AS completed_date`
+       FROM \\`${completionConfig.table}\` c
       WHERE c.\`${completionConfig.userId}\` = :userId
       ORDER BY c.\`${completionConfig.completedAt}\` ASC`,
     { userId: normalizedUserId },
@@ -276,26 +292,49 @@ const loadUserDailyStats = async (userId, today) => {
 };
 
 const buildLeaderboard = async (scope = 'global', sessionUser = null) => {
+  const fallbackRaw = getFallbackLeaderboard(scope, sessionUser) || [];
+  const fallbackEntries = fallbackRaw.map((entry, index) => {
+    const seed = entry || {};
+    const progressValue = Number(seed.progress ?? 0);
+    const hoursValue = Number(seed.hours ?? 0);
+    const streakValue = Number.isFinite(Number(seed.streak))
+      ? Number(seed.streak)
+      : Math.max(1, Math.round((Number.isFinite(progressValue) ? progressValue : 0) / 12));
+    const activeDaysValue = Number.isFinite(Number(seed.activeDays))
+      ? Number(seed.activeDays)
+      : Math.max(5, Math.round((Number.isFinite(hoursValue) ? hoursValue : 0) / 1.5));
+
+    return {
+      id: seed.id != null ? String(seed.id) : `fallback-${scope}-${index}`,
+      name: seed.name || '学习同学',
+      university: seed.university || '未填写院校',
+      progress: Number.isFinite(progressValue) ? progressValue : 0,
+      hours: Number.isFinite(hoursValue) ? hoursValue : 0,
+      streak: streakValue,
+      activeDays: activeDaysValue,
+    };
+  });
+
   const completionConfig = await getDailyTaskCompletionConfig();
 
   if (!completionConfig || !completionConfig.userId || !completionConfig.completedAt) {
-    return [];
+    return fallbackEntries;
   }
 
   if (!(await tableExists('users'))) {
-    return [];
+    return fallbackEntries;
   }
 
   const userColumns = await getTableColumns('users');
 
   if (userColumns.size === 0) {
-    return [];
+    return fallbackEntries;
   }
 
   const userIdColumn = resolveColumn(userColumns, ['id', 'user_id']);
 
   if (!userIdColumn) {
-    return [];
+    return fallbackEntries;
   }
 
   const displayColumn = resolveColumn(userColumns, ['display_name', 'name', 'full_name']);
@@ -360,7 +399,7 @@ const buildLeaderboard = async (scope = 'global', sessionUser = null) => {
   const whereSql = whereClauses.length ? `WHERE ${whereClauses.join(' AND ')}` : '';
 
   const rows = await query(
-    `SELECT ${selectFragments.join(', ')}
+    `SELECT ${selectFragments.join(', ')}`
        FROM \`${completionConfig.table}\` c
        JOIN users u ON u.\`${userIdColumn}\` = c.\`${completionConfig.userId}\`
        ${joinTask}
@@ -372,7 +411,7 @@ const buildLeaderboard = async (scope = 'global', sessionUser = null) => {
   );
 
   if (!rows.length) {
-    return [];
+    return fallbackEntries;
   }
 
   const userIds = rows.map((row) => row.user_id).filter(Boolean);
@@ -382,7 +421,7 @@ const buildLeaderboard = async (scope = 'global', sessionUser = null) => {
   if (clause) {
     const dateRows = await query(
       `SELECT c.\`${completionConfig.userId}\` AS user_id,
-              DATE(c.\`${completionConfig.completedAt}\`) AS completed_date
+              DATE(c.\`${completionConfig.completedAt}\`) AS completed_date`
          FROM \`${completionConfig.table}\` c
         WHERE c.\`${completionConfig.userId}\` IN (${clause})
         ORDER BY c.\`${completionConfig.userId}\`, c.\`${completionConfig.completedAt}\` ASC`,
@@ -409,7 +448,7 @@ const buildLeaderboard = async (scope = 'global', sessionUser = null) => {
   const today = formatDateOnly(new Date());
   const bestActiveDays = Math.max(...rows.map((row) => Number(row.active_days) || 0), 1);
 
-  return rows
+  const leaderboard = rows
     .map((row) => {
       const userIdValue = row.user_id;
       const dates = completionMap.get(userIdValue) || [];
@@ -440,6 +479,8 @@ const buildLeaderboard = async (scope = 'global', sessionUser = null) => {
 
       return b.activeDays - a.activeDays;
     });
+
+  return leaderboard.length ? leaderboard : fallbackEntries;
 };
 
 const parseDateTimeInput = (value, referenceDate = null) => {
@@ -1090,8 +1131,20 @@ router.post('/daily-task/complete', requireAuth, async (req, res) => {
   }
 
   try {
+    const normalizedUserId = normalizeIdentifier(req.session?.user?.id);
+
+    if (!normalizedUserId) {
+      return res.status(401).json({ message: '登录状态已失效，请重新登录后再试。' });
+    }
+
     const completionConfig = await getDailyTaskCompletionConfig();
     const taskConfig = await getDailyTaskConfig();
+    const today = formatDateOnly(new Date());
+    const todayTask = await loadDailyTaskForDate(today);
+
+    if (!todayTask || String(todayTask.id) !== String(taskId)) {
+      return res.status(400).json({ message: '任务已更新，请刷新后重新打卡。' });
+    }
 
     if (
       !completionConfig ||
@@ -1101,17 +1154,15 @@ router.post('/daily-task/complete', requireAuth, async (req, res) => {
       !taskConfig ||
       !taskConfig.id
     ) {
-      return res.status(500).json({ message: '系统尚未配置打卡数据表，请联系管理员。' });
+      recordFallbackCompletion(normalizedUserId, today);
+      const stats = computeStreakFromDates(getFallbackCompletionDates(normalizedUserId), today);
+      return res.json({
+        streak: stats.streak,
+        completedToday: true,
+        lastCompletedDate: stats.lastCompletedDate,
+        totalCompletedDays: stats.totalCompletedDays,
+      });
     }
-
-    const today = formatDateOnly(new Date());
-    const todayTask = await loadDailyTaskForDate(today);
-
-    if (!todayTask || String(todayTask.id) !== String(taskId)) {
-      return res.status(400).json({ message: '任务已更新，请刷新后重新打卡。' });
-    }
-
-    const normalizedUserId = normalizeIdentifier(req.session?.user?.id);
 
     await query(
       `INSERT INTO \`${completionConfig.table}\` (\`${completionConfig.taskId}\`, \`${completionConfig.userId}\`, \`${completionConfig.completedAt}\`)
@@ -1121,6 +1172,7 @@ router.post('/daily-task/complete', requireAuth, async (req, res) => {
     );
 
     const stats = await loadUserDailyStats(normalizedUserId, today);
+    recordFallbackCompletion(normalizedUserId, today);
 
     return res.json({
       streak: stats.streak,

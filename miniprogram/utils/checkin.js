@@ -73,25 +73,66 @@ const saveCachedTask = (task, today) => {
   saveToStorage(CHECKIN_TASK_KEY, cache);
 };
 
-const fetchTaskFromApi = async () => {
+const syncStateFromServer = (today, payload, fallbackState) => {
+  if (!payload) {
+    return fallbackState;
+  }
+
+  const nextState = {
+    lastCompletedDate: fallbackState.lastCompletedDate,
+    lastEvaluatedDate: today,
+    streak: fallbackState.streak,
+  };
+
+  const streakFromServer =
+    typeof payload.streak === 'number' && Number.isFinite(payload.streak)
+      ? Math.max(0, Math.floor(payload.streak))
+      : null;
+
+  const completedToday = Boolean(payload.completedToday);
+  const serverLastDate =
+    typeof payload.lastCompletedDate === 'string' && payload.lastCompletedDate.length === 10
+      ? payload.lastCompletedDate
+      : null;
+
+  if (streakFromServer !== null) {
+    nextState.streak = streakFromServer;
+  }
+
+  if (completedToday) {
+    nextState.lastCompletedDate = today;
+  } else if (serverLastDate) {
+    nextState.lastCompletedDate = serverLastDate;
+  }
+
+  setStoredState(nextState);
+  return nextState;
+};
+
+const fetchTaskFromApi = async (today) => {
+  const stateBeforeSync = ensureEvaluatedState(getStoredState(), today);
+
   try {
     const response = await apiRequest({ path: '/learning/daily-task' });
-    if (response && response.task) {
-      return normalizeTask(response.task);
-    }
+    const task = response && response.task ? normalizeTask(response.task) : normalizeTask(dailyTaskSeed);
+    const syncedState = syncStateFromServer(today, response || null, stateBeforeSync);
+    return { task, state: syncedState };
   } catch (error) {
     console.warn('[checkin] 获取今日任务失败，将使用本地兜底数据。', error?.message || error);
+    const fallbackTask = normalizeTask(dailyTaskSeed);
+    return { task: fallbackTask, state: stateBeforeSync };
   }
-  return normalizeTask(dailyTaskSeed);
 };
 
 const initializeDailyTask = async () => {
   const today = getToday();
-  const state = ensureEvaluatedState(getStoredState(), today);
+  let state = ensureEvaluatedState(getStoredState(), today);
   let task = loadCachedTask(today);
 
   if (!task) {
-    task = await fetchTaskFromApi();
+    const remote = await fetchTaskFromApi(today);
+    task = remote.task;
+    state = remote.state;
     saveCachedTask(task, today);
   }
 
@@ -102,17 +143,20 @@ const initializeDailyTask = async () => {
   };
 };
 
-const markTaskCompletedToday = (task) => {
+const markTaskCompletedToday = (task, overrideStreak) => {
   const today = getToday();
   const yesterday = getYesterday();
   const state = getStoredState();
-  let streak = state.streak;
 
-  if (state.lastCompletedDate === today) {
+  if (state.lastCompletedDate === today && overrideStreak === undefined) {
     return state;
   }
 
-  if (state.lastCompletedDate === yesterday) {
+  let streak = state.streak;
+
+  if (typeof overrideStreak === 'number' && Number.isFinite(overrideStreak)) {
+    streak = Math.max(0, Math.floor(overrideStreak));
+  } else if (state.lastCompletedDate === yesterday) {
     streak += 1;
   } else {
     streak = 1;
@@ -130,8 +174,9 @@ const markTaskCompletedToday = (task) => {
 
 const reloadDailyTask = async () => {
   const today = getToday();
-  const state = ensureEvaluatedState(getStoredState(), today);
-  const task = await fetchTaskFromApi();
+  const remote = await fetchTaskFromApi(today);
+  const task = remote.task;
+  const state = remote.state;
   saveCachedTask(task, today);
   return {
     task,
