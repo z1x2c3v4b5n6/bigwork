@@ -79,6 +79,10 @@ Page({
     submittingTopic: false,
     submittingReply: false,
     liking: false,
+    topicFormVisible: false,
+    replyFormVisible: false,
+    topicFormErrorMessage: '',
+    replyFormErrorMessage: '',
   },
 
   onShow() {
@@ -86,7 +90,13 @@ Page({
   },
 
   async loadTopics() {
-    this.setData({ loadingTopics: true, errorMessage: '', successMessage: '' });
+    this.setData({
+      loadingTopics: true,
+      errorMessage: '',
+      successMessage: '',
+      topicFormErrorMessage: '',
+      replyFormErrorMessage: '',
+    });
 
     try {
       const response = await apiRequest<{ topics: Record<string, unknown>[] }>({ path: '/forum/topics' });
@@ -104,6 +114,8 @@ Page({
         activeTopic,
         likeButtonText: resolveLikeButtonText(activeTopic),
         likeCount: activeTopic?.likes ?? 0,
+        replyFormVisible: false,
+        replyFormErrorMessage: '',
       });
 
       if (selectedTopicId) {
@@ -120,7 +132,7 @@ Page({
   },
 
   async loadPosts(topicId: string) {
-    this.setData({ loadingPosts: true, errorMessage: '', successMessage: '' });
+    this.setData({ loadingPosts: true, errorMessage: '', successMessage: '', replyFormErrorMessage: '' });
 
     try {
       const response = await apiRequest<{ posts: Record<string, unknown>[] }>({
@@ -134,7 +146,7 @@ Page({
       const apiError = error as ApiError;
       this.setData({ errorMessage: apiError?.message || '加载回复失败，请稍后重试。', posts: [] });
     } finally {
-      this.setData({ loadingPosts: false });
+      this.setData({ loadingPosts: false, replyFormErrorMessage: '' });
     }
   },
 
@@ -152,8 +164,75 @@ Page({
       replyForm: createReplyForm(),
       successMessage: '',
       errorMessage: '',
+      replyFormVisible: false,
+      replyFormErrorMessage: '',
     });
     void this.loadPosts(id);
+  },
+
+  toggleTopicForm() {
+    const nextVisible = !this.data.topicFormVisible;
+    if (!nextVisible && this.data.submittingTopic) {
+      return;
+    }
+    if (nextVisible) {
+      this.setData({ topicFormVisible: true, topicFormErrorMessage: '', successMessage: '' });
+      return;
+    }
+
+    this.setData({
+      topicFormVisible: false,
+      topicForm: createTopicForm(),
+      topicFormErrorMessage: '',
+    });
+  },
+
+  cancelTopicForm() {
+    if (this.data.submittingTopic) {
+      return;
+    }
+
+    this.setData({
+      topicFormVisible: false,
+      topicForm: createTopicForm(),
+      topicFormErrorMessage: '',
+      successMessage: '',
+    });
+  },
+
+  toggleReplyForm() {
+    if (!this.data.selectedTopicId) {
+      this.setData({ replyFormErrorMessage: '请先选择话题' });
+      return;
+    }
+
+    const nextVisible = !this.data.replyFormVisible;
+    if (!nextVisible && this.data.submittingReply) {
+      return;
+    }
+    if (nextVisible) {
+      this.setData({ replyFormVisible: true, replyFormErrorMessage: '', successMessage: '' });
+      return;
+    }
+
+    this.setData({
+      replyFormVisible: false,
+      replyForm: createReplyForm(),
+      replyFormErrorMessage: '',
+    });
+  },
+
+  cancelReplyForm() {
+    if (this.data.submittingReply) {
+      return;
+    }
+
+    this.setData({
+      replyFormVisible: false,
+      replyForm: createReplyForm(),
+      replyFormErrorMessage: '',
+      successMessage: '',
+    });
   },
 
   handleTopicInput(event: WechatMiniprogram.Input) {
@@ -166,6 +245,7 @@ Page({
       topicForm: { ...this.data.topicForm, [field]: value },
       errorMessage: '',
       successMessage: '',
+      topicFormErrorMessage: '',
     });
   },
 
@@ -175,13 +255,14 @@ Page({
       replyForm: { ...this.data.replyForm, content: value },
       errorMessage: '',
       successMessage: '',
+      replyFormErrorMessage: '',
     });
   },
 
   async createTopic() {
     const form = this.data.topicForm;
     if (!form.title || !form.title.trim()) {
-      this.setData({ errorMessage: '请输入话题标题' });
+      this.setData({ topicFormErrorMessage: '请输入话题标题' });
       return;
     }
 
@@ -190,7 +271,12 @@ Page({
       .map((tag) => tag.trim())
       .filter(Boolean);
 
-    this.setData({ submittingTopic: true, errorMessage: '', successMessage: '' });
+    this.setData({
+      submittingTopic: true,
+      errorMessage: '',
+      successMessage: '',
+      topicFormErrorMessage: '',
+    });
 
     try {
       await ensureSession();
@@ -204,7 +290,12 @@ Page({
         },
       });
 
-      this.setData({ topicForm: createTopicForm(), successMessage: '话题发布成功。' });
+      this.setData({
+        topicForm: createTopicForm(),
+        successMessage: '话题发布成功。',
+        topicFormVisible: false,
+        topicFormErrorMessage: '',
+      });
       await this.loadTopics();
     } catch (error) {
       const apiError = error as ApiError;
@@ -212,7 +303,7 @@ Page({
         apiError?.statusCode === 401
           ? '请先登录后再发帖，可在个人中心输入账号密码。'
           : apiError?.message || '发布话题失败，请稍后重试。';
-      this.setData({ errorMessage: message });
+      this.setData({ errorMessage: message, topicFormErrorMessage: message });
     } finally {
       this.setData({ submittingTopic: false });
     }
@@ -223,16 +314,21 @@ Page({
     const topicId = this.data.selectedTopicId;
 
     if (!topicId) {
-      this.setData({ errorMessage: '请先选择话题' });
+      this.setData({ replyFormErrorMessage: '请先选择话题' });
       return;
     }
 
     if (!content || !content.trim()) {
-      this.setData({ errorMessage: '请输入回复内容' });
+      this.setData({ replyFormErrorMessage: '请输入回复内容' });
       return;
     }
 
-    this.setData({ submittingReply: true, errorMessage: '', successMessage: '' });
+    this.setData({
+      submittingReply: true,
+      errorMessage: '',
+      successMessage: '',
+      replyFormErrorMessage: '',
+    });
 
     try {
       await ensureSession();
@@ -244,7 +340,12 @@ Page({
         },
       });
 
-      this.setData({ replyForm: createReplyForm(), successMessage: '回复已发送。' });
+      this.setData({
+        replyForm: createReplyForm(),
+        successMessage: '回复已发送。',
+        replyFormVisible: false,
+        replyFormErrorMessage: '',
+      });
       await this.loadPosts(topicId);
     } catch (error) {
       const apiError = error as ApiError;
@@ -252,7 +353,7 @@ Page({
         apiError?.statusCode === 401
           ? '请先登录后再回复，可在个人中心输入账号密码。'
           : apiError?.message || '回复失败，请稍后重试。';
-      this.setData({ errorMessage: message });
+      this.setData({ errorMessage: message, replyFormErrorMessage: message });
     } finally {
       this.setData({ submittingReply: false });
     }

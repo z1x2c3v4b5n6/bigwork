@@ -44,6 +44,14 @@ Page({
     questionForm: createQuestionForm(),
     errorMessage: '',
     successMessage: '',
+    loadingSets: false,
+    loadingQuestions: false,
+    submittingSet: false,
+    submittingQuestion: false,
+    setFormVisible: false,
+    questionFormVisible: false,
+    setFormErrorMessage: '',
+    questionFormErrorMessage: '',
   },
 
   onShow() {
@@ -60,6 +68,10 @@ Page({
       questions: savedQuestions,
       selectedSetId,
       visibleQuestions: savedQuestions.filter((question) => question.setId === selectedSetId),
+      errorMessage: '',
+      successMessage: '',
+      setFormErrorMessage: '',
+      questionFormErrorMessage: '',
     });
   },
 
@@ -75,6 +87,9 @@ Page({
       visibleQuestions: this.data.questions.filter((question) => question.setId === id),
       errorMessage: '',
       successMessage: '',
+      questionFormVisible: false,
+      questionForm: createQuestionForm(),
+      questionFormErrorMessage: '',
     });
   },
 
@@ -91,6 +106,7 @@ Page({
       setForm: { ...this.data.setForm, [field]: value },
       errorMessage: '',
       successMessage: '',
+      setFormErrorMessage: '',
     });
   },
 
@@ -107,13 +123,71 @@ Page({
       questionForm: { ...this.data.questionForm, [field]: value },
       errorMessage: '',
       successMessage: '',
+      questionFormErrorMessage: '',
+    });
+  },
+
+  toggleSetForm() {
+    const nextVisible = !this.data.setFormVisible;
+    if (!nextVisible && this.data.submittingSet) {
+      return;
+    }
+    if (nextVisible) {
+      this.setData({ setFormVisible: true, setFormErrorMessage: '', successMessage: '' });
+      return;
+    }
+
+    this.setData({ setFormVisible: false, setForm: createSetForm(), setFormErrorMessage: '' });
+  },
+
+  cancelSetForm() {
+    if (this.data.submittingSet) {
+      return;
+    }
+
+    this.setData({
+      setFormVisible: false,
+      setForm: createSetForm(),
+      setFormErrorMessage: '',
+      successMessage: '',
+    });
+  },
+
+  toggleQuestionForm() {
+    if (!this.data.selectedSetId) {
+      this.setData({ questionFormErrorMessage: '请先选择题单' });
+      return;
+    }
+
+    const nextVisible = !this.data.questionFormVisible;
+    if (!nextVisible && this.data.submittingQuestion) {
+      return;
+    }
+    if (nextVisible) {
+      this.setData({ questionFormVisible: true, questionFormErrorMessage: '', successMessage: '' });
+      return;
+    }
+
+    this.setData({ questionFormVisible: false, questionForm: createQuestionForm(), questionFormErrorMessage: '' });
+  },
+
+  cancelQuestionForm() {
+    if (this.data.submittingQuestion) {
+      return;
+    }
+
+    this.setData({
+      questionFormVisible: false,
+      questionForm: createQuestionForm(),
+      questionFormErrorMessage: '',
+      successMessage: '',
     });
   },
 
   createSet() {
     const form = this.data.setForm;
     if (!form.title || !form.title.trim()) {
-      this.setData({ errorMessage: '请输入题单名称' });
+      this.setData({ setFormErrorMessage: '请输入题单名称' });
       return;
     }
 
@@ -121,6 +195,8 @@ Page({
       .split(/[,，\s]+/)
       .map((tag) => tag.trim())
       .filter(Boolean);
+
+    this.setData({ submittingSet: true, errorMessage: '', successMessage: '', setFormErrorMessage: '' });
 
     const set = {
       id: `set_${Date.now()}`,
@@ -135,14 +211,23 @@ Page({
 
     const sets = [set, ...this.data.sets];
     saveToStorage(SET_STORAGE_KEY, sets);
-    this.setData({
-      sets,
-      selectedSetId: set.id,
-      visibleQuestions: [],
-      setForm: createSetForm(),
-      successMessage: '题单创建成功，请继续添加题目。',
-      errorMessage: '',
-    });
+    try {
+      this.setData({
+        sets,
+        selectedSetId: set.id,
+        visibleQuestions: [],
+        setForm: createSetForm(),
+        successMessage: '题单创建成功，请继续添加题目。',
+        errorMessage: '',
+        setFormVisible: false,
+        setFormErrorMessage: '',
+      });
+    } catch (error) {
+      const message = '创建题单失败，请稍后重试。';
+      this.setData({ errorMessage: message, setFormErrorMessage: message });
+    } finally {
+      this.setData({ submittingSet: false });
+    }
   },
 
   createQuestion() {
@@ -150,12 +235,12 @@ Page({
     const setId = this.data.selectedSetId;
 
     if (!setId) {
-      this.setData({ errorMessage: '请先选择题单' });
+      this.setData({ questionFormErrorMessage: '请先选择题单' });
       return;
     }
 
     if (!form.questionText || !form.questionText.trim()) {
-      this.setData({ errorMessage: '请输入题干内容' });
+      this.setData({ questionFormErrorMessage: '请输入题干内容' });
       return;
     }
 
@@ -163,6 +248,13 @@ Page({
       .split(/[,，\s]+/)
       .map((tag) => tag.trim())
       .filter(Boolean);
+
+    this.setData({
+      submittingQuestion: true,
+      errorMessage: '',
+      successMessage: '',
+      questionFormErrorMessage: '',
+    });
 
     const question = {
       id: `question_${Date.now()}`,
@@ -192,13 +284,22 @@ Page({
     saveToStorage(QUESTION_STORAGE_KEY, questions);
     saveToStorage(SET_STORAGE_KEY, sets);
 
-    this.setData({
-      questions,
-      sets,
-      visibleQuestions: questions.filter((item) => item.setId === setId),
-      questionForm: createQuestionForm(),
-      successMessage: '题目已录入。',
-      errorMessage: '',
-    });
+    try {
+      this.setData({
+        questions,
+        sets,
+        visibleQuestions: questions.filter((item) => item.setId === setId),
+        questionForm: createQuestionForm(),
+        successMessage: '题目已录入。',
+        errorMessage: '',
+        questionFormVisible: false,
+        questionFormErrorMessage: '',
+      });
+    } catch (error) {
+      const message = '保存题目失败，请稍后重试。';
+      this.setData({ errorMessage: message, questionFormErrorMessage: message });
+    } finally {
+      this.setData({ submittingQuestion: false });
+    }
   },
 });
