@@ -30,7 +30,7 @@
 
 <view class="section-card">
   <view class="section-title">热门专业速览</view>
-  <scroll-view scroll-x="true" class="table-scroll">
+  <scroll-view scroll-x="true" class="table-scroll" enable-flex="true">
     <view class="table" style="min-width: 1600rpx;">
       <view class="table-row table-header">
         <view class="table-cell col-major">热门专业</view>

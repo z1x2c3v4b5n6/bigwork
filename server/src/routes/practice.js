@@ -655,9 +655,11 @@ router.post('/wrong-questions/bulk', requireAuth, async (req, res) => {
     const config = await getWrongQuestionConfig();
 
     if (!config || !config.id || !config.userId || !config.question) {
-      return res
-        .status(500)
-        .json({ message: '当前数据库未配置错题本表结构，请联系管理员检查 wrong_questions 表。' });
+      return res.json({
+        success: false,
+        synced: 0,
+        message: '当前数据库未配置错题本表结构，请联系管理员检查 wrong_questions 表。',
+      });
     }
 
     const normalizedUserId = normalizeIdentifier(req.session.user.id);

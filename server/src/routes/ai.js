@@ -8,6 +8,7 @@ const {
 } = require('../database');
 const { requireAuth } = require('../middleware/auth');
 const { normalizeIdentifier, normalizeValueForColumn } = require('../utils/db');
+const { normalizeDate } = require('../utils/formatters');
 
 const router = express.Router();
 
@@ -73,6 +74,69 @@ const keywordTopics = [
   { id: 'politics', keywords: ['政治', '时政', '马原', '毛概'], summary: '政治与时政复习' },
   { id: 'interview', keywords: ['复试', '面试', '导师', '自我介绍'], summary: '复试面试准备' },
 ];
+
+const suggestionPrompts = {
+  english: '如何整理英语作文模板，写作时更快进入状态？',
+  algorithm: '408 数据结构与算法刷题应该如何安排顺序？',
+  math: '线性代数冲刺阶段如何稳住计算和证明题？',
+  politics: '时政主观题如何构建高分答题框架？',
+  interview: '复试面试自我介绍需要包含哪些重点？',
+};
+
+const suggestionTitles = {
+  english: '英语写作突破',
+  algorithm: '算法与 408 提升',
+  math: '数学冲刺策略',
+  politics: '政治热点梳理',
+  interview: '复试面试准备',
+};
+
+const fallbackCourseSuggestions = [
+  {
+    title: '英语写作冲刺训练营',
+    teacher: '王老师',
+    highlight: '系统整理万能开头、结尾模板，配合真题限时演练。',
+  },
+  {
+    title: '408 高频考点刷题班',
+    teacher: '张老师',
+    highlight: '按知识点拆分题型，补齐图论与动态规划薄弱环节。',
+  },
+  {
+    title: '复试面试模拟工作坊',
+    teacher: '教研团队',
+    highlight: '模拟导师追问场景，打磨结构化自我介绍。',
+  },
+];
+
+const fallbackMaterialSuggestions = [
+  {
+    title: '英语作文万能句型速查表',
+    type: '资料',
+    url: '',
+    description: '精选 30 句高频万能句，支持临场快速套用。',
+  },
+  {
+    title: '线代必背公式与易错点',
+    type: '资料',
+    url: '',
+    description: '覆盖矩阵运算、特征值等核心考点，附典型例题。',
+  },
+  {
+    title: '复试热点答题模板',
+    type: '资料',
+    url: '',
+    description: '按时政主题整理的结构化答题模板，便于速记。',
+  },
+];
+
+const buildSuggestions = () =>
+  keywordTopics.map((topic) => ({
+    id: topic.id,
+    title: suggestionTitles[topic.id] || topic.summary,
+    description: topic.summary,
+    sampleQuestion: suggestionPrompts[topic.id] || suggestionPrompts.interview,
+  }));
 
 const detectTopics = (question) => {
   const matches = keywordTopics
@@ -238,6 +302,33 @@ const fetchMaterialSuggestions = async (topics) => {
   }));
 };
 
+const formatDisplayTime = (value) => {
+  if (!value) {
+    return null;
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  const pad = (num) => String(num).padStart(2, '0');
+  const now = new Date();
+  if (now.getFullYear() === date.getFullYear() && now.getMonth() === date.getMonth()) {
+    if (now.getDate() === date.getDate()) {
+      return `今天 ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+    }
+
+    if (now.getDate() - date.getDate() === 1) {
+      return `昨天 ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+    }
+  }
+
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(
+    date.getMinutes(),
+  )}`;
+};
+
 const buildAnswer = async (question, sessionUser) => {
   const trimmed = question.trim();
   const topics = detectTopics(trimmed);
@@ -293,6 +384,101 @@ const buildAnswer = async (question, sessionUser) => {
 
   return lines.join('\n\n');
 };
+
+router.get('/overview', requireAuth, async (req, res) => {
+  const sessionUser = req.session?.user || null;
+
+  try {
+    const config = await getConversationConfig();
+    let recentConversations = [];
+
+    if (config && config.tableName && config.question && config.answer) {
+      const selectFragments = [];
+      if (config.id) {
+        selectFragments.push(`c.\`${config.id}\` AS id`);
+      }
+      selectFragments.push(`c.\`${config.question}\` AS question`);
+      selectFragments.push(`c.\`${config.answer}\` AS answer`);
+      selectFragments.push(
+        config.createdAt ? `c.\`${config.createdAt}\` AS created_at` : 'NULL AS created_at',
+      );
+
+      const whereClauses = [];
+      const params = {};
+      if (config.userId && sessionUser?.id) {
+        whereClauses.push(`c.\`${config.userId}\` = :userId`);
+        params.userId = normalizeIdentifier(sessionUser.id);
+      }
+
+      const whereSql = whereClauses.length ? `WHERE ${whereClauses.join(' AND ')}` : '';
+      const orderColumn = config.createdAt
+        ? `c.\`${config.createdAt}\` DESC`
+        : config.id
+        ? `c.\`${config.id}\` DESC`
+        : '';
+      const orderSql = orderColumn ? `ORDER BY ${orderColumn}` : '';
+
+      const rows = await query(
+        `
+        SELECT ${selectFragments.join(', ')}
+        FROM \`${config.tableName}\` c
+        ${whereSql}
+        ${orderSql}
+        LIMIT 5
+        `,
+        params,
+      );
+
+      recentConversations = rows
+        .map((row, index) => ({
+          id: row.id ? String(row.id) : `${sessionUser?.id || 'conversation'}-${index}`,
+          question: row.question || '',
+          answer: row.answer || '',
+          createdAt: normalizeDate(row.created_at),
+        }))
+        .filter((item) => item.question)
+        .map((item) => ({
+          ...item,
+          createdAtText: formatDisplayTime(item.createdAt) || '',
+        }));
+    }
+
+    const suggestions = buildSuggestions();
+    const relevantTopics = new Set();
+
+    recentConversations.forEach((conversation) => {
+      detectTopics(conversation.question).forEach((topic) => relevantTopics.add(topic));
+    });
+
+    if (!relevantTopics.size) {
+      relevantTopics.add('english');
+      relevantTopics.add('interview');
+    }
+
+    const topicList = Array.from(relevantTopics).slice(0, 3);
+    const recommendedCourses = topicList.length
+      ? await fetchCourseSuggestions(topicList)
+      : [];
+    const recommendedMaterials = topicList.length
+      ? await fetchMaterialSuggestions(topicList)
+      : [];
+
+    res.json({
+      suggestions,
+      recentConversations,
+      recommendedCourses: recommendedCourses.length ? recommendedCourses : fallbackCourseSuggestions,
+      recommendedMaterials: recommendedMaterials.length ? recommendedMaterials : fallbackMaterialSuggestions,
+    });
+  } catch (error) {
+    console.error('获取 AI 助手概览失败', error);
+    res.json({
+      suggestions: buildSuggestions(),
+      recentConversations: [],
+      recommendedCourses: fallbackCourseSuggestions,
+      recommendedMaterials: fallbackMaterialSuggestions,
+    });
+  }
+});
 
 router.post('/ask', requireAuth, async (req, res) => {
   const { question } = req.body || {};
