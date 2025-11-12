@@ -1,5 +1,10 @@
 import { loadFromStorage, resetStorageKey, saveToStorage } from './storage';
 
+type CookieResponse = {
+  header?: Record<string, unknown>;
+  cookies?: unknown;
+} & Record<string, unknown>;
+
 const COOKIE_STORAGE_KEY = 'sessionCookieHeader';
 
 const normalizeCookie = (cookie: string): string | null => {
@@ -60,9 +65,7 @@ export const getStoredCookieHeader = (): string | null => {
   return null;
 };
 
-export const storeResponseCookies = (
-  response: WechatMiniprogram.RequestSuccessCallbackResult,
-): string | null => {
+export const storeResponseCookies = (response: CookieResponse): string | null => {
   const header = response.header ?? {};
   const cookieCandidates = [
     ...extractFromCookieArray((response as { cookies?: unknown }).cookies),

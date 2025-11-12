@@ -11,6 +11,7 @@ type AdminTab =
   | 'courses'
   | 'materials'
   | 'forum'
+  | 'mobileToolkit'
   | 'statistics';
 
 type MetricCard = { id: string; label: string; value: number };
@@ -63,6 +64,25 @@ type MaterialRecord = {
   fileUrl: string | null;
   courseId: number | null;
   courseTitle?: string | null;
+};
+
+type MobileFieldNote = {
+  id: string;
+  title: string;
+  description: string;
+  photos: string[];
+  createdAt: string;
+  createdText: string;
+  locationName: string;
+  latitude: number | null;
+  longitude: number | null;
+  resolved: boolean;
+};
+
+type MobileToolkitInsight = {
+  id: string;
+  title: string;
+  description: string;
 };
 
 type ForumTopic = {
@@ -124,6 +144,15 @@ type MaterialForm = {
   courseId: string;
 };
 
+type FieldNoteForm = {
+  title: string;
+  description: string;
+  photos: string[];
+  locationName: string;
+  latitude: number | null;
+  longitude: number | null;
+};
+
 const tabs: { id: AdminTab; label: string }[] = [
   { id: 'overview', label: '总览' },
   { id: 'settings', label: '基本信息' },
@@ -132,6 +161,7 @@ const tabs: { id: AdminTab; label: string }[] = [
   { id: 'courses', label: '课程' },
   { id: 'materials', label: '资料' },
   { id: 'forum', label: '论坛' },
+  { id: 'mobileToolkit', label: '掌上工具' },
   { id: 'statistics', label: '统计' },
 ];
 
@@ -166,6 +196,15 @@ const createSettingsForm = (settings: Record<string, string> = {}): Record<strin
   security_note: settings.security_note ?? '',
 });
 
+const createFieldNoteForm = (): FieldNoteForm => ({
+  title: '',
+  description: '',
+  photos: [],
+  locationName: '',
+  latitude: null,
+  longitude: null,
+});
+
 const getErrorMessage = (error: unknown, fallback: string): string => {
   if (!error) {
     return fallback;
@@ -188,6 +227,86 @@ const getErrorMessage = (error: unknown, fallback: string): string => {
   return fallback;
 };
 
+const FIELD_NOTES_STORAGE_KEY = 'adminFieldNotes';
+
+const formatDateTime = (input?: string | number | Date) => {
+  const date = input ? new Date(input) : new Date();
+  if (Number.isNaN(date.getTime())) {
+    return '刚刚';
+  }
+
+  const year = date.getFullYear();
+  const month = `${date.getMonth() + 1}`.padStart(2, '0');
+  const day = `${date.getDate()}`.padStart(2, '0');
+  const hours = `${date.getHours()}`.padStart(2, '0');
+  const minutes = `${date.getMinutes()}`.padStart(2, '0');
+  return `${year}-${month}-${day} ${hours}:${minutes}`;
+};
+
+const normalizeStoredFieldNotes = (value: unknown): MobileFieldNote[] => {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .map((entry) => {
+      if (!entry || typeof entry !== 'object') {
+        return null;
+      }
+
+      const raw = entry as Record<string, unknown>;
+      const id = raw.id ? String(raw.id) : `${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
+      const title = typeof raw.title === 'string' ? raw.title : '';
+      const description = typeof raw.description === 'string' ? raw.description : '';
+      const photos = Array.isArray(raw.photos)
+        ? (raw.photos as unknown[]).filter((item): item is string => typeof item === 'string')
+        : [];
+      const createdAtRaw =
+        (typeof raw.createdAt === 'string' && raw.createdAt) ||
+        (typeof raw.created_at === 'string' && raw.created_at) ||
+        new Date().toISOString();
+      const createdAt = new Date(createdAtRaw).toString() === 'Invalid Date' ? new Date().toISOString() : createdAtRaw;
+      const createdText = typeof raw.createdText === 'string' && raw.createdText ? raw.createdText : formatDateTime(createdAt);
+      const locationName =
+        (typeof raw.locationName === 'string' && raw.locationName) ||
+        (typeof raw.location === 'string' && raw.location) ||
+        '';
+      const latitude = typeof raw.latitude === 'number' ? raw.latitude : null;
+      const longitude = typeof raw.longitude === 'number' ? raw.longitude : null;
+      const resolved = Boolean(raw.resolved);
+
+      return {
+        id,
+        title,
+        description,
+        photos,
+        createdAt,
+        createdText,
+        locationName,
+        latitude,
+        longitude,
+        resolved,
+      } satisfies MobileFieldNote;
+    })
+    .filter((note): note is MobileFieldNote => Boolean(note?.id));
+};
+
+const buildFieldNoteFromForm = (form: FieldNoteForm): MobileFieldNote => {
+  const now = new Date();
+  return {
+    id: `${now.getTime()}-${Math.random().toString(16).slice(2, 8)}`,
+    title: form.title.trim(),
+    description: form.description.trim(),
+    photos: form.photos.slice(0, 6),
+    createdAt: now.toISOString(),
+    createdText: formatDateTime(now),
+    locationName: form.locationName.trim(),
+    latitude: form.latitude,
+    longitude: form.longitude,
+    resolved: false,
+  };
+};
+
 Page({
   data: {
     tabs,
@@ -202,6 +321,7 @@ Page({
       courses: false,
       materials: false,
       forum: false,
+      mobileToolkit: false,
       statistics: false,
     } as Record<AdminTab, boolean>,
     sectionErrors: {
@@ -212,6 +332,7 @@ Page({
       courses: '',
       materials: '',
       forum: '',
+      mobileToolkit: '',
       statistics: '',
     } as Record<AdminTab, string>,
     loadedTabs: {
@@ -222,6 +343,7 @@ Page({
       courses: false,
       materials: false,
       forum: false,
+      mobileToolkit: false,
       statistics: false,
     } as Record<AdminTab, boolean>,
     metricsCards: [] as MetricCard[],
@@ -273,6 +395,13 @@ Page({
     statisticsSearchLoading: false,
     statisticsSearchError: '',
     statisticsSearchResult: null as AdminSearchResult | null,
+    mobileFieldNotes: [] as MobileFieldNote[],
+    mobileToolkitInsights: [] as MobileToolkitInsight[],
+    fieldNoteFormVisible: false,
+    fieldNoteForm: createFieldNoteForm(),
+    fieldNoteFormError: '',
+    fieldNoteSubmitting: false,
+    fieldNoteLocationLoading: false,
   },
 
   async onShow() {
@@ -336,6 +465,9 @@ Page({
       case 'forum':
         await this.loadForum();
         break;
+      case 'mobileToolkit':
+        await this.loadMobileToolkit();
+        break;
       case 'statistics':
         await this.loadStatistics();
         break;
@@ -360,7 +492,7 @@ Page({
       }>({ path: '/admin/dashboard' });
 
       const metrics = response.metrics ?? {};
-      const metricCards: MetricCard[] = [
+      const metricsCards: MetricCard[] = [
         { id: 'activeStudents', label: '活跃学员', value: metrics.activeStudents ?? 0 },
         { id: 'tasksCompletedToday', label: '今日完成任务', value: metrics.tasksCompletedToday ?? 0 },
         { id: 'followUpsPending', label: '待跟进提醒', value: metrics.followUpsPending ?? 0 },
@@ -375,6 +507,7 @@ Page({
         dashboardNote: response.securityNote || '',
         'loadedTabs.overview': true,
       });
+      this.refreshMobileToolkitInsights();
     } catch (error) {
       this.setData({
         'sectionErrors.overview': getErrorMessage(error, '无法加载后台概览数据，请稍后重试。'),
@@ -1150,6 +1283,305 @@ Page({
       await this.loadForum();
     } catch (error) {
       wx.showToast({ title: getErrorMessage(error, '删除失败，请稍后重试。'), icon: 'none' });
+    }
+  },
+
+  async loadMobileToolkit() {
+    this.setData({ 'sectionLoading.mobileToolkit': true, 'sectionErrors.mobileToolkit': '' });
+
+    try {
+      let storedNotes: MobileFieldNote[] = [];
+      try {
+        const storageValue = wx.getStorageSync(FIELD_NOTES_STORAGE_KEY);
+        storedNotes = normalizeStoredFieldNotes(storageValue);
+      } catch (storageError) {
+        console.warn('读取巡课速记缓存失败', storageError);
+      }
+
+      this.setData({
+        mobileFieldNotes: storedNotes,
+        fieldNoteForm: createFieldNoteForm(),
+        'loadedTabs.mobileToolkit': true,
+      });
+      this.refreshMobileToolkitInsights(storedNotes);
+    } catch (error) {
+      console.warn('加载掌上工具数据失败', error);
+      this.setData({ 'sectionErrors.mobileToolkit': '无法加载掌上工具数据，请稍后重试。' });
+    } finally {
+      this.setData({ 'sectionLoading.mobileToolkit': false });
+    }
+  },
+
+  refreshMobileToolkitInsights(fieldNotes: MobileFieldNote[] = this.data.mobileFieldNotes || []) {
+    const pendingNotes = fieldNotes.filter((note) => !note.resolved).length;
+    const followUps = this.data.metricsCards.find((card) => card.id === 'followUpsPending')?.value ?? 0;
+    const systemAlerts = this.data.metricsCards.find((card) => card.id === 'systemAlerts')?.value ?? 0;
+    const today = new Date();
+    const todayLabel = `${today.getMonth() + 1}月${today.getDate()}日`;
+
+    const insights: MobileToolkitInsight[] = [
+      {
+        id: 'fieldNotes',
+        title: '巡课速记进度',
+        description:
+          pendingNotes > 0
+            ? `还有 ${pendingNotes} 条巡课速记待跟进，可直接在掌上工具中更新状态。`
+            : '所有巡课速记均已处理，保持巡课节奏，持续补充新的现场记录。',
+      },
+      {
+        id: 'followUps',
+        title: '待跟进提醒',
+        description:
+          followUps > 0
+            ? `后台待跟进提醒 ${followUps} 条，建议结合巡课速记逐一回访。`
+            : '暂无待跟进提醒，可利用移动端完成线下巡查与访谈记录。',
+      },
+      {
+        id: 'systemHealth',
+        title: '系统健康度',
+        description:
+          systemAlerts > 0
+            ? `系统告警 ${systemAlerts} 条，处理后可补充到巡课速记中形成闭环。`
+            : '系统运行平稳，放心将精力投入到现场巡课与学员辅导。',
+      },
+      {
+        id: 'dailySuggestion',
+        title: `${todayLabel} 掌上建议`,
+        description: '巡课时点击“新增巡课速记”，拍照、定位与记录反馈，一次完成数据沉淀。',
+      },
+    ];
+
+    this.setData({ mobileToolkitInsights: insights });
+  },
+
+  openFieldNoteForm() {
+    this.setData({
+      fieldNoteFormVisible: true,
+      fieldNoteFormError: '',
+      fieldNoteForm: createFieldNoteForm(),
+    });
+  },
+
+  closeFieldNoteForm() {
+    if (this.data.fieldNoteSubmitting) {
+      return;
+    }
+
+    this.setData({
+      fieldNoteFormVisible: false,
+      fieldNoteForm: createFieldNoteForm(),
+      fieldNoteFormError: '',
+      fieldNoteSubmitting: false,
+      fieldNoteLocationLoading: false,
+    });
+  },
+
+  handleFieldNoteInput(event: WechatMiniprogram.Input) {
+    const field = event.currentTarget?.dataset?.field as keyof FieldNoteForm | undefined;
+    if (!field) {
+      return;
+    }
+
+    const value = event.detail?.value ?? '';
+    this.setData({
+      fieldNoteForm: { ...this.data.fieldNoteForm, [field]: value },
+      fieldNoteFormError: '',
+    });
+  },
+
+  async chooseFieldNoteImages() {
+    if (this.data.fieldNoteSubmitting) {
+      return;
+    }
+
+    const currentPhotos = this.data.fieldNoteForm.photos ?? [];
+    const maxPhotos = 6;
+    if (currentPhotos.length >= maxPhotos) {
+      wx.showToast({ title: '最多可添加 6 张图片', icon: 'none' });
+      return;
+    }
+
+    try {
+      const result = await wx.chooseImage({
+        count: maxPhotos - currentPhotos.length,
+        sizeType: ['compressed'],
+        sourceType: ['camera', 'album'],
+      });
+
+      const tempFilePaths = Array.isArray(result.tempFilePaths) ? result.tempFilePaths : [];
+      if (tempFilePaths.length === 0) {
+        return;
+      }
+
+      const savedPaths = await Promise.all(
+        tempFilePaths.map(async (tempPath) => {
+          try {
+            const res = await wx.saveFile({ tempFilePath: tempPath });
+            return res.savedFilePath || tempPath;
+          } catch (error) {
+            console.warn('保存图片失败', error);
+            return tempPath;
+          }
+        }),
+      );
+
+      const photos = [...currentPhotos, ...savedPaths].slice(0, maxPhotos);
+      this.setData({
+        fieldNoteForm: { ...this.data.fieldNoteForm, photos },
+        fieldNoteFormError: '',
+      });
+    } catch (error) {
+      console.warn('选择图片失败', error);
+      wx.showToast({ title: '无法选择图片', icon: 'none' });
+    }
+  },
+
+  removeFieldNotePhoto(event: WechatMiniprogram.BaseEvent) {
+    const index = Number(event.currentTarget?.dataset?.index ?? -1);
+    if (index < 0) {
+      return;
+    }
+
+    const nextPhotos = [...(this.data.fieldNoteForm.photos ?? [])];
+    nextPhotos.splice(index, 1);
+    this.setData({
+      fieldNoteForm: { ...this.data.fieldNoteForm, photos: nextPhotos },
+    });
+  },
+
+  async captureFieldNoteLocation() {
+    if (this.data.fieldNoteLocationLoading) {
+      return;
+    }
+
+    this.setData({ fieldNoteLocationLoading: true, fieldNoteFormError: '' });
+
+    try {
+      const location = await wx.chooseLocation({});
+      if (!location) {
+        return;
+      }
+
+      this.setData({
+        fieldNoteForm: {
+          ...this.data.fieldNoteForm,
+          locationName: location.name || location.address || '位置已记录',
+          latitude: typeof location.latitude === 'number' ? location.latitude : null,
+          longitude: typeof location.longitude === 'number' ? location.longitude : null,
+        },
+      });
+    } catch (error) {
+      console.warn('选择位置失败', error);
+      wx.showToast({ title: '获取位置失败，请稍后重试', icon: 'none' });
+    } finally {
+      this.setData({ fieldNoteLocationLoading: false });
+    }
+  },
+
+  async submitFieldNote() {
+    if (this.data.fieldNoteSubmitting) {
+      return;
+    }
+
+    const title = (this.data.fieldNoteForm.title || '').trim();
+    if (!title) {
+      this.setData({ fieldNoteFormError: '请填写巡课主题。' });
+      return;
+    }
+
+    this.setData({ fieldNoteSubmitting: true, fieldNoteFormError: '' });
+
+    try {
+      const note = buildFieldNoteFromForm(this.data.fieldNoteForm);
+      const nextNotes = [note, ...this.data.mobileFieldNotes];
+      this.setData({
+        mobileFieldNotes: nextNotes,
+        fieldNoteFormVisible: false,
+        fieldNoteForm: createFieldNoteForm(),
+      });
+      this.refreshMobileToolkitInsights(nextNotes);
+      await this.persistFieldNotes(nextNotes);
+      wx.showToast({ title: '已保存', icon: 'success' });
+    } catch (error) {
+      console.warn('保存巡课速记失败', error);
+      this.setData({ fieldNoteFormError: '保存失败，请稍后重试。' });
+    } finally {
+      this.setData({ fieldNoteSubmitting: false });
+    }
+  },
+
+  async toggleFieldNoteResolved(event: WechatMiniprogram.BaseEvent) {
+    const noteId = event.currentTarget?.dataset?.id as string | undefined;
+    if (!noteId) {
+      return;
+    }
+
+    const nextNotes = this.data.mobileFieldNotes.map((note) =>
+      note.id === noteId ? { ...note, resolved: !note.resolved } : note,
+    );
+
+    this.setData({ mobileFieldNotes: nextNotes });
+    this.refreshMobileToolkitInsights(nextNotes);
+    await this.persistFieldNotes(nextNotes);
+
+    const updatedNote = nextNotes.find((note) => note.id === noteId);
+    wx.showToast({ title: updatedNote?.resolved ? '已标记完成' : '已设为待跟进', icon: 'success' });
+  },
+
+  async deleteFieldNote(event: WechatMiniprogram.BaseEvent) {
+    const noteId = event.currentTarget?.dataset?.id as string | undefined;
+    if (!noteId) {
+      return;
+    }
+
+    try {
+      const { confirm } = await wx.showModal({
+        title: '删除巡课速记',
+        content: '删除后将无法恢复，确定继续吗？',
+        confirmText: '删除',
+        confirmColor: '#d14343',
+      });
+
+      if (!confirm) {
+        return;
+      }
+
+      const nextNotes = this.data.mobileFieldNotes.filter((note) => note.id !== noteId);
+      this.setData({ mobileFieldNotes: nextNotes });
+      this.refreshMobileToolkitInsights(nextNotes);
+      await this.persistFieldNotes(nextNotes);
+      wx.showToast({ title: '已删除', icon: 'success' });
+    } catch (error) {
+      console.warn('删除巡课速记失败', error);
+      wx.showToast({ title: '删除失败，请稍后重试', icon: 'none' });
+    }
+  },
+
+  previewFieldNotePhoto(event: WechatMiniprogram.BaseEvent) {
+    const noteId = event.currentTarget?.dataset?.noteId as string | undefined;
+    const index = Number(event.currentTarget?.dataset?.photoIndex ?? 0);
+
+    let photos: string[] = [];
+    if (noteId) {
+      const note = this.data.mobileFieldNotes.find((item) => item.id === noteId);
+      photos = note?.photos ?? [];
+    } else {
+      photos = this.data.fieldNoteForm.photos ?? [];
+    }
+
+    if (!photos || photos.length === 0) {
+      return;
+    }
+
+    const current = photos[index] || photos[0];
+    wx.previewImage({ current, urls: photos });
+  },
+
+  async persistFieldNotes(fieldNotes: MobileFieldNote[]) {
+    try {
+      await wx.setStorage({ key: FIELD_NOTES_STORAGE_KEY, data: fieldNotes });
+    } catch (error) {
+      console.warn('缓存巡课速记失败', error);
     }
   },
 

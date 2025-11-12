@@ -490,6 +490,160 @@
     </view>
   </view>
 
+  <view wx:elif="{{activeTab === 'mobileToolkit'}}">
+    <view wx:if="{{sectionLoading.mobileToolkit}}" class="panel panel--loading">正在加载掌上工具…</view>
+    <view wx:elif="{{sectionErrors.mobileToolkit}}" class="panel panel--error">
+      <text>{{sectionErrors.mobileToolkit}}</text>
+      <button size="mini" data-tab="mobileToolkit" bindtap="retrySection">重试</button>
+    </view>
+    <view wx:else class="panel">
+      <view class="section">
+        <view class="section__toolbar">
+          <view class="section__info">
+            <view class="section__title">巡课速记</view>
+            <view class="section__subtitle">利用小程序拍照、定位，沉淀线下巡课与临场反馈。</view>
+          </view>
+          <button class="primary-button" size="mini" bindtap="openFieldNoteForm">新增巡课速记</button>
+        </view>
+        <view wx:if="{{mobileFieldNotes.length === 0}}" class="empty">暂无巡课速记，点击右上角按钮添加第一条记录。</view>
+        <view wx:else class="mobile-note-list">
+          <block wx:for="{{mobileFieldNotes}}" wx:key="id" wx:for-item="note" wx:for-index="noteIndex">
+            <view class="mobile-note-card {{note.resolved ? 'is-resolved' : ''}}">
+              <view class="mobile-note-card__header">
+                <view class="mobile-note-card__title">{{note.title}}</view>
+                <view class="mobile-note-card__time">{{note.createdText}}</view>
+              </view>
+              <view class="mobile-note-card__body">{{note.description || '未填写备注。'}}</view>
+              <view wx:if="{{note.locationName}}" class="mobile-note-card__location">📍 {{note.locationName}}</view>
+              <view wx:if="{{note.photos && note.photos.length}}" class="mobile-note-card__photos">
+                <block wx:for="{{note.photos}}" wx:key="*this" wx:for-item="photo" wx:for-index="photoIndex">
+                  <image
+                    class="mobile-note-card__photo"
+                    src="{{photo}}"
+                    mode="aspectFill"
+                    data-note-id="{{note.id}}"
+                    data-photo-index="{{photoIndex}}"
+                    bindtap="previewFieldNotePhoto"
+                  />
+                </block>
+              </view>
+              <view class="mobile-note-card__chips">
+                <view class="status-chip {{note.resolved ? 'status-chip--success' : 'status-chip--pending'}}">
+                  {{note.resolved ? '已处理' : '待跟进'}}
+                </view>
+                <view wx:if="{{note.latitude != null && note.longitude != null}}" class="status-chip status-chip--outline">
+                  {{note.latitude}}, {{note.longitude}}
+                </view>
+              </view>
+              <view class="mobile-note-card__actions">
+                <button size="mini" class="ghost-button" data-id="{{note.id}}" bindtap="toggleFieldNoteResolved">
+                  {{note.resolved ? '标记待跟进' : '标记已处理'}}
+                </button>
+                <button size="mini" type="warn" data-id="{{note.id}}" bindtap="deleteFieldNote">删除</button>
+              </view>
+            </view>
+          </block>
+        </view>
+      </view>
+
+      <view class="section">
+        <view class="section__header">
+          <view class="section__title">掌上洞察</view>
+          <view class="section__subtitle">结合后台指标生成移动端专属提醒，随时掌握运营节奏。</view>
+        </view>
+        <view wx:if="{{mobileToolkitInsights.length === 0}}" class="empty">暂无洞察，先补充几条巡课速记试试。</view>
+        <view wx:else class="insight-list">
+          <block wx:for="{{mobileToolkitInsights}}" wx:key="id" wx:for-item="insight">
+            <view class="insight-card">
+              <view class="insight-card__title">{{insight.title}}</view>
+              <view class="insight-card__description">{{insight.description}}</view>
+            </view>
+          </block>
+        </view>
+      </view>
+    </view>
+
+    <view wx:if="{{fieldNoteFormVisible}}" class="dialog">
+      <view class="dialog__mask" bindtap="closeFieldNoteForm"></view>
+      <view class="dialog__panel dialog__panel--wide">
+        <view class="dialog__title">新增巡课速记</view>
+        <view class="dialog__body">
+          <view wx:if="{{fieldNoteFormError}}" class="form-message form-message--error">{{fieldNoteFormError}}</view>
+          <view class="form-field">
+            <view class="form-field__label">巡课主题</view>
+            <input
+              class="form-field__input"
+              value="{{fieldNoteForm.title}}"
+              data-field="title"
+              bindinput="handleFieldNoteInput"
+              placeholder="例如：自习室巡查 / 复试串讲班"
+            />
+          </view>
+          <view class="form-field">
+            <view class="form-field__label">情况记录</view>
+            <textarea
+              class="form-field__textarea"
+              value="{{fieldNoteForm.description}}"
+              data-field="description"
+              bindinput="handleFieldNoteInput"
+              placeholder="记录现场反馈、学员提问或老师点评"
+            ></textarea>
+          </view>
+          <view class="form-field">
+            <view class="form-field__label">现场照片</view>
+            <view class="photo-picker">
+              <block wx:for="{{fieldNoteForm.photos}}" wx:key="*this" wx:for-item="photo" wx:for-index="photoIndex">
+                <view class="photo-picker__item">
+                  <image
+                    class="photo-picker__preview"
+                    src="{{photo}}"
+                    mode="aspectFill"
+                    data-photo-index="{{photoIndex}}"
+                    bindtap="previewFieldNotePhoto"
+                  />
+                  <button size="mini" class="photo-picker__remove" data-index="{{photoIndex}}" bindtap="removeFieldNotePhoto">移除</button>
+                </view>
+              </block>
+              <button class="ghost-button photo-picker__add" size="mini" bindtap="chooseFieldNoteImages">添加图片</button>
+            </view>
+          </view>
+          <view class="form-field">
+            <view class="form-field__label">巡课地点</view>
+            <view class="location-row">
+              <input
+                class="form-field__input location-row__input"
+                value="{{fieldNoteForm.locationName}}"
+                data-field="locationName"
+                bindinput="handleFieldNoteInput"
+                placeholder="点击右侧按钮快速选择"
+              />
+              <button
+                size="mini"
+                class="ghost-button"
+                loading="{{fieldNoteLocationLoading}}"
+                disabled="{{fieldNoteLocationLoading}}"
+                bindtap="captureFieldNoteLocation"
+              >
+                {{fieldNoteLocationLoading ? '定位中…' : '选择位置'}}
+              </button>
+            </view>
+          </view>
+        </view>
+        <view class="dialog__footer">
+          <button class="dialog__btn" bindtap="closeFieldNoteForm" disabled="{{fieldNoteSubmitting}}">取消</button>
+          <button
+            class="dialog__btn dialog__btn--primary"
+            bindtap="submitFieldNote"
+            loading="{{fieldNoteSubmitting}}"
+            disabled="{{fieldNoteSubmitting}}"
+          >
+            保存速记
+          </button>
+        </view>
+      </view>
+    </view>
+  </view>
+
   <view wx:elif="{{activeTab === 'statistics'}}">
     <view wx:if="{{sectionLoading.statistics}}" class="panel panel--loading">正在加载统计信息…</view>
     <view wx:elif="{{sectionErrors.statistics}}" class="panel panel--error">
