@@ -145,7 +145,7 @@ Page({
     },
     completeTask: function () {
         return __awaiter(this, void 0, void 0, function () {
-            var task, response, overrideStreak, nextState, error_3, apiError, message;
+            var task, latestStatus, latestTask, submitCompletion, error_3, apiError, message;
             return __generator(this, function (_a) {
                 switch (_a.label) {
                     case 0:
@@ -165,37 +165,82 @@ Page({
                         this.setData({ completing: true, errorMessage: '' });
                         _a.label = 1;
                     case 1:
-                        _a.trys.push([1, 4, 5, 6]);
+                        _a.trys.push([1, 5, 6, 7]);
                         return [4 /*yield*/, (0, session_1.ensureSession)()];
                     case 2:
                         _a.sent();
-                        return [4 /*yield*/, (0, api_1.apiRequest)({
-                                path: '/learning/daily-task/complete',
-                                method: 'POST',
-                                data: { taskId: task.id },
-                            })];
+                        return [4 /*yield*/, (0, checkin_2.reloadDailyTask)()];
                     case 3:
-                        response = _a.sent();
-                        overrideStreak = typeof (response === null || response === void 0 ? void 0 : response.streak) === 'number' && Number.isFinite(response.streak)
-                            ? Math.max(0, Math.floor(response.streak))
-                            : undefined;
-                        nextState = (0, checkin_2.markTaskCompletedToday)(task, overrideStreak);
-                        this.setData({
-                            status: { task: task, completedToday: true, streak: nextState.streak },
-                            posterTempPath: '',
-                        });
-                        wx.showToast({ title: '打卡成功', icon: 'success' });
-                        return [3 /*break*/, 6];
+                        latestStatus = _a.sent();
+                        latestTask = latestStatus.task;
+                        this.setData({ status: latestStatus });
+                        if (!latestTask || !latestTask.id) {
+                            this.setData({ errorMessage: '今日任务尚未发布，请稍后再试。' });
+                            return [3 /*break*/, 7];
+                        }
+                        submitCompletion = function (targetTask, allowRetry) { return __awaiter(this, void 0, void 0, function () {
+                            var response, overrideStreak, nextState, refreshedStatus, refreshedTask;
+                            return __generator(this, function (_a) {
+                                switch (_a.label) {
+                                    case 0:
+                                        _a.trys.push([0, 3, , 6]);
+                                        return [4 /*yield*/, (0, api_1.apiRequest)({
+                                                path: '/learning/daily-task/complete',
+                                                method: 'POST',
+                                                data: { taskId: targetTask.id },
+                                            })];
+                                    case 1:
+                                        response = _a.sent();
+                                        overrideStreak = typeof (response === null || response === void 0 ? void 0 : response.streak) === 'number' && Number.isFinite(response.streak)
+                                            ? Math.max(0, Math.floor(response.streak))
+                                            : undefined;
+                                        nextState = (0, checkin_2.markTaskCompletedToday)(targetTask, overrideStreak);
+                                        this.setData({
+                                            status: { task: targetTask, completedToday: true, streak: nextState.streak },
+                                            posterTempPath: '',
+                                        });
+                                        wx.showToast({ title: '打卡成功', icon: 'success' });
+                                        return [3 /*break*/, 6];
+                                    case 2: return [3 /*break*/, 6];
+                                    case 3:
+                                        error_3 = _a.sent();
+                                        apiError = error_3;
+                                        if (!(allowRetry && ((apiError === null || apiError === void 0 ? void 0 : apiError.statusCode) === 400))) return [3 /*break*/, 5];
+                                        wx.showToast({ title: '任务已更新', icon: 'none' });
+                                        return [4 /*yield*/, (0, checkin_2.reloadDailyTask)()];
+                                    case 4:
+                                        refreshedStatus = _a.sent();
+                                        refreshedTask = refreshedStatus.task;
+                                        this.setData({ status: refreshedStatus, errorMessage: '' });
+                                        if (refreshedTask && refreshedTask.id && refreshedTask.id !== targetTask.id) {
+                                            return [2 /*return*/, submitCompletion.call(this, refreshedTask, false)];
+                                        }
+                                        _a.label = 5;
+                                    case 5: throw apiError;
+                                    case 6: return [2 /*return*/];
+                                }
+                            });
+                        }); };
+                        return [4 /*yield*/, submitCompletion.call(this, latestTask, true)];
                     case 4:
+                        _a.sent();
+                        return [3 /*break*/, 7];
+                    case 5:
                         error_3 = _a.sent();
                         apiError = error_3;
+                        if ((apiError === null || apiError === void 0 ? void 0 : apiError.statusCode) === 409) {
+                            wx.showToast({ title: '任务已更新', icon: 'none' });
+                            void this.refreshTask(true);
+                            this.setData({ completing: false });
+                            return [2 /*return*/];
+                        }
                         message = (apiError === null || apiError === void 0 ? void 0 : apiError.message) || '打卡上报失败，请稍后再试。';
                         this.setData({ errorMessage: message });
-                        return [3 /*break*/, 6];
-                    case 5:
+                        return [3 /*break*/, 7];
+                    case 6:
                         this.setData({ completing: false });
                         return [7 /*endfinally*/];
-                    case 6: return [2 /*return*/];
+                    case 7: return [2 /*return*/];
                 }
             });
         });

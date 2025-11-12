@@ -9,7 +9,7 @@ import {
   type ScheduleItem,
 } from '../../data/dashboard';
 import { apiRequest, type ApiError } from '../../utils/api';
-import { ensureSession } from '../../utils/session';
+import { ensureSession, getStoredSession } from '../../utils/session';
 import { loadFromStorage, saveToStorage } from '../../utils/storage';
 
 const DASHBOARD_STORAGE_KEY = 'dashboardSnapshot';
@@ -116,9 +116,14 @@ const quickLinkEntries: QuickLinkItem[] = [
   { id: 'ai', label: 'AI 助手', caption: '随问随答', icon: '🤖', page: 'ai', variant: 'accent' },
 ];
 
+const filterQuickLinksByRole = (role: string | null | undefined): QuickLinkItem[] => {
+  const normalizedRole = role === 'admin' ? 'admin' : 'student';
+  return quickLinkEntries.filter((item) => normalizedRole === 'admin' || item.id !== 'admin');
+};
+
 Page({
   data: {
-    quickLinks: quickLinkEntries,
+    quickLinks: filterQuickLinksByRole(getStoredSession()?.role ?? null),
     snapshot: normalizeDashboard(
       loadFromStorage<DashboardSnapshot>(DASHBOARD_STORAGE_KEY, dashboardSnapshotSeed),
     ),
@@ -127,14 +132,21 @@ Page({
   },
 
   onShow() {
+    const stored = getStoredSession();
+    this.updateQuickLinks(stored?.role ?? null);
     void this.loadDashboard();
+  },
+
+  updateQuickLinks(role: string | null) {
+    this.setData({ quickLinks: filterQuickLinksByRole(role) });
   },
 
   async loadDashboard() {
     this.setData({ loading: true, errorMessage: '' });
 
     try {
-      await ensureSession();
+      const sessionUser = await ensureSession();
+      this.updateQuickLinks(sessionUser.role ?? null);
     } catch (error) {
       const apiError = error as ApiError;
       const message =
@@ -142,6 +154,7 @@ Page({
           ? '请先在个人中心使用账号密码登录后，再刷新学习看板。'
           : apiError?.message || '无法校验登录状态，请稍后重试。';
       this.setData({ loading: false, errorMessage: message });
+      this.updateQuickLinks(null);
       return;
     }
 

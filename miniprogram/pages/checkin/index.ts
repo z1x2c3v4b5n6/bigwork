@@ -111,27 +111,63 @@ Page({
 
     try {
       await ensureSession();
-      const response = await apiRequest<{
-        streak?: number;
-        completedToday?: boolean;
-        lastCompletedDate?: string | null;
-      }>({
-        path: '/learning/daily-task/complete',
-        method: 'POST',
-        data: { taskId: task.id },
-      });
-      const overrideStreak =
-        typeof response?.streak === 'number' && Number.isFinite(response.streak)
-          ? Math.max(0, Math.floor(response.streak))
-          : undefined;
-      const nextState = markTaskCompletedToday(task, overrideStreak);
-      this.setData({
-        status: { task, completedToday: true, streak: nextState.streak },
-        posterTempPath: '',
-      });
-      wx.showToast({ title: '打卡成功', icon: 'success' });
+      const latestStatus = await reloadDailyTask();
+      const latestTask = latestStatus.task as DailyTask | undefined;
+
+      this.setData({ status: latestStatus });
+
+      if (!latestTask || !latestTask.id) {
+        this.setData({ errorMessage: '今日任务尚未发布，请稍后再试。' });
+        return;
+      }
+
+      const submitCompletion = async (targetTask: DailyTask, allowRetry: boolean): Promise<void> => {
+        try {
+          const response = await apiRequest<{
+            streak?: number;
+            completedToday?: boolean;
+            lastCompletedDate?: string | null;
+          }>({
+            path: '/learning/daily-task/complete',
+            method: 'POST',
+            data: { taskId: targetTask.id },
+          });
+          const overrideStreak =
+            typeof response?.streak === 'number' && Number.isFinite(response.streak)
+              ? Math.max(0, Math.floor(response.streak))
+              : undefined;
+          const nextState = markTaskCompletedToday(targetTask, overrideStreak);
+          this.setData({
+            status: { task: targetTask, completedToday: true, streak: nextState.streak },
+            posterTempPath: '',
+          });
+          wx.showToast({ title: '打卡成功', icon: 'success' });
+        } catch (error) {
+          const apiError = error as ApiError;
+          if (allowRetry && apiError?.statusCode === 400) {
+            wx.showToast({ title: '任务已更新', icon: 'none' });
+            const refreshedStatus = await reloadDailyTask();
+            const refreshedTask = refreshedStatus.task as DailyTask | undefined;
+            this.setData({ status: refreshedStatus, errorMessage: '' });
+
+            if (refreshedTask && refreshedTask.id && refreshedTask.id !== targetTask.id) {
+              await submitCompletion(refreshedTask, false);
+              return;
+            }
+          }
+          throw apiError;
+        }
+      };
+
+      await submitCompletion(latestTask, true);
     } catch (error) {
       const apiError = error as ApiError;
+      if (apiError?.statusCode === 409) {
+        wx.showToast({ title: '任务已更新', icon: 'none' });
+        void this.refreshTask(true);
+        this.setData({ completing: false });
+        return;
+      }
       const message = apiError?.message || '打卡上报失败，请稍后再试。';
       this.setData({ errorMessage: message });
     } finally {
