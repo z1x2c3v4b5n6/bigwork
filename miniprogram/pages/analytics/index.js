@@ -1,21 +1,38 @@
 "use strict";
-var __assign = (this && this.__assign) || function () {
-    __assign = Object.assign || function(t) {
-        for (var s, i = 1, n = arguments.length; i < n; i++) {
-            s = arguments[i];
-            for (var p in s) if (Object.prototype.hasOwnProperty.call(s, p))
-                t[p] = s[p];
-        }
-        return t;
-    };
-    return __assign.apply(this, arguments);
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 var analytics_1 = require("../../data/analytics");
+var toMasteryText = function (value) {
+    var numeric = Number(value);
+    if (!Number.isFinite(numeric) || numeric < 0) {
+        return '0%';
+    }
+    var percentage = Math.max(0, Math.min(1, numeric));
+    return "".concat(Math.round(percentage * 100), "%");
+};
+var normalizeSubjects = function () {
+    return analytics_1.subjectMasterySeed.map(function (item) { return ({
+        name: item.name,
+        mastery: item.mastery,
+        masteryText: toMasteryText(item.mastery),
+        trend: item.trend,
+        focus: item.focus,
+    }); });
+};
+var normalizeHighlights = function () { return analytics_1.analyticsHighlights.map(function (item) { return ({
+    id: item.id,
+    title: item.title,
+    description: item.description,
+}); }); };
+var normalizeKnowledgeGraph = function () { return analytics_1.knowledgeGraphSeed.map(function (item) { return ({
+    id: item.id,
+    topic: item.topic,
+    errorRate: item.errorRate,
+    action: item.action,
+}); }); };
 Page({
     data: {
-        highlights: analytics_1.analyticsHighlights,
-        subjects: analytics_1.subjectMasterySeed.map(function (subject) { return (__assign(__assign({}, subject), { masteryText: "".concat(Math.round(subject.mastery * 100), "%") })); }),
-        knowledgeGraph: analytics_1.knowledgeGraphSeed,
+        highlights: normalizeHighlights(),
+        subjects: normalizeSubjects(),
+        knowledgeGraph: normalizeKnowledgeGraph(),
     },
 });
