@@ -153,7 +153,7 @@ var buildRecommendations = function (totalScore, major, examPreferences) {
         math: normalizeMathSubject(examPreferences === null || examPreferences === void 0 ? void 0 : examPreferences.math),
         english: normalizeEnglishSubject(examPreferences === null || examPreferences === void 0 ? void 0 : examPreferences.english),
     };
-    var results = universityProfiles_1.universityProfiles
+    var scored = universityProfiles_1.universityProfiles
         .map(function (university) {
         var _a;
         var matchLevel = evaluateMatchLevel(totalScore, university);
@@ -194,9 +194,8 @@ var buildRecommendations = function (totalScore, major, examPreferences) {
             scoreDelta: diff,
             compositeScore: compositeScore,
         };
-    })
-        .filter(function (item) { return item.scoreDelta >= -25 || item.matchLevel !== '高风险'; })
-        .sort(function (a, b) {
+    });
+    var compareByFit = function (a, b) {
         var levelDiff = matchLevelOrder[a.matchLevel] - matchLevelOrder[b.matchLevel];
         if (levelDiff !== 0) {
             return levelDiff;
@@ -205,8 +204,10 @@ var buildRecommendations = function (totalScore, major, examPreferences) {
             return b.compositeScore - a.compositeScore;
         }
         return b.scoreDelta - a.scoreDelta;
-    });
-    var recommendedUniversities = results.slice(0, 6).map(function (item) {
+    };
+    var prioritized = scored.filter(function (item) { return item.scoreDelta >= -25 || item.matchLevel !== '高风险'; });
+    var ranked = (prioritized.length > 0 ? prioritized : scored).slice().sort(compareByFit);
+    var recommendedUniversities = ranked.slice(0, 6).map(function (item) {
         var scoreDelta = item.scoreDelta, compositeScore = item.compositeScore, rest = __rest(item, ["scoreDelta", "compositeScore"]);
         return rest;
     });

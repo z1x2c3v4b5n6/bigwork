@@ -1,16 +1,9 @@
-const { scoreBandGuides, bilingualTemplate, rehearsalChecklist } = require('../../data/resources.js');
-
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+var resources_1 = require("../../data/resources");
 Page({
-  data: {
-    scoreBandGuides,
-    bilingualTemplate,
-    rehearsalChecklist,
-  },
-
-  onShareAppMessage() {
-    return {
-      title: '复试自我介绍模板（含中英文）',
-      path: '/pages/intro/index',
-    };
-  },
+    data: {
+        templates: resources_1.introTemplates,
+        scoreBandGuides: resources_1.scoreBandGuides,
+    },
 });
