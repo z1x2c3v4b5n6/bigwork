@@ -15,6 +15,12 @@
     </button>
   </view>
 
+  <view class="section" wx:if="{{sessionUser && sessionUser.role === 'admin'}}">
+    <view class="section__title">后台管理面板</view>
+    <view class="section__subtitle">访问课程、题库、论坛审核等管理员工具。</view>
+    <button class="button button--primary" bindtap="navigateToAdmin" hover-class="none">打开后台管理</button>
+  </view>
+
   <view class="section section--login" wx:if="{{!sessionUser}}">
     <view class="login-header">
       <view class="login-icon">🔐</view>

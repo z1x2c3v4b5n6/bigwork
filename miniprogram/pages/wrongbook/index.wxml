@@ -31,7 +31,7 @@
 
   <view class="empty" wx:if="{{!items.length}}">暂无错题，快去刷题吧！</view>
 
-  <scroll-view scroll-y="true" class="list" wx:if="{{items.length}}">
+  <scroll-view scroll-y="true" class="list" wx:if="{{items.length}}" enable-flex="true">
     <block wx:for="{{items}}" wx:key="id">
       <view class="item {{item.synced ? '' : 'item--pending'}}">
         <view class="item__header">
