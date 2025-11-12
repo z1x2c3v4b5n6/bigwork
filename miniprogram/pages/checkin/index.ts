@@ -22,6 +22,7 @@ Page({
     generatingPoster: false,
     errorMessage: '',
     posterTempPath: '',
+    sessionRequired: false,
     status: createInitialState(),
   },
 
@@ -36,30 +37,44 @@ Page({
     this.setData({ loading: true, errorMessage: '' });
 
     let pendingMessage = '';
+    let requireLogin = false;
     try {
       await ensureSession();
     } catch (error) {
       const apiError = error as ApiError;
-      pendingMessage =
-        apiError?.statusCode === 401
-          ? '请先完成登录后再查看打卡任务，可在“我的”页使用账号密码登录。'
-          : apiError?.message || '登录状态校验失败，请稍后再试。';
+      if (apiError?.statusCode === 401) {
+        requireLogin = true;
+        pendingMessage = '请先完成登录后再查看打卡任务，可在“我的”页使用账号密码登录。';
+      } else {
+        pendingMessage = apiError?.message || '登录状态校验失败，请稍后再试。';
+      }
     }
 
-    try {
-      const status = forceReload ? await reloadDailyTask() : await initializeDailyTask();
-      this.setData({ status, posterTempPath: '' });
+    if (requireLogin) {
+      this.setData({
+        status: createInitialState(),
+        posterTempPath: '',
+        sessionRequired: true,
+      });
       if (pendingMessage) {
         this.setData({ errorMessage: pendingMessage });
       }
-    } catch (error) {
-      const apiError = error as ApiError;
-      const message = apiError?.message || '加载今日任务失败，请稍后重试。';
-      this.setData({ errorMessage: message });
-    } finally {
-      this.setData({ loading: false });
-      wx.stopPullDownRefresh();
+    } else {
+      try {
+        const status = forceReload ? await reloadDailyTask() : await initializeDailyTask();
+        this.setData({ status, posterTempPath: '', sessionRequired: false });
+        if (pendingMessage) {
+          this.setData({ errorMessage: pendingMessage });
+        }
+      } catch (error) {
+        const apiError = error as ApiError;
+        const message = apiError?.message || '加载今日任务失败，请稍后重试。';
+        this.setData({ errorMessage: message });
+      }
     }
+
+    this.setData({ loading: false });
+    wx.stopPullDownRefresh();
   },
 
   onPullDownRefresh() {
@@ -71,7 +86,18 @@ Page({
     void this.refreshTask(force);
   },
 
+  handleGoLogin() {
+    wx.switchTab({ url: '/pages/profile/index' });
+  },
+
   async completeTask() {
+    if (this.data.sessionRequired) {
+      this.setData({
+        errorMessage: '请先登录后再进行打卡，可在“我的”页使用账号密码登录。',
+      });
+      return;
+    }
+
     if (this.data.completing || this.data.status.completedToday) {
       return;
     }
@@ -85,27 +111,63 @@ Page({
 
     try {
       await ensureSession();
-      const response = await apiRequest<{
-        streak?: number;
-        completedToday?: boolean;
-        lastCompletedDate?: string | null;
-      }>({
-        path: '/learning/daily-task/complete',
-        method: 'POST',
-        data: { taskId: task.id },
-      });
-      const overrideStreak =
-        typeof response?.streak === 'number' && Number.isFinite(response.streak)
-          ? Math.max(0, Math.floor(response.streak))
-          : undefined;
-      const nextState = markTaskCompletedToday(task, overrideStreak);
-      this.setData({
-        status: { task, completedToday: true, streak: nextState.streak },
-        posterTempPath: '',
-      });
-      wx.showToast({ title: '打卡成功', icon: 'success' });
+      const latestStatus = await reloadDailyTask();
+      const latestTask = latestStatus.task as DailyTask | undefined;
+
+      this.setData({ status: latestStatus });
+
+      if (!latestTask || !latestTask.id) {
+        this.setData({ errorMessage: '今日任务尚未发布，请稍后再试。' });
+        return;
+      }
+
+      const submitCompletion = async (targetTask: DailyTask, allowRetry: boolean): Promise<void> => {
+        try {
+          const response = await apiRequest<{
+            streak?: number;
+            completedToday?: boolean;
+            lastCompletedDate?: string | null;
+          }>({
+            path: '/learning/daily-task/complete',
+            method: 'POST',
+            data: { taskId: targetTask.id },
+          });
+          const overrideStreak =
+            typeof response?.streak === 'number' && Number.isFinite(response.streak)
+              ? Math.max(0, Math.floor(response.streak))
+              : undefined;
+          const nextState = markTaskCompletedToday(targetTask, overrideStreak);
+          this.setData({
+            status: { task: targetTask, completedToday: true, streak: nextState.streak },
+            posterTempPath: '',
+          });
+          wx.showToast({ title: '打卡成功', icon: 'success' });
+        } catch (error) {
+          const apiError = error as ApiError;
+          if (allowRetry && apiError?.statusCode === 400) {
+            wx.showToast({ title: '任务已更新', icon: 'none' });
+            const refreshedStatus = await reloadDailyTask();
+            const refreshedTask = refreshedStatus.task as DailyTask | undefined;
+            this.setData({ status: refreshedStatus, errorMessage: '' });
+
+            if (refreshedTask && refreshedTask.id && refreshedTask.id !== targetTask.id) {
+              await submitCompletion(refreshedTask, false);
+              return;
+            }
+          }
+          throw apiError;
+        }
+      };
+
+      await submitCompletion(latestTask, true);
     } catch (error) {
       const apiError = error as ApiError;
+      if (apiError?.statusCode === 409) {
+        wx.showToast({ title: '任务已更新', icon: 'none' });
+        void this.refreshTask(true);
+        this.setData({ completing: false });
+        return;
+      }
       const message = apiError?.message || '打卡上报失败，请稍后再试。';
       this.setData({ errorMessage: message });
     } finally {

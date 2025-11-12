@@ -304,6 +304,24 @@ Page({
         });
         this.recalculateStatistics();
     },
+    _getData: function () {
+        var _a;
+        if (((_a = this.data.sectionLoading) === null || _a === void 0 ? void 0 : _a.overview) && typeof this.loadOverview === 'function') {
+            try {
+                this.loadOverview();
+            }
+            catch (error) {
+                console.warn('加载后台总览数据失败', error);
+            }
+        }
+        return Promise.resolve({
+            metricsCards: this.data.metricsCards,
+            studentProgress: this.data.studentProgress,
+            auditLogs: this.data.auditLogs,
+            administrators: this.data.administrators,
+            dashboardNote: this.data.dashboardNote,
+        });
+    },
     switchTab: function (event) {
         var _a, _b;
         var tab = (_b = (_a = event.currentTarget) === null || _a === void 0 ? void 0 : _a.dataset) === null || _b === void 0 ? void 0 : _b.tab;

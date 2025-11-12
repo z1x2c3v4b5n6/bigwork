@@ -124,6 +124,38 @@
   color: #fecaca;
 }
 
+.login-placeholder {
+  background: rgba(15, 23, 42, 0.72);
+  border-radius: 28rpx;
+  padding: 40rpx 32rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 24rpx;
+  text-align: left;
+}
+
+.login-placeholder__title {
+  font-size: 36rpx;
+  font-weight: 600;
+  color: #facc15;
+}
+
+.login-placeholder__desc {
+  font-size: 26rpx;
+  line-height: 1.6;
+  color: rgba(226, 232, 240, 0.9);
+}
+
+.login-placeholder__btn {
+  align-self: flex-start;
+  padding: 20rpx 48rpx;
+  border-radius: 999rpx;
+  background: linear-gradient(135deg, #38bdf8, #22d3ee);
+  color: #0f172a;
+  font-weight: 600;
+  border: none;
+}
+
 .section {
   background: rgba(15, 23, 42, 0.72);
   border-radius: 28rpx;

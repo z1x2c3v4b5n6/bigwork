@@ -1,5 +1,5 @@
 import { getApiConfig } from '../config';
-import { clearStoredCookies, getStoredCookieHeader, storeResponseCookies } from './authCookies';
+import { clearStoredToken, getStoredToken } from './authToken';
 
 export interface ApiRequestOptions<TData = any> {
   path: string;
@@ -111,14 +111,14 @@ export const apiRequest = <TResponse = any, TData = any>({
   }
 
   return new Promise<TResponse>((resolve, reject) => {
-    const storedCookie = getStoredCookieHeader();
+    const storedToken = getStoredToken();
     const requestHeader: Record<string, unknown> = {
       'Content-Type': 'application/json',
       ...header,
     };
 
-    if (storedCookie && !requestHeader.Cookie && !requestHeader.cookie) {
-      requestHeader.Cookie = storedCookie;
+    if (storedToken && !requestHeader.Authorization && !requestHeader.authorization) {
+      requestHeader.Authorization = `Bearer ${storedToken}`;
     }
 
     wx.request({
@@ -127,10 +127,8 @@ export const apiRequest = <TResponse = any, TData = any>({
       data,
       header: requestHeader,
       timeout: timeout ?? defaultTimeout,
-      withCredentials: true,
+      withCredentials: false,
       success: (res) => {
-        storeResponseCookies(res);
-
         if (res.statusCode >= 200 && res.statusCode < 300) {
           resolve(res.data as TResponse);
           return;
@@ -144,7 +142,7 @@ export const apiRequest = <TResponse = any, TData = any>({
         error.statusCode = res.statusCode;
         error.data = res.data;
         if (res.statusCode === 401) {
-          clearStoredCookies();
+          clearStoredToken();
         }
         reject(error);
       },
