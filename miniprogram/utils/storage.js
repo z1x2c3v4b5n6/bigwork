@@ -1,34 +1,35 @@
-const loadFromStorage = (key, fallback) => {
-  try {
-    const raw = wx.getStorageSync(key);
-    if (raw === '' || raw === null || typeof raw === 'undefined') {
-      return fallback;
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.resetStorageKey = exports.saveToStorage = exports.loadFromStorage = void 0;
+var loadFromStorage = function (key, fallback) {
+    try {
+        var raw = wx.getStorageSync(key);
+        if (raw === '' || raw === null || raw === undefined) {
+            return fallback;
+        }
+        return raw;
     }
-    return raw;
-  } catch (error) {
-    console.warn(`[storage] 读取 ${key} 失败`, error);
-    return fallback;
-  }
+    catch (error) {
+        console.warn("[storage] \u8BFB\u53D6 ".concat(key, " \u5931\u8D25"), error);
+        return fallback;
+    }
 };
-
-const saveToStorage = (key, value) => {
-  try {
-    wx.setStorageSync(key, value);
-  } catch (error) {
-    console.warn(`[storage] 写入 ${key} 失败`, error);
-  }
+exports.loadFromStorage = loadFromStorage;
+var saveToStorage = function (key, value) {
+    try {
+        wx.setStorageSync(key, value);
+    }
+    catch (error) {
+        console.warn("[storage] \u5199\u5165 ".concat(key, " \u5931\u8D25"), error);
+    }
 };
-
-const resetStorageKey = (key) => {
-  try {
-    wx.removeStorageSync(key);
-  } catch (error) {
-    console.warn(`[storage] 清除 ${key} 失败`, error);
-  }
+exports.saveToStorage = saveToStorage;
+var resetStorageKey = function (key) {
+    try {
+        wx.removeStorageSync(key);
+    }
+    catch (error) {
+        console.warn("[storage] \u6E05\u9664 ".concat(key, " \u5931\u8D25"), error);
+    }
 };
-
-module.exports = {
-  loadFromStorage,
-  saveToStorage,
-  resetStorageKey,
-};
+exports.resetStorageKey = resetStorageKey;
