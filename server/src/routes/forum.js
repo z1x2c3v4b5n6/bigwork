@@ -24,6 +24,16 @@ const {
 
 const router = express.Router();
 
+const BACKTICK = '`';
+const quoteIdentifier = (value) => BACKTICK + value + BACKTICK;
+const qualifyColumn = (alias, column) => alias + '.' + quoteIdentifier(column);
+const buildSelectFragment = (alias, column, asAlias, fallback) => {
+  if (column === null || column === undefined) {
+    return fallback || 'NULL AS ' + asAlias;
+  }
+  return qualifyColumn(alias, column) + ' AS ' + asAlias;
+};
+
 const TOPIC_TABLE = 'forum_topics';
 const POST_TABLE_CANDIDATES = ['forum_posts', 'forum_comments'];
 const LIKE_TABLE_CANDIDATES = ['forum_topic_likes', 'forum_likes'];
@@ -51,7 +61,7 @@ const getDefaultUserId = async () => {
     idColumn;
 
   const rows = await query(
-    `SELECT u.\`${idColumn}\` AS id FROM users u ORDER BY u.\`${orderColumn}\` ASC LIMIT 1`,
+    'SELECT ' + qualifyColumn('u', idColumn) + ' AS id FROM users u ORDER BY ' + qualifyColumn('u', orderColumn) + ' ASC LIMIT 1',
   );
 
   const identifier = rows[0]?.id;
@@ -168,10 +178,10 @@ const getUserJoinConfig = async (alias = 'u') => {
 
   const pieces = [];
   if (displayColumn) {
-    pieces.push(`${alias}.\`${displayColumn}\``);
+    pieces.push(qualifyColumn(alias, displayColumn));
   }
   if (usernameColumn) {
-    pieces.push(`${alias}.\`${usernameColumn}\``);
+    pieces.push(qualifyColumn(alias, usernameColumn));
   }
 
   const select = `COALESCE(${pieces.join(', ')}, '匿名用户') AS author`;
@@ -305,7 +315,7 @@ const seedForumTopics = async (topicConfig) => {
       return;
     }
 
-    const existing = await query(`SELECT COUNT(*) AS total FROM \`${topicConfig.tableName}\``);
+    const existing = await query('SELECT COUNT(*) AS total FROM ' + quoteIdentifier(topicConfig.tableName));
     if (Number(existing[0]?.total) > 0) {
       return;
     }
@@ -375,8 +385,10 @@ const countLikesForTopic = async (likeConfig, topicId) => {
     return 0;
   }
 
+  const likeTable = quoteIdentifier(likeConfig.tableName);
+  const likeTopicColumn = quoteIdentifier(likeConfig.topicId);
   const rows = await query(
-    `SELECT COUNT(*) AS total FROM \`${likeConfig.tableName}\` WHERE \`${likeConfig.topicId}\` = :topicId`,
+    'SELECT COUNT(*) AS total FROM ' + likeTable + ' WHERE ' + likeTopicColumn + ' = :topicId',
     { topicId: normalizedTopicId },
   );
 
@@ -413,32 +425,38 @@ router.get('/topics', async (req, res) => {
     const userJoin = await getUserJoinConfig('u');
     const joinClause =
       userJoin && userJoin.userIdColumn && topicConfig.authorId
-        ? `LEFT JOIN users ${userJoin.alias} ON ${userJoin.alias}.\`${userJoin.userIdColumn}\` = ft.\`${topicConfig.authorId}\``
+        ? 'LEFT JOIN users ' +
+          userJoin.alias +
+          ' ON ' +
+          qualifyColumn(userJoin.alias, userJoin.userIdColumn) +
+          ' = ' +
+          qualifyColumn('ft', topicConfig.authorId)
         : '';
     const authorSelect = joinClause ? userJoin.select : "'匿名用户' AS author";
 
     const selectFragments = [
-      `ft.\`${topicConfig.id}\` AS id`,
-      `ft.\`${topicConfig.title}\` AS title`,
-      topicConfig.description ? `ft.\`${topicConfig.description}\` AS description` : 'NULL AS description',
-      topicConfig.tags ? `ft.\`${topicConfig.tags}\` AS tags` : 'NULL AS tags',
-      topicConfig.createdAt ? `ft.\`${topicConfig.createdAt}\` AS created_at` : 'NULL AS created_at',
-      topicConfig.updatedAt ? `ft.\`${topicConfig.updatedAt}\` AS updated_at` : 'NULL AS updated_at',
+      buildSelectFragment('ft', topicConfig.id, 'id'),
+      buildSelectFragment('ft', topicConfig.title, 'title'),
+      buildSelectFragment('ft', topicConfig.description, 'description'),
+      buildSelectFragment('ft', topicConfig.tags, 'tags'),
+      buildSelectFragment('ft', topicConfig.createdAt, 'created_at'),
+      buildSelectFragment('ft', topicConfig.updatedAt, 'updated_at'),
       authorSelect,
     ];
 
     const orderColumn = topicConfig.updatedAt
-      ? `ft.\`${topicConfig.updatedAt}\``
+      ? qualifyColumn('ft', topicConfig.updatedAt)
       : topicConfig.createdAt
-      ? `ft.\`${topicConfig.createdAt}\``
-      : `ft.\`${topicConfig.id}\``;
+      ? qualifyColumn('ft', topicConfig.createdAt)
+      : qualifyColumn('ft', topicConfig.id);
+    const topicTable = quoteIdentifier(topicConfig.tableName);
 
     let rows = await query(
       `
         SELECT ${selectFragments.join(', ')}
-        FROM \`${topicConfig.tableName}\` ft
+        FROM ${topicTable} ft
         ${joinClause}
-        ORDER BY ${orderColumn} DESC, ft.\`${topicConfig.id}\` DESC
+        ORDER BY ${orderColumn} DESC, ${qualifyColumn('ft', topicConfig.id)} DESC
       `,
     );
 
@@ -471,11 +489,13 @@ router.get('/topics', async (req, res) => {
     if (postConfig?.topicId && topicIds.length > 0) {
       const { clause, params } = buildInClause(topicIds, 'topic');
       if (clause) {
+        const postTopicColumn = qualifyColumn('fp', postConfig.topicId);
+        const postTableName = quoteIdentifier(postConfig.tableName);
         const replyRows = await query(
-          `SELECT fp.\`${postConfig.topicId}\` AS topic_id, COUNT(*) AS total`
-             FROM \`${postConfig.tableName}\` fp
-            WHERE fp.\`${postConfig.topicId}\` IN (${clause})
-            GROUP BY fp.\`${postConfig.topicId}\``,
+          `SELECT ${postTopicColumn} AS topic_id, COUNT(*) AS total`
+             FROM ${postTableName} fp
+            WHERE ${postTopicColumn} IN (${clause})
+            GROUP BY ${postTopicColumn}`,
           params,
         );
         replyCountMap = new Map(
@@ -491,11 +511,13 @@ router.get('/topics', async (req, res) => {
     if (likeConfig?.topicId && topicIds.length > 0) {
       const { clause, params } = buildInClause(topicIds, 'likeTopic');
       if (clause) {
+        const likeTopicColumn = qualifyColumn('fl', likeConfig.topicId);
+        const likeTableName = quoteIdentifier(likeConfig.tableName);
         const likeRows = await query(
-          `SELECT fl.\`${likeConfig.topicId}\` AS topic_id, COUNT(*) AS total`
-             FROM \`${likeConfig.tableName}\` fl
-            WHERE fl.\`${likeConfig.topicId}\` IN (${clause})
-            GROUP BY fl.\`${likeConfig.topicId}\``,
+          `SELECT ${likeTopicColumn} AS topic_id, COUNT(*) AS total`
+             FROM ${likeTableName} fl
+            WHERE ${likeTopicColumn} IN (${clause})
+            GROUP BY ${likeTopicColumn}`,
           params,
         );
         likeCountMap = new Map(
@@ -511,11 +533,14 @@ router.get('/topics', async (req, res) => {
     if (likeConfig?.topicId && likeConfig?.userId && currentUserId && topicIds.length > 0) {
       const { clause, params } = buildInClause(topicIds, 'likedTopic');
       if (clause) {
+        const likedTopicColumn = qualifyColumn('fl', likeConfig.topicId);
+        const likedTableName = quoteIdentifier(likeConfig.tableName);
+        const userIdColumn = qualifyColumn('fl', likeConfig.userId);
         const likedRows = await query(
-          `SELECT fl.\`${likeConfig.topicId}\` AS topic_id`
-             FROM \`${likeConfig.tableName}\` fl
-            WHERE fl.\`${likeConfig.userId}\` = :userId
-              AND fl.\`${likeConfig.topicId}\` IN (${clause})`,
+          `SELECT ${likedTopicColumn} AS topic_id`
+             FROM ${likedTableName} fl
+            WHERE ${userIdColumn} = :userId
+              AND ${likedTopicColumn} IN (${clause})`,
           { ...params, userId: currentUserId },
         );
         likedSet = new Set(
@@ -637,23 +662,28 @@ router.get('/topics/:topicId/posts', async (req, res) => {
     const userJoin = await getUserJoinConfig('u');
     const joinClause =
       userJoin && userJoin.userIdColumn && postConfig.authorId
-        ? `LEFT JOIN users ${userJoin.alias} ON ${userJoin.alias}.\`${userJoin.userIdColumn}\` = fp.\`${postConfig.authorId}\``
+        ? 'LEFT JOIN users ' +
+          userJoin.alias +
+          ' ON ' +
+          qualifyColumn(userJoin.alias, userJoin.userIdColumn) +
+          ' = ' +
+          qualifyColumn('fp', postConfig.authorId)
         : '';
     const authorSelect = joinClause ? userJoin.select : "'匿名用户' AS author";
 
     const selectFragments = [
-      `fp.\`${postConfig.id}\` AS id`,
-      postConfig.content ? `fp.\`${postConfig.content}\` AS content` : "'' AS content",
-      postConfig.createdAt ? `fp.\`${postConfig.createdAt}\` AS created_at` : 'NULL AS created_at',
-      postConfig.updatedAt ? `fp.\`${postConfig.updatedAt}\` AS updated_at` : 'NULL AS updated_at',
-      postConfig.topicId ? `fp.\`${postConfig.topicId}\` AS topic_id` : 'NULL AS topic_id',
-      postConfig.authorId ? `fp.\`${postConfig.authorId}\` AS author_id` : 'NULL AS author_id',
+      buildSelectFragment('fp', postConfig.id, 'id'),
+      buildSelectFragment('fp', postConfig.content, 'content', "'' AS content"),
+      buildSelectFragment('fp', postConfig.createdAt, 'created_at'),
+      buildSelectFragment('fp', postConfig.updatedAt, 'updated_at'),
+      buildSelectFragment('fp', postConfig.topicId, 'topic_id'),
+      buildSelectFragment('fp', postConfig.authorId, 'author_id'),
       authorSelect,
     ];
 
     const orderColumn = postConfig.createdAt
-      ? `fp.\`${postConfig.createdAt}\``
-      : `fp.\`${postConfig.id}\``;
+      ? qualifyColumn('fp', postConfig.createdAt)
+      : qualifyColumn('fp', postConfig.id);
 
     const normalizedTopicId = normalizeValueForColumn(
       postConfig.columnDetails,
@@ -665,12 +695,13 @@ router.get('/topics/:topicId/posts', async (req, res) => {
       return res.json({ posts: [] });
     }
 
+    const postTable = quoteIdentifier(postConfig.tableName);
     const rows = await query(
       `SELECT ${selectFragments.join(', ')}
-         FROM \`${postConfig.tableName}\` fp
+         FROM ${postTable} fp
          ${joinClause}
-        WHERE fp.\`${postConfig.topicId}\` = :topicId
-        ORDER BY ${orderColumn} ASC, fp.\`${postConfig.id}\` ASC`,
+        WHERE ${qualifyColumn('fp', postConfig.topicId)} = :topicId
+        ORDER BY ${orderColumn} ASC, ${qualifyColumn('fp', postConfig.id)} ASC`,
       { topicId: normalizedTopicId },
     );
 
@@ -774,9 +805,9 @@ router.delete('/topics/:topicId/posts/:postId', requireAuth, async (req, res) =>
     }
 
     const selectFragments = [
-      `fp.\`${postConfig.id}\` AS id`,
-      postConfig.topicId ? `fp.\`${postConfig.topicId}\` AS topic_id` : 'NULL AS topic_id',
-      postConfig.authorId ? `fp.\`${postConfig.authorId}\` AS author_id` : 'NULL AS author_id',
+      buildSelectFragment('fp', postConfig.id, 'id'),
+      buildSelectFragment('fp', postConfig.topicId, 'topic_id'),
+      buildSelectFragment('fp', postConfig.authorId, 'author_id'),
     ];
 
     const normalizedPostId = normalizeValueForColumn(
@@ -789,10 +820,11 @@ router.delete('/topics/:topicId/posts/:postId', requireAuth, async (req, res) =>
       return res.status(400).json({ message: '帖子编号无效' });
     }
 
+    const postTable = quoteIdentifier(postConfig.tableName);
     const rows = await query(
       `SELECT ${selectFragments.join(', ')}
-         FROM \`${postConfig.tableName}\` fp
-        WHERE fp.\`${postConfig.id}\` = :postId
+         FROM ${postTable} fp
+        WHERE ${qualifyColumn('fp', postConfig.id)} = :postId
         LIMIT 1`,
       { postId: normalizedPostId },
     );
@@ -886,8 +918,10 @@ router.post('/topics/:topicId/likes', requireAuth, async (req, res) => {
       return res.status(400).json({ message: '用户编号不符合点赞表要求' });
     }
 
+    const topicTableName = quoteIdentifier(topicConfig.tableName);
+    const topicIdColumn = quoteIdentifier(topicConfig.id);
     const topicRows = await query(
-      `SELECT 1 FROM \`${topicConfig.tableName}\` WHERE \`${topicConfig.id}\` = :topicId LIMIT 1`,
+      `SELECT 1 FROM ${topicTableName} WHERE ${topicIdColumn} = :topicId LIMIT 1`,
       { topicId: normalizedTopicId },
     );
 
@@ -895,19 +929,26 @@ router.post('/topics/:topicId/likes', requireAuth, async (req, res) => {
       return res.status(404).json({ message: '话题不存在或已被删除' });
     }
 
+    const likeTableName = quoteIdentifier(likeConfig.tableName);
+    const likeTopicColumn = qualifyColumn('fl', likeConfig.topicId);
+    const likeUserColumn = qualifyColumn('fl', likeConfig.userId);
+    const likeIdSelect = likeConfig.id ? qualifyColumn('fl', likeConfig.id) : '1';
     const existing = await query(
-      `SELECT ${likeConfig.id ? `fl.\`${likeConfig.id}\`` : '1'} AS id
-         FROM \`${likeConfig.tableName}\` fl
-        WHERE fl.\`${likeConfig.topicId}\` = :topicId
-          AND fl.\`${likeConfig.userId}\` = :userId
+      `SELECT ${likeIdSelect} AS id
+         FROM ${likeTableName} fl
+        WHERE ${likeTopicColumn} = :topicId
+          AND ${likeUserColumn} = :userId
         LIMIT 1`,
       { topicId: likeTopicId, userId: normalizedUserId },
     );
 
     if (existing.length > 0) {
+      const deleteTable = quoteIdentifier(likeConfig.tableName);
+      const deleteTopicColumn = quoteIdentifier(likeConfig.topicId);
+      const deleteUserColumn = quoteIdentifier(likeConfig.userId);
       await query(
-        `DELETE FROM \`${likeConfig.tableName}\`
-          WHERE \`${likeConfig.topicId}\` = :topicId AND \`${likeConfig.userId}\` = :userId`,
+        `DELETE FROM ${deleteTable}
+          WHERE ${deleteTopicColumn} = :topicId AND ${deleteUserColumn} = :userId`,
         { topicId: likeTopicId, userId: normalizedUserId },
       );
       const likes = await countLikesForTopic(likeConfig, likeTopicId);
