@@ -38,7 +38,7 @@ var __generator = (this && this.__generator) || function (thisArg, body) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.logout = exports.login = exports.ensureSession = exports.fetchSession = exports.saveSession = exports.getStoredSession = void 0;
 var api_1 = require("./api");
-var authCookies_1 = require("./authCookies");
+var authToken_1 = require("./authToken");
 var storage_1 = require("./storage");
 var SESSION_STORAGE_KEY = 'sessionUser';
 var normalizeSessionUser = function (value) {
@@ -85,7 +85,7 @@ var saveSession = function (user) {
     }
     else {
         (0, storage_1.resetStorageKey)(SESSION_STORAGE_KEY);
-        (0, authCookies_1.clearStoredCookies)();
+        (0, authToken_1.clearStoredToken)();
     }
 };
 exports.saveSession = saveSession;
@@ -109,7 +109,7 @@ var fetchSession = function () { return __awaiter(void 0, void 0, void 0, functi
                 response = _a.sent();
                 sessionUser = extractSessionUser(response);
                 if (!sessionUser) {
-                    (0, authCookies_1.clearStoredCookies)();
+                    (0, authToken_1.clearStoredToken)();
                     throw createUnauthorizedError('登录状态无效，请重新登录。');
                 }
                 (0, exports.saveSession)(sessionUser);
@@ -137,7 +137,7 @@ var ensureSession = function () { return __awaiter(void 0, void 0, void 0, funct
                 apiError = error_1;
                 if ((apiError === null || apiError === void 0 ? void 0 : apiError.statusCode) === 401 || (apiError === null || apiError === void 0 ? void 0 : apiError.statusCode) === 404) {
                     (0, exports.saveSession)(null);
-                    (0, authCookies_1.clearStoredCookies)();
+                    (0, authToken_1.clearStoredToken)();
                     throw createUnauthorizedError('请先登录后再进行操作。');
                 }
                 throw error_1;
@@ -147,7 +147,7 @@ var ensureSession = function () { return __awaiter(void 0, void 0, void 0, funct
 }); };
 exports.ensureSession = ensureSession;
 var login = function (username, password) { return __awaiter(void 0, void 0, void 0, function () {
-    var response, sessionUser;
+    var response, payload, sessionUser, token;
     return __generator(this, function (_a) {
         switch (_a.label) {
             case 0: return [4 /*yield*/, (0, api_1.apiRequest)({
@@ -157,9 +157,18 @@ var login = function (username, password) { return __awaiter(void 0, void 0, voi
                 })];
             case 1:
                 response = _a.sent();
-                sessionUser = extractSessionUser(response);
+                payload = response;
+                sessionUser = extractSessionUser(payload);
                 if (!sessionUser) {
                     throw new Error('登录响应格式不正确，请稍后重试。');
+                }
+                token = payload.token;
+                if (typeof token === 'string' && token.trim()) {
+                    (0, authToken_1.saveToken)(token);
+                }
+                else {
+                    (0, authToken_1.clearStoredToken)();
+                    throw new Error('登录响应缺少访问令牌，请稍后重试。');
                 }
                 (0, exports.saveSession)(sessionUser);
                 return [2 /*return*/, sessionUser];
@@ -186,7 +195,7 @@ var logout = function () { return __awaiter(void 0, void 0, void 0, function () 
                 return [3 /*break*/, 3];
             case 3:
                 (0, exports.saveSession)(null);
-                (0, authCookies_1.clearStoredCookies)();
+                (0, authToken_1.clearStoredToken)();
                 return [2 /*return*/];
         }
     });

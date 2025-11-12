@@ -53,13 +53,30 @@ var redirectToLoginPage = function () {
     });
 };
 var showDailyTaskModal = function () { return __awaiter(void 0, void 0, void 0, function () {
-    var status_1, task, streak, completedToday, content, error_1;
+    var error_1, status_1, task, streak, completedToday, content, error_2;
     return __generator(this, function (_a) {
         switch (_a.label) {
             case 0:
                 _a.trys.push([0, 2, , 3]);
-                return [4 /*yield*/, (0, checkin_1.initializeDailyTask)()];
+                return [4 /*yield*/, (0, session_1.ensureSession)()];
             case 1:
+                globalData.sessionUser = _a.sent();
+                return [3 /*break*/, 3];
+            case 2:
+                error_1 = _a.sent();
+                globalData.sessionUser = null;
+                if ((error_1 === null || error_1 === void 0 ? void 0 : error_1.statusCode) === 401) {
+                    console.log('跳过打卡任务弹窗：当前未登录或会话已过期。');
+                    redirectToLoginPage();
+                }
+                else {
+                    console.warn('校验登录状态失败，跳过打卡任务弹窗。', (error_1 === null || error_1 === void 0 ? void 0 : error_1.message) || error_1);
+                }
+                return [2 /*return*/];
+            case 3:
+                _a.trys.push([3, 5, , 6]);
+                return [4 /*yield*/, (0, checkin_1.initializeDailyTask)()];
+            case 4:
                 status_1 = _a.sent();
                 task = status_1.task, streak = status_1.streak, completedToday = status_1.completedToday;
                 content = "\u4ECA\u65E5\u4EFB\u52A1\uFF1A".concat(task.targetText, "\n").concat(task.description, "\n\u5F53\u524D\u8FDE\u7EED\u6253\u5361 ").concat(streak, " \u5929");
@@ -76,12 +93,12 @@ var showDailyTaskModal = function () { return __awaiter(void 0, void 0, void 0, 
                         }
                     },
                 });
-                return [3 /*break*/, 3];
-            case 2:
-                error_1 = _a.sent();
-                console.warn('展示打卡任务失败', error_1);
-                return [3 /*break*/, 3];
-            case 3: return [2 /*return*/];
+                return [3 /*break*/, 6];
+            case 5:
+                error_2 = _a.sent();
+                console.warn('展示打卡任务失败', error_2);
+                return [3 /*break*/, 6];
+            case 6: return [2 /*return*/];
         }
     });
 }); };
@@ -98,7 +115,6 @@ App({
         }
         console.log('未检测到登录用户，跳转至登录页。');
         redirectToLoginPage();
-        void showDailyTaskModal();
     },
     setSessionUser: function (user) {
         this.globalData.sessionUser = user;
