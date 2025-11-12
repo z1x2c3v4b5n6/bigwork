@@ -40,6 +40,155 @@
   color: #fecaca;
 }
 
+.message--info {
+  background: rgba(59, 130, 246, 0.16);
+  color: #bfdbfe;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 16rpx;
+  background: rgba(15, 23, 42, 0.6);
+  padding: 24rpx;
+  border-radius: 24rpx;
+  border: 1rpx solid rgba(59, 130, 246, 0.15);
+}
+
+.section__header {
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+}
+
+.section__title {
+  font-size: 30rpx;
+  font-weight: 600;
+}
+
+.section__subtitle {
+  font-size: 24rpx;
+  color: rgba(148, 163, 184, 0.8);
+}
+
+.suggestion-grid {
+  display: grid;
+  gap: 20rpx;
+  grid-template-columns: repeat(auto-fit, minmax(260rpx, 1fr));
+}
+
+.suggestion-card {
+  background: rgba(30, 41, 59, 0.78);
+  border-radius: 24rpx;
+  padding: 24rpx;
+  border: 1rpx solid rgba(56, 189, 248, 0.25);
+  display: flex;
+  flex-direction: column;
+  gap: 12rpx;
+}
+
+.suggestion-card__title {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #e0f2fe;
+}
+
+.suggestion-card__description {
+  font-size: 24rpx;
+  color: rgba(191, 219, 254, 0.85);
+  line-height: 1.6;
+}
+
+.suggestion-card__action {
+  align-self: flex-start;
+  border-radius: 999rpx;
+  padding: 8rpx 20rpx;
+  background: rgba(59, 130, 246, 0.28);
+  color: #dbeafe;
+  border: 1rpx solid rgba(37, 99, 235, 0.3);
+  font-size: 22rpx;
+}
+
+.recommendation-group {
+  display: flex;
+  flex-direction: column;
+  gap: 12rpx;
+}
+
+.recommendation-group__title {
+  font-size: 26rpx;
+  font-weight: 600;
+  color: rgba(191, 219, 254, 0.95);
+}
+
+.recommendation-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16rpx;
+}
+
+.recommendation-item {
+  background: rgba(30, 41, 59, 0.78);
+  border-radius: 24rpx;
+  padding: 20rpx;
+  border: 1rpx solid rgba(59, 130, 246, 0.18);
+  display: flex;
+  flex-direction: column;
+  gap: 10rpx;
+}
+
+.recommendation-item__title {
+  font-size: 26rpx;
+  font-weight: 600;
+}
+
+.recommendation-item__meta {
+  font-size: 22rpx;
+  color: rgba(148, 163, 184, 0.85);
+}
+
+.recommendation-item__description {
+  font-size: 24rpx;
+  color: rgba(226, 232, 240, 0.88);
+  line-height: 1.6;
+}
+
+.recommendation-item__link {
+  align-self: flex-start;
+  border-radius: 16rpx;
+  background: rgba(59, 130, 246, 0.2);
+  color: #dbeafe;
+  border: 1rpx solid rgba(37, 99, 235, 0.3);
+  font-size: 22rpx;
+  padding: 6rpx 16rpx;
+}
+
+.history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16rpx;
+}
+
+.history-item {
+  background: rgba(30, 41, 59, 0.72);
+  border-radius: 20rpx;
+  padding: 18rpx 20rpx;
+  border: 1rpx solid rgba(99, 102, 241, 0.25);
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+}
+
+.history-item__question {
+  font-size: 26rpx;
+  color: #e2e8f0;
+}
+
+.history-item__meta {
+  font-size: 22rpx;
+  color: rgba(148, 163, 184, 0.7);
+}
+
 .conversation {
   flex: 1;
   max-height: 900rpx;
