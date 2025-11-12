@@ -1,5 +1,5 @@
 import { apiRequest, type ApiError } from './api';
-import { clearStoredCookies } from './authCookies';
+import { clearStoredToken, saveToken } from './authToken';
 import { loadFromStorage, resetStorageKey, saveToStorage } from './storage';
 
 export interface SessionUser {
@@ -74,7 +74,7 @@ export const saveSession = (user: SessionUser | null) => {
     saveToStorage(SESSION_STORAGE_KEY, user);
   } else {
     resetStorageKey(SESSION_STORAGE_KEY);
-    clearStoredCookies();
+    clearStoredToken();
   }
 };
 
@@ -97,7 +97,7 @@ export const fetchSession = async (): Promise<SessionUser> => {
   const sessionUser = extractSessionUser(response);
 
   if (!sessionUser) {
-    clearStoredCookies();
+    clearStoredToken();
     throw createUnauthorizedError('登录状态无效，请重新登录。');
   }
 
@@ -119,7 +119,7 @@ export const ensureSession = async (): Promise<SessionUser> => {
 
     if (apiError?.statusCode === 401 || apiError?.statusCode === 404) {
       saveSession(null);
-      clearStoredCookies();
+      clearStoredToken();
       throw createUnauthorizedError('请先登录后再进行操作。');
     }
 
@@ -127,17 +127,30 @@ export const ensureSession = async (): Promise<SessionUser> => {
   }
 };
 
+interface LoginResponse extends SessionResponse {
+  token?: string;
+}
+
 export const login = async (username: string, password: string): Promise<SessionUser> => {
-  const response = await apiRequest<SessionResponse | SessionUser, { username: string; password: string }>({
+  const response = await apiRequest<LoginResponse | SessionUser, { username: string; password: string }>({
     path: '/auth/login',
     method: 'POST',
     data: { username, password },
   });
 
-  const sessionUser = extractSessionUser(response);
+  const payload = response as LoginResponse | SessionUser;
+  const sessionUser = extractSessionUser(payload);
 
   if (!sessionUser) {
     throw new Error('登录响应格式不正确，请稍后重试。');
+  }
+
+  const token = (payload as LoginResponse)?.token;
+  if (typeof token === 'string' && token.trim()) {
+    saveToken(token);
+  } else {
+    clearStoredToken();
+    throw new Error('登录响应缺少访问令牌，请稍后重试。');
   }
 
   saveSession(sessionUser);
@@ -154,5 +167,5 @@ export const logout = async (): Promise<void> => {
     }
   }
   saveSession(null);
-  clearStoredCookies();
+  clearStoredToken();
 };

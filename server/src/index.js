@@ -67,6 +67,20 @@ app.use(
 
 app.use(express.json({ limit: '10mb' }));
 
+app.use((req, res, next) => {
+  const originalJson = res.json.bind(res);
+
+  res.json = (body) => {
+    if (res.statusCode >= 500 && res.statusCode < 600) {
+      return originalJson({ code: res.statusCode, message: 'Internal Server Error' });
+    }
+
+    return originalJson(body);
+  };
+
+  next();
+});
+
 const uploadsDir = path.resolve(__dirname, '..', 'uploads');
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
@@ -112,7 +126,7 @@ app.use((err, req, res, next) => {
   }
 
   console.error('接口出现未捕获异常', err);
-  return res.status(500).json({ message: '服务器内部错误，请稍后重试' });
+  return res.status(500).json({ code: 500, message: 'Internal Server Error' });
 });
 
 app.listen(PORT, () => {

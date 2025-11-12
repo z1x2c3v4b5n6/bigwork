@@ -1139,8 +1139,9 @@ router.get('/daily-task', requireAuth, async (req, res) => {
 
 router.post('/daily-task/complete', requireAuth, async (req, res) => {
   const { taskId } = req.body || {};
+  const normalizedTaskId = taskId != null ? String(taskId).trim() : '';
 
-  if (!taskId) {
+  if (!normalizedTaskId) {
     return res.status(400).json({ message: '缺少任务编号，请刷新后重试。' });
   }
 
@@ -1156,7 +1157,7 @@ router.post('/daily-task/complete', requireAuth, async (req, res) => {
     const today = formatDateOnly(new Date());
     const todayTask = await loadDailyTaskForDate(today);
 
-    if (!todayTask || String(todayTask.id) !== String(taskId)) {
+    if (!todayTask || String(todayTask.id) !== normalizedTaskId) {
       return res.status(400).json({ message: '任务已更新，请刷新后重新打卡。' });
     }
 
@@ -1182,7 +1183,7 @@ router.post('/daily-task/complete', requireAuth, async (req, res) => {
       `INSERT INTO \`${completionConfig.table}\` (\`${completionConfig.taskId}\`, \`${completionConfig.userId}\`, \`${completionConfig.completedAt}\`)
          VALUES (:taskId, :userId, NOW())
         ON DUPLICATE KEY UPDATE \`${completionConfig.completedAt}\` = NOW()`,
-      { taskId: String(taskId), userId: normalizedUserId },
+      { taskId: normalizedTaskId, userId: normalizedUserId },
     );
 
     const stats = await loadUserDailyStats(normalizedUserId, today);
