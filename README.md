@@ -8,6 +8,7 @@
 | ---- | ------ | ---- | -------- |
 | 前端界面 | Vite + React 18 + React Router + MUI 组件库，辅以 React Query、Axios 管理数据请求 | `frontend/` | `npm install` → `npm run dev`（默认端口 5173） |
 | 后端服务 | Node.js (Express) + MySQL，会话管理使用 express-session + express-mysql-session，密码加密采用 bcryptjs | `server/` | `npm install` → `npm run dev` 或 `npm start`（默认端口 3000） |
+| 微信小程序 | 微信小程序原生框架 + TypeScript，复用服务端院校推荐算法并内置完整演示数据 | `miniprogram/` | 直接导入微信开发者工具，基础库 ≥ 2.33.0 |
 
 ### 前端结构与职责概述
 - `src/layouts/AppLayout.tsx`：负责整体导航框架、响应式抽屉与主题切换。
@@ -22,6 +23,18 @@
 - `src/routes/`：按功能拆分模块（`auth`、`learning`、`practice`、`forum`、`admin`），统一挂载在 `/api` 前缀下。
 - `src/middleware/`：包含认证、错误处理、会话持久化等通用逻辑。
 
+## 微信小程序实现概览
+
+小程序端定位为“移动复试资料助手”，复刻 Web 端核心能力并支持离线演示、在线联调双模式：
+
+- **页面结构**：`app.json` 中配置 12 个页面（概览、课程、刷题、日程、学习分析、院校顾问、论坛、个人中心、后台、复试资料三大分栏等），全局样式由 `app.ts` / `app.wxss` 控制，保证卡片式统一视觉。【F:miniprogram/README.md†L5-L35】
+- **数据来源**：默认读取 `data/` 目录内的 TypeScript 数据文件（如 `dashboard.ts`、`practice.ts`、`resources.ts`），借助 `utils/storage.ts` 写入本地存储，首次进入即可看到完整样例数据。【F:miniprogram/README.md†L37-L60】
+- **智能推荐**：`utils/universityAdvisor.ts` 重用了 Web/后端的推荐算法，结合 `data/universityProfiles.ts` 生成冲刺 / 稳妥 / 保底院校组合，并输出策略建议。【F:miniprogram/README.md†L61-L86】
+- **接口适配**：`config.ts` 提供 `baseUrl` 配置；小程序 API 封装在 `utils/api.ts` 中，自动附带 Express 会话 Cookie 并在 401 时清理缓存，保证与服务器联调时的登录态一致。【F:miniprogram/utils/api.ts†L1-L70】
+- **启动体验**：`app.ts` 中的登录检测逻辑会在冷启动时检查本地凭据，若会话失效则直接跳转到“个人中心/登录”页，避免未授权访问导致的 401 报错。【F:miniprogram/app.ts†L1-L37】
+
+> 微信端所有页面均基于原生组件实现，无需额外第三方 UI 库，可通过修改 `app.wxss` 与各页面样式快速适配院校主题色。
+
 ## 毕业论文撰写思路（示例）
 1. **背景与需求分析**：说明考研学习的痛点、目标用户、核心需求以及竞品调研结果。
 2. **系统总体设计**：从整体架构入手，描述前后端分离、RESTful API、会话认证与权限划分，并附系统功能模块图或用例图。
@@ -35,29 +48,23 @@
 
 ## 数据库设计摘要
 
-后端不会自动迁移数据库，请在部署前手动执行 `server/schema/structure.sql` 或使用下列表结构清单创建所需数据表：
+后端不会自动迁移数据库，请在部署前手动执行 `server/schema/structure.sql`，或参照下表创建所有业务数据表：
 
-- **认证与基础设置**
-  - `users`：`id`、`username`、`password`、`display_name`、`email`、`role`、`created_at`、`updated_at`
-  - `site_settings`：`key`、`value`、`updated_at`
-  - `admin_audit_logs`：`id`、`action`、`detail`、`actor_name`、`created_at`
-- **学习进度与站点运营**
-  - `student_progress`：`id`、`user_id`、`target_university`、`weekly_study_hours`、`completion_rate`、`updated_at`
-  - `study_tasks`：`id`、`user_id`、`title`、`completed`、`completed_at`
-  - `follow_up_tasks`：`id`、`title`、`status`
-  - `system_alerts`：`id`、`message`、`resolved`
-- **专业课程与资料**
-  - `majors`：`id`、`name`、`description`、`created_at`、`updated_at`
-  - `courses`：`id`、`title`/`name`、`teacher`、`category`、`progress`、`next_task`、`description`、`created_at`、`updated_at`
-  - `course_materials`：`id`、`course_id`、`title`、`description`、`file_url`、`created_at`、`updated_at`
-- **刷题题库**
-  - `practice_sets`：`id`、`title`/`name`、`description`、`difficulty`/`level`、`tags`/`tags_json`、`accuracy`（可选）、`created_by`、`created_at`、`updated_at`
-  - `practice_questions`：`id`、`practice_set_id`/`set_id`、`question_text`/`content`、`answer_text`、`explanation`、`tags`、`difficulty`、`created_by`、`created_at`、`updated_at`
-- **论坛交流**
-  - `forum_topics`：`id`、`title`、`description`、`author_id`、`created_at`、`updated_at`
-  - `forum_posts`：`id`、`topic_id`、`author_id`、`content`、`created_at`、`updated_at`
-  - `forum_topic_likes`：`id`、`topic_id`、`user_id`、`created_at`
-- **学习日程**
-  - `study_schedule` / `schedule_events`：`id`、`title`/`name`、`type`、`start_time`、`end_time`、`all_day`、`location`、`user_id`、`created_at`、`updated_at`
+| 模块 | 数据表 | 关键字段（节选） |
+| ---- | ------ | ---------------- |
+| 用户与基础配置 | `majors` | `id`、`name`、`description`、`created_at` |
+| 用户与基础配置 | `users` | `id`、`username`、`password`、`display_name`、`role`、`major_id`、`created_at`、`updated_at` |
+| 课程与资料 | `courses` | `id`、`major_id`、`name`、`category`、`teacher`、`status`、`summary`、`created_at`、`updated_at` |
+| 课程与资料 | `materials` | `id`、`course_id`、`title`、`material_type`、`url`、`description`、`created_at` |
+| 刷题训练 | `practice_sets` | `id`、`owner_id`、`name`、`focus`、`difficulty`、`duration_minutes`、`question_count`、`last_accuracy`、`updated_at` |
+| 刷题训练 | `practice_questions` | `id`、`practice_set_id`、`question_type`、`stem`、`options_json`、`correct_options`、`created_at` |
+| 刷题训练 | `practice_attempts` | `id`、`practice_set_id`、`user_id`、`accuracy`、`score`、`answers_json`、`summary`、`created_at` |
+| 日程管理 | `schedule_events` | `id`、`user_id`、`title`、`event_type`、`start_time`、`end_time`、`location`、`tags_json`、`created_at` |
+| 学习分析 | `subject_mastery` | `id`、`user_id`、`subject`、`mastery`、`trend`、`focus` |
+| 学习分析 | `analytics_overview` | `user_id`、`mock_trend`、`time_distribution`、`behavior_insight`、`updated_at` |
+| 学习分析 | `weak_topics` | `id`、`user_id`、`topic`、`error_rate`、`suggestion` |
+| 论坛社区 | `forum_topics` | `id`、`author_id`、`title`、`content`、`tags_json`、`created_at` |
+| 论坛社区 | `forum_comments` | `id`、`topic_id`、`author_id`、`content`、`created_at` |
+| 论坛社区 | `forum_likes` | `topic_id`、`user_id`、`created_at` |
 
-确保上述表结构与字段类型在 MySQL 中创建完毕后，即可通过后端接口和前端界面完成完整的业务流程。
+脚本末尾同时包含示例数据（专业、课程、资料、题单等），执行一次即可完成基础数据填充，方便前端、小程序联调。【F:server/schema/structure.sql†L1-L213】
