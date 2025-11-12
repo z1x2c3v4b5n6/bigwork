@@ -1,5 +1,6 @@
 import { getApiConfig } from './config';
-import { getStoredSession, type SessionUser } from './utils/session';
+import { type ApiError } from './utils/api';
+import { ensureSession, getStoredSession, type SessionUser } from './utils/session';
 import { initializeDailyTask } from './utils/checkin';
 
 type GlobalData = {
@@ -22,6 +23,21 @@ const redirectToLoginPage = () => {
 };
 
 const showDailyTaskModal = async () => {
+  try {
+    const session = await ensureSession();
+    globalData.sessionUser = session;
+  } catch (error) {
+    const apiError = error as ApiError;
+    globalData.sessionUser = null;
+    if (apiError?.statusCode === 401) {
+      console.log('跳过打卡任务弹窗：当前未登录或会话已过期。');
+      redirectToLoginPage();
+    } else {
+      console.warn('校验登录状态失败，跳过打卡任务弹窗。', apiError?.message ?? error);
+    }
+    return;
+  }
+
   try {
     const status = await initializeDailyTask();
     const { task, streak, completedToday } = status;
@@ -58,7 +74,6 @@ App({
     }
     console.log('未检测到登录用户，跳转至登录页。');
     redirectToLoginPage();
-    void showDailyTaskModal();
   },
 
   setSessionUser(this: any, user: SessionUser | null) {
