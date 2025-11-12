@@ -52,6 +52,7 @@ Page({
         generatingPoster: false,
         errorMessage: '',
         posterTempPath: '',
+        sessionRequired: false,
         status: createInitialState(),
     },
     onShow: function () {
@@ -59,7 +60,7 @@ Page({
     },
     refreshTask: function () {
         return __awaiter(this, arguments, void 0, function (forceReload) {
-            var pendingMessage, error_1, apiError, status_1, _a, error_2, apiError, message;
+            var pendingMessage, requireLogin, error_1, apiError, status_1, _a, error_2, apiError, message;
             if (forceReload === void 0) { forceReload = false; }
             return __generator(this, function (_b) {
                 switch (_b.label) {
@@ -69,6 +70,7 @@ Page({
                         }
                         this.setData({ loading: true, errorMessage: '' });
                         pendingMessage = '';
+                        requireLogin = false;
                         _b.label = 1;
                     case 1:
                         _b.trys.push([1, 3, , 4]);
@@ -79,40 +81,53 @@ Page({
                     case 3:
                         error_1 = _b.sent();
                         apiError = error_1;
-                        pendingMessage =
-                            (apiError === null || apiError === void 0 ? void 0 : apiError.statusCode) === 401
-                                ? '请先完成登录后再查看打卡任务，可在“我的”页使用账号密码登录。'
-                                : (apiError === null || apiError === void 0 ? void 0 : apiError.message) || '登录状态校验失败，请稍后再试。';
+                        if ((apiError === null || apiError === void 0 ? void 0 : apiError.statusCode) === 401) {
+                            requireLogin = true;
+                            pendingMessage = '请先完成登录后再查看打卡任务，可在“我的”页使用账号密码登录。';
+                        }
+                        else {
+                            pendingMessage = (apiError === null || apiError === void 0 ? void 0 : apiError.message) || '登录状态校验失败，请稍后再试。';
+                        }
                         return [3 /*break*/, 4];
                     case 4:
-                        _b.trys.push([4, 9, 10, 11]);
-                        if (!forceReload) return [3 /*break*/, 6];
-                        return [4 /*yield*/, (0, checkin_2.reloadDailyTask)()];
-                    case 5:
-                        _a = _b.sent();
-                        return [3 /*break*/, 8];
-                    case 6: return [4 /*yield*/, (0, checkin_2.initializeDailyTask)()];
-                    case 7:
-                        _a = _b.sent();
-                        _b.label = 8;
-                    case 8:
-                        status_1 = _a;
-                        this.setData({ status: status_1, posterTempPath: '' });
+                        if (!requireLogin) return [3 /*break*/, 5];
+                        this.setData({
+                            status: createInitialState(),
+                            posterTempPath: '',
+                            sessionRequired: true,
+                        });
                         if (pendingMessage) {
                             this.setData({ errorMessage: pendingMessage });
                         }
                         return [3 /*break*/, 11];
+                    case 5:
+                        _b.trys.push([5, 10, , 11]);
+                        if (!forceReload) return [3 /*break*/, 7];
+                        return [4 /*yield*/, (0, checkin_2.reloadDailyTask)()];
+                    case 6:
+                        _a = _b.sent();
+                        return [3 /*break*/, 9];
+                    case 7: return [4 /*yield*/, (0, checkin_2.initializeDailyTask)()];
+                    case 8:
+                        _a = _b.sent();
+                        _b.label = 9;
                     case 9:
+                        status_1 = _a;
+                        this.setData({ status: status_1, posterTempPath: '', sessionRequired: false });
+                        if (pendingMessage) {
+                            this.setData({ errorMessage: pendingMessage });
+                        }
+                        return [3 /*break*/, 11];
+                    case 10:
                         error_2 = _b.sent();
                         apiError = error_2;
                         message = (apiError === null || apiError === void 0 ? void 0 : apiError.message) || '加载今日任务失败，请稍后重试。';
                         this.setData({ errorMessage: message });
                         return [3 /*break*/, 11];
-                    case 10:
+                    case 11:
                         this.setData({ loading: false });
                         wx.stopPullDownRefresh();
-                        return [7 /*endfinally*/];
-                    case 11: return [2 /*return*/];
+                        return [2 /*return*/];
                 }
             });
         });
@@ -125,12 +140,21 @@ Page({
         var force = Boolean((_b = (_a = event === null || event === void 0 ? void 0 : event.currentTarget) === null || _a === void 0 ? void 0 : _a.dataset) === null || _b === void 0 ? void 0 : _b.force);
         void this.refreshTask(force);
     },
+    handleGoLogin: function () {
+        wx.switchTab({ url: '/pages/profile/index' });
+    },
     completeTask: function () {
         return __awaiter(this, void 0, void 0, function () {
             var task, response, overrideStreak, nextState, error_3, apiError, message;
             return __generator(this, function (_a) {
                 switch (_a.label) {
                     case 0:
+                        if (this.data.sessionRequired) {
+                            this.setData({
+                                errorMessage: '请先登录后再进行打卡，可在“我的”页使用账号密码登录。',
+                            });
+                            return [2 /*return*/];
+                        }
                         if (this.data.completing || this.data.status.completedToday) {
                             return [2 /*return*/];
                         }
