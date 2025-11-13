@@ -1,5 +1,0 @@
-.scroll {
-  height: 100vh;
-  box-sizing: border-box;
-  padding: 32rpx;
-}
