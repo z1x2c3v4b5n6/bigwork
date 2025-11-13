@@ -9,18 +9,72 @@ interface MajorOption {
   description?: string | null;
 }
 
-const createEmptyForm = (majors: MajorOption[] = []) => ({
-  title: '',
-  teacher: '',
-  category: '公共课',
-  progress: 0,
-  nextTask: '',
-  description: '',
-  majorId: majors[0]?.id ?? '',
-});
+interface CourseForm {
+  title: string;
+  teacher: string;
+  category: string;
+  progress: number;
+  nextTask: string;
+  description: string;
+  majorId: string;
+  tagsInput: string;
+  mathSubjects: string[];
+  englishSubjects: string[];
+  visibleMajorIds: string[];
+}
+
+const mathSubjectOptions = ['数学一', '数学二', '数学三', '不考数学'];
+const englishSubjectOptions = ['英语一', '英语二', '不考英语'];
+
+const createEmptyForm = (majors: MajorOption[] = []): CourseForm => {
+  const defaultMajorId = majors[0]?.id ?? '';
+  return {
+    title: '',
+    teacher: '',
+    category: '公共课',
+    progress: 0,
+    nextTask: '',
+    description: '',
+    majorId: defaultMajorId,
+    tagsInput: '',
+    mathSubjects: [],
+    englishSubjects: [],
+    visibleMajorIds: defaultMajorId ? [defaultMajorId] : [],
+  };
+};
 
 const resolveMajorName = (majorId: string, majors: MajorOption[]) =>
   majors.find((major) => major.id === majorId)?.name ?? '请选择';
+
+const normalizeList = (values: string[] | string | undefined | null): string[] => {
+  if (Array.isArray(values)) {
+    return Array.from(
+      new Set(values.map((value) => String(value ?? '').trim()).filter((value) => value.length > 0)),
+    );
+  }
+  if (typeof values === 'string') {
+    return values
+      .split(/[，,]/)
+      .map((value) => value.trim())
+      .filter((value) => value.length > 0);
+  }
+  return [];
+};
+
+const normalizeCourse = (course: CourseProgress): CourseProgress => ({
+  ...course,
+  tags: Array.isArray(course.tags) ? course.tags : [],
+  suitability: course.suitability
+    ? {
+        mathSubjects: normalizeList(course.suitability.mathSubjects),
+        englishSubjects: normalizeList(course.suitability.englishSubjects),
+        majors: normalizeList(course.suitability.majors),
+        majorIds: normalizeList(course.suitability.majorIds),
+        scoreMin: course.suitability.scoreMin ?? undefined,
+        scoreMax: course.suitability.scoreMax ?? undefined,
+      }
+    : undefined,
+});
 
 Page({
   data: {
@@ -35,6 +89,8 @@ Page({
     selectedMajorName: '请选择',
     formVisible: false,
     formErrorMessage: '',
+    mathSubjectOptions,
+    englishSubjectOptions,
   },
 
   onShow() {
@@ -42,7 +98,12 @@ Page({
   },
 
   async loadPage() {
-    this.setData({ loading: true, errorMessage: '', successMessage: '', formErrorMessage: '' });
+    this.setData({
+      loading: true,
+      errorMessage: '',
+      successMessage: '',
+      formErrorMessage: '',
+    });
 
     try {
       await ensureSession();
@@ -63,13 +124,17 @@ Page({
       ]);
 
       const majors = majorsResponse.length > 0 ? majorsResponse : this.data.majors;
-      const form = this.data.form.majorId
-        ? this.data.form
+      const currentForm = this.data.form;
+      const form = currentForm.majorId
+        ? { ...currentForm }
         : createEmptyForm(majors);
+      if (!form.visibleMajorIds || form.visibleMajorIds.length === 0) {
+        form.visibleMajorIds = form.majorId ? [form.majorId] : [];
+      }
       const selectedMajorName = resolveMajorName(form.majorId, majors);
 
       this.setData({
-        courses: coursesResponse,
+        courses: coursesResponse.map(normalizeCourse),
         majors,
         form,
         selectedMajorName,
@@ -87,7 +152,10 @@ Page({
     const response = await apiRequest<{ courses: CourseProgress[] }>({
       path: '/learning/courses',
     });
-    return Array.isArray(response.courses) ? response.courses : [];
+    if (!Array.isArray(response.courses)) {
+      return [];
+    }
+    return response.courses.map(normalizeCourse);
   },
 
   async fetchMajors(): Promise<MajorOption[]> {
@@ -142,15 +210,14 @@ Page({
   },
 
   handleInput(event: WechatMiniprogram.Input) {
-    const field = event.currentTarget?.dataset?.field as keyof typeof this.data.form | undefined;
+    const field = event.currentTarget?.dataset?.field as keyof CourseForm | undefined;
     if (!field) {
       return;
     }
     const value = event.detail.value;
-    const key = field;
-    const nextValue = key === 'progress' ? Number(value) : value;
+    const nextValue = field === 'progress' ? Number(value) : value;
     this.setData({
-      form: { ...this.data.form, [key]: nextValue } as typeof this.data.form,
+      form: { ...this.data.form, [field]: nextValue } as CourseForm,
       errorMessage: '',
       successMessage: '',
       formErrorMessage: '',
@@ -160,9 +227,28 @@ Page({
   handleMajorChange(event: WechatMiniprogram.PickerChange) {
     const index = Number(event.detail.value ?? 0);
     const nextMajor = this.data.majors[index]?.id ?? '';
+    const visibleMajorIds = this.data.form.visibleMajorIds.includes(nextMajor)
+      ? this.data.form.visibleMajorIds
+      : nextMajor
+      ? Array.from(new Set([...this.data.form.visibleMajorIds, nextMajor]))
+      : this.data.form.visibleMajorIds;
     this.setData({
-      form: { ...this.data.form, majorId: nextMajor },
+      form: { ...this.data.form, majorId: nextMajor, visibleMajorIds },
       selectedMajorName: resolveMajorName(nextMajor, this.data.majors),
+      errorMessage: '',
+      successMessage: '',
+      formErrorMessage: '',
+    });
+  },
+
+  handleCheckboxChange(event: WechatMiniprogram.CheckboxGroupChange) {
+    const field = event.currentTarget?.dataset?.field as keyof CourseForm | undefined;
+    if (!field) {
+      return;
+    }
+    const values = Array.isArray(event.detail?.value) ? event.detail.value : [];
+    this.setData({
+      form: { ...this.data.form, [field]: values } as CourseForm,
       errorMessage: '',
       successMessage: '',
       formErrorMessage: '',
@@ -182,6 +268,18 @@ Page({
     }
 
     const normalizedProgress = Math.min(100, Math.max(0, Number(form.progress) || 0));
+    const tags = normalizeList(form.tagsInput);
+    const mathSubjects = normalizeList(form.mathSubjects);
+    const englishSubjects = normalizeList(form.englishSubjects);
+    const visibleMajorIdsRaw = normalizeList(form.visibleMajorIds);
+    const includeOthers = visibleMajorIdsRaw.includes('__other__');
+    const visibleMajorIds = visibleMajorIdsRaw.filter((value) => value !== '__other__');
+    const visibleMajorNames = visibleMajorIds
+      .map((id) => resolveMajorName(id, this.data.majors))
+      .filter((name) => name && name !== '请选择');
+    if (includeOthers && !visibleMajorNames.includes('其他专业')) {
+      visibleMajorNames.push('其他专业');
+    }
 
     this.setData({ submitting: true, errorMessage: '', successMessage: '', formErrorMessage: '' });
 
@@ -197,6 +295,11 @@ Page({
           nextTask: form.nextTask?.trim() || null,
           description: form.description?.trim() || null,
           majorId: form.majorId,
+          tags: tags.length > 0 ? tags : undefined,
+          mathSubjects: mathSubjects.length > 0 ? mathSubjects : undefined,
+          englishSubjects: englishSubjects.length > 0 ? englishSubjects : undefined,
+          visibleMajorIds: visibleMajorIds.length > 0 ? visibleMajorIds : undefined,
+          visibleMajorNames: visibleMajorNames.length > 0 ? visibleMajorNames : undefined,
         },
       });
 
@@ -204,7 +307,7 @@ Page({
       const nextForm = createEmptyForm(this.data.majors);
 
       this.setData({
-        courses: refreshed,
+        courses: refreshed.map(normalizeCourse),
         form: nextForm,
         selectedMajorName: resolveMajorName(nextForm.majorId, this.data.majors),
         successMessage: '课程已保存，可在列表顶部查看。',

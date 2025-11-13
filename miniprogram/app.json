@@ -14,8 +14,7 @@
     "pages/english/index",
     "pages/checkin/index",
     "pages/leaderboard/index",
-    "pages/wrongbook/index",
-    "pages/ai/index"
+    "pages/wrongbook/index"
   ],
   "window": {
     "navigationBarTitleText": "研学进阶",

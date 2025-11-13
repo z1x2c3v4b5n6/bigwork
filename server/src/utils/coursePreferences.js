@@ -1,5 +1,5 @@
 const { resolveMajorSubjects } = require('../data/majorSubjects');
-const { getCourseSubjectMeta } = require('../data/courseSubjects');
+const { enrichCourseWithMetadata } = require('../data/courseMetadata');
 
 const normalizeTag = (value) => {
   if (!value) {
@@ -19,17 +19,6 @@ const hasTagIntersection = (courseTags = [], majorTags = []) => {
       (majorTag) => courseTag.includes(majorTag) || majorTag.includes(courseTag),
     ),
   );
-};
-
-const enrichCourse = (course) => {
-  const meta = getCourseSubjectMeta(course.id);
-  if (!meta || !meta.tags || meta.tags.length === 0) {
-    return { course, meta };
-  }
-  return {
-    course: { ...course, subjectTags: meta.tags },
-    meta,
-  };
 };
 
 const filterCoursesByProfile = (courses = [], { examProfile = null, sessionUser = null } = {}) => {
@@ -52,9 +41,72 @@ const filterCoursesByProfile = (courses = [], { examProfile = null, sessionUser 
   ).filter(Boolean);
   const normalizedMajorId = resolvedMajor.id || examMajorId || sessionMajorId || null;
 
+  const fallbackMajorName = examMajorName || sessionMajorName || resolvedMajor.name || '';
+
   return courses
-    .map((course) => enrichCourse(course))
-    .filter(({ course, meta }) => {
+    .map((course) => enrichCourseWithMetadata(course))
+    .filter(({ course, subjectMeta }) => {
+      const suitability = course.suitability || null;
+
+      if (suitability) {
+        if (Array.isArray(suitability.mathSubjects) && suitability.mathSubjects.length > 0) {
+          const mathSubject = examProfile?.mathSubject ? String(examProfile.mathSubject).trim() : '';
+          if (!mathSubject || !suitability.mathSubjects.includes(mathSubject)) {
+            return false;
+          }
+        }
+
+        if (Array.isArray(suitability.englishSubjects) && suitability.englishSubjects.length > 0) {
+          const englishSubject = examProfile?.englishSubject ? String(examProfile.englishSubject).trim() : '';
+          if (!englishSubject || !suitability.englishSubjects.includes(englishSubject)) {
+            return false;
+          }
+        }
+
+        if (Array.isArray(suitability.majorIds) && suitability.majorIds.length > 0) {
+          if (!normalizedMajorId) {
+            return false;
+          }
+          if (!suitability.majorIds.includes(normalizedMajorId)) {
+            return false;
+          }
+        }
+
+        if (Array.isArray(suitability.majors) && suitability.majors.length > 0) {
+          const allowOther = suitability.majors.includes('其他专业');
+          if (!allowOther) {
+            const normalizedMajorName = normalizeTag(fallbackMajorName);
+            if (!normalizedMajorName) {
+              return false;
+            }
+            const normalizedAllowed = suitability.majors.map(normalizeTag).filter(Boolean);
+            if (
+              normalizedAllowed.length > 0 &&
+              !normalizedAllowed.some(
+                (allowed) => normalizedMajorName.includes(allowed) || allowed.includes(normalizedMajorName),
+              )
+            ) {
+              return false;
+            }
+          }
+        }
+
+        const scoreMin = suitability.scoreMin;
+        const scoreMax = suitability.scoreMax;
+        if (scoreMin !== undefined || scoreMax !== undefined) {
+          const totalScore = examProfile?.totalScore;
+          if (totalScore != null && Number.isFinite(Number(totalScore))) {
+            const numericScore = Number(totalScore);
+            if (scoreMin !== undefined && numericScore < scoreMin) {
+              return false;
+            }
+            if (scoreMax !== undefined && numericScore > scoreMax) {
+              return false;
+            }
+          }
+        }
+      }
+
       const category = typeof course.category === 'string' ? course.category : '';
       const isProfessionalCourse = category.includes('专业');
 
@@ -62,17 +114,17 @@ const filterCoursesByProfile = (courses = [], { examProfile = null, sessionUser 
         return true;
       }
 
-      if (!meta) {
+      if (!subjectMeta) {
         // 未识别的专业课不强制过滤，交由前端根据课程画像处理
         return true;
       }
 
-      if (meta.general) {
+      if (subjectMeta.general) {
         return true;
       }
 
-      if (meta.majorIds && meta.majorIds.length > 0) {
-        if (normalizedMajorId && meta.majorIds.includes(normalizedMajorId)) {
+      if (subjectMeta.majorIds && subjectMeta.majorIds.length > 0) {
+        if (normalizedMajorId && subjectMeta.majorIds.includes(normalizedMajorId)) {
           return true;
         }
         if (!normalizedMajorId) {
@@ -80,7 +132,7 @@ const filterCoursesByProfile = (courses = [], { examProfile = null, sessionUser 
         }
       }
 
-      if (hasTagIntersection(meta.tags || [], mergedMajorTags)) {
+      if (hasTagIntersection(subjectMeta.tags || [], mergedMajorTags)) {
         return true;
       }
 

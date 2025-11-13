@@ -4,6 +4,10 @@ import {
   Box,
   Button,
   Chip,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   Divider,
   FormControl,
   Grid,
@@ -18,13 +22,14 @@ import {
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
-import { ChangeEvent, useEffect, useMemo, useState } from 'react';
+import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
 import {
   fetchMajors,
   fetchUserProfile,
   updateUserProfile,
+  updateExamProfile,
   type MajorOption,
   type UserProfile,
 } from '../services/userService';
@@ -49,6 +54,15 @@ const Profile = () => {
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [avatarUploading, setAvatarUploading] = useState(false);
+  const [examDialogOpen, setExamDialogOpen] = useState(false);
+  const [examDialogError, setExamDialogError] = useState<string | null>(null);
+  const [examForm, setExamForm] = useState({
+    totalScore: '',
+    targetMajor: '',
+    mathSubject: '',
+    englishSubject: '',
+    majorId: '',
+  });
 
   const profileQuery = useQuery<UserProfile>({
     queryKey: ['profile', user?.id],
@@ -102,6 +116,21 @@ const Profile = () => {
     },
   });
 
+  const updateExamProfileMutation = useMutation({
+    mutationFn: (payload: Parameters<typeof updateExamProfile>[1]) => updateExamProfile(user!.id, payload),
+    onSuccess: (updated) => {
+      setFeedback({ type: 'success', message: '考试档案已更新。' });
+      refreshUser(updated);
+      queryClient.setQueryData(['profile', user?.id], updated);
+      setExamDialogError(null);
+      setExamDialogOpen(false);
+    },
+    onError: (error) => {
+      const message = error instanceof Error ? error.message : '更新考试档案失败，请稍后重试。';
+      setExamDialogError(message);
+    },
+  });
+
   const handleAvatarChange = async (event: ChangeEvent<HTMLInputElement>) => {
     if (!user) {
       return;
@@ -139,6 +168,50 @@ const Profile = () => {
     }
   };
 
+  const handleOpenExamDialog = () => {
+    if (!user) {
+      return;
+    }
+    setExamDialogError(null);
+    setExamForm({
+      totalScore: examProfile?.totalScore != null ? String(examProfile.totalScore) : '',
+      targetMajor: examProfile?.targetMajor ?? '',
+      mathSubject: examProfile?.mathSubject ?? '',
+      englishSubject: examProfile?.englishSubject ?? '',
+      majorId: examProfile?.majorId ?? formState.majorId ?? '',
+    });
+    setExamDialogOpen(true);
+  };
+
+  const handleCloseExamDialog = () => {
+    if (updateExamProfileMutation.isPending) {
+      return;
+    }
+    setExamDialogOpen(false);
+  };
+
+  const handleSubmitExamProfile = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setExamDialogError(null);
+
+    const trimmedScore = examForm.totalScore.trim();
+    if (trimmedScore) {
+      const numeric = Number(trimmedScore);
+      if (!Number.isFinite(numeric) || numeric < 0) {
+        setExamDialogError('请输入有效的初试总分');
+        return;
+      }
+    }
+
+    await updateExamProfileMutation.mutateAsync({
+      totalScore: trimmedScore ? Number(trimmedScore) : null,
+      targetMajor: examForm.targetMajor.trim() ? examForm.targetMajor.trim() : null,
+      mathSubject: examForm.mathSubject || null,
+      englishSubject: examForm.englishSubject || null,
+      majorId: examForm.majorId || null,
+    });
+  };
+
   const handleSave = async () => {
     if (!user) return;
     setFeedback(null);
@@ -162,6 +235,8 @@ const Profile = () => {
   const isInstitution = (profile?.role ?? user?.role) === 'institution';
   const majors = majorsQuery.data ?? [];
   const examProfile = profile?.examProfile ?? user?.examProfile ?? null;
+  const mathSubjectOptions = ['数学一', '数学二', '数学三', '不考数学'];
+  const englishSubjectOptions = ['英语一', '英语二', '不考英语'];
 
   const goalLabel = isAdmin ? '教研重点' : isInstitution ? '招生重点' : '备考目标';
   const organizationLabel = isAdmin
@@ -278,9 +353,20 @@ const Profile = () => {
                 </Stack>
                 <Divider flexItem sx={{ my: 2 }} />
                 <Stack spacing={1}>
-                  <Typography variant="subtitle2" color="text.secondary">
-                    我的考试档案
-                  </Typography>
+                  <Stack direction="row" alignItems="center" justifyContent="space-between">
+                    <Typography variant="subtitle2" color="text.secondary">
+                      我的考试档案
+                    </Typography>
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      startIcon={<EditIcon fontSize="small" />}
+                      onClick={handleOpenExamDialog}
+                      disabled={updateExamProfileMutation.isPending}
+                    >
+                      {examProfile ? '编辑档案' : '完善档案'}
+                    </Button>
+                  </Stack>
                   {examProfile ? (
                     <Stack spacing={1}>
                       <Typography variant="h6" fontWeight={600}>
@@ -437,6 +523,102 @@ const Profile = () => {
       </Paper>
     </Grid>
   </Grid>
+
+      <Dialog open={examDialogOpen} onClose={handleCloseExamDialog} fullWidth maxWidth="sm">
+        <Box component="form" onSubmit={handleSubmitExamProfile}>
+          <DialogTitle>更新考试档案</DialogTitle>
+          <DialogContent dividers>
+            <Stack spacing={2.5}>
+              <TextField
+                label="初试总分"
+                type="number"
+                value={examForm.totalScore}
+                onChange={(event) =>
+                  setExamForm((prev) => ({ ...prev, totalScore: event.target.value }))
+                }
+                inputProps={{ min: 0, max: 500 }}
+                helperText="可输入最近一次统考成绩，留空表示暂未填写"
+                fullWidth
+              />
+              <TextField
+                label="目标专业（可选）"
+                value={examForm.targetMajor}
+                onChange={(event) =>
+                  setExamForm((prev) => ({ ...prev, targetMajor: event.target.value }))
+                }
+                placeholder="如 计算机科学、金融等"
+                fullWidth
+              />
+              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+                <TextField
+                  select
+                  label="数学科目"
+                  value={examForm.mathSubject}
+                  onChange={(event) =>
+                    setExamForm((prev) => ({ ...prev, mathSubject: event.target.value }))
+                  }
+                  helperText="选择报考的数学类别"
+                  fullWidth
+                >
+                  <MenuItem value="">不限</MenuItem>
+                  {mathSubjectOptions.map((option) => (
+                    <MenuItem key={option} value={option}>
+                      {option}
+                    </MenuItem>
+                  ))}
+                </TextField>
+                <TextField
+                  select
+                  label="英语科目"
+                  value={examForm.englishSubject}
+                  onChange={(event) =>
+                    setExamForm((prev) => ({ ...prev, englishSubject: event.target.value }))
+                  }
+                  helperText="选择报考的英语类别"
+                  fullWidth
+                >
+                  <MenuItem value="">不限</MenuItem>
+                  {englishSubjectOptions.map((option) => (
+                    <MenuItem key={option} value={option}>
+                      {option}
+                    </MenuItem>
+                  ))}
+                </TextField>
+              </Stack>
+              <TextField
+                select
+                label="目标专业方向"
+                value={examForm.majorId}
+                onChange={(event) =>
+                  setExamForm((prev) => ({ ...prev, majorId: event.target.value }))
+                }
+                helperText="同步到课程与推荐系统使用的目标专业，可留空"
+                fullWidth
+              >
+                <MenuItem value="">未选择</MenuItem>
+                {majors.map((major) => (
+                  <MenuItem key={major.id} value={major.id}>
+                    {major.name}
+                  </MenuItem>
+                ))}
+              </TextField>
+            </Stack>
+            {examDialogError ? (
+              <Alert severity="error" sx={{ mt: 2 }}>
+                {examDialogError}
+              </Alert>
+            ) : null}
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={handleCloseExamDialog} disabled={updateExamProfileMutation.isPending}>
+              取消
+            </Button>
+            <Button type="submit" variant="contained" disabled={updateExamProfileMutation.isPending}>
+              {updateExamProfileMutation.isPending ? '保存中…' : '保存档案'}
+            </Button>
+          </DialogActions>
+        </Box>
+      </Dialog>
 
       {isInstitution && <InstitutionBrochureManager />}
     </Stack>
