@@ -161,6 +161,7 @@ const Profile = () => {
   const isAdmin = (profile?.role ?? user?.role) === 'admin';
   const isInstitution = (profile?.role ?? user?.role) === 'institution';
   const majors = majorsQuery.data ?? [];
+  const examProfile = profile?.examProfile ?? user?.examProfile ?? null;
 
   const goalLabel = isAdmin ? '教研重点' : isInstitution ? '招生重点' : '备考目标';
   const organizationLabel = isAdmin
@@ -274,6 +275,37 @@ const Profile = () => {
                   {tagChips.map((tag) => (
                     <Chip key={tag} label={tag} size="small" />
                   ))}
+                </Stack>
+                <Divider flexItem sx={{ my: 2 }} />
+                <Stack spacing={1}>
+                  <Typography variant="subtitle2" color="text.secondary">
+                    我的考试档案
+                  </Typography>
+                  {examProfile ? (
+                    <Stack spacing={1}>
+                      <Typography variant="h6" fontWeight={600}>
+                        {examProfile.totalScore != null ? `${examProfile.totalScore} 分` : '尚未填写分数'}
+                      </Typography>
+                      <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                        {examProfile.mathSubject ? (
+                          <Chip label={`数学：${examProfile.mathSubject}`} size="small" variant="outlined" />
+                        ) : null}
+                        {examProfile.englishSubject ? (
+                          <Chip label={`英语：${examProfile.englishSubject}`} size="small" variant="outlined" />
+                        ) : null}
+                        {examProfile.targetMajor ? (
+                          <Chip label={`目标专业：${examProfile.targetMajor}`} size="small" variant="outlined" />
+                        ) : null}
+                      </Stack>
+                      <Typography variant="body2" color="text.secondary">
+                        填写的成绩与科目信息将同步到首页推荐与院校顾问中，便于系统自动筛选院校与课程。
+                      </Typography>
+                    </Stack>
+                  ) : (
+                    <Typography variant="body2" color="text.secondary">
+                      暂无考试档案信息，可在注册时填写或联系管理员补充以获取更精准推荐。
+                    </Typography>
+                  )}
                 </Stack>
               </Stack>
             </Stack>

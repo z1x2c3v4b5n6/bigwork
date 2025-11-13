@@ -12,6 +12,7 @@ const {
 } = require('../utils/auth');
 const { setExamProfile, getExamProfile } = require('../data/userExtras');
 const { registerInstitutionAccount, getInstitutionProfileForUser } = require('../data/institutionState');
+const { normalizeIdentifier } = require('../utils/db');
 
 const { SESSION_NAME = 'connect.sid' } = process.env;
 
@@ -179,6 +180,7 @@ router.post('/register', async (req, res) => {
     role,
     totalScore,
     targetMajor,
+    majorId,
     mathSubject,
     englishSubject,
     officialWebsite,
@@ -225,8 +227,17 @@ router.post('/register', async (req, res) => {
       payload[map.role] = normalizedRole;
     }
 
+    if (map.majorId) {
+      const normalizedMajorId = normalizeIdentifier(majorId);
+      if (normalizedMajorId) {
+        payload[map.majorId] = normalizedMajorId;
+      } else if (majorId === null) {
+        payload[map.majorId] = null;
+      }
+    }
+
     if (map.goal && targetMajor) {
-      payload[map.goal] = targetMajor;
+      payload[map.goal] = String(targetMajor).trim();
     }
 
     await insertRecord('users', payload);
@@ -241,9 +252,12 @@ router.post('/register', async (req, res) => {
     if (normalizedRole === 'student') {
       const examProfile = setExamProfile(user.id, {
         totalScore,
-        targetMajor,
-        mathSubject,
-        englishSubject,
+        targetMajor:
+          typeof targetMajor === 'string' && targetMajor.trim() ? targetMajor.trim() : undefined,
+        mathSubject:
+          typeof mathSubject === 'string' && mathSubject.trim() ? mathSubject.trim() : undefined,
+        englishSubject:
+          typeof englishSubject === 'string' && englishSubject.trim() ? englishSubject.trim() : undefined,
       });
       if (examProfile) {
         user.examProfile = examProfile;

@@ -5,6 +5,7 @@ import {
   DashboardStat,
   PracticeSet,
   ScheduleItem,
+  attachCourseMetadata,
   dashboardFallback,
 } from '../data/dashboard';
 import type { UserRole } from '../context/AuthContext';
@@ -84,11 +85,15 @@ const mergeWithFallback = (payload: DashboardOverview | undefined): DashboardOve
         }))
       : fallback.stats;
 
+    const fallbackCourses = attachCourseMetadata(fallback.courses);
     return {
       role: payload?.role ?? 'student',
       userName: payload?.userName ?? fallback.userName,
       stats,
-      courses: payload?.courses && payload.courses.length > 0 ? payload.courses : fallback.courses,
+      courses:
+        payload?.courses && payload.courses.length > 0
+          ? attachCourseMetadata(payload.courses as CourseProgress[])
+          : fallbackCourses,
       practiceSets:
         payload?.practiceSets && payload.practiceSets.length > 0
           ? payload.practiceSets
@@ -110,6 +115,7 @@ const mergeWithFallback = (payload: DashboardOverview | undefined): DashboardOve
 
   return {
     ...payload,
+    courses: attachCourseMetadata((payload?.courses as CourseProgress[] | undefined) ?? []),
     pushMessages: payload?.pushMessages ?? [],
     followedInstitutions: payload?.followedInstitutions ?? [],
     subjectHighlights: payload?.subjectHighlights ?? [],

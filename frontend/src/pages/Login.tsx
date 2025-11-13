@@ -41,6 +41,13 @@ const demoAccounts: DemoAccount[] = [
     password: 'admin123',
     description: '可访问后台管理面板，体验课程、题库与论坛审核流程。',
   },
+  {
+    key: 'institution',
+    label: '院校官方体验账号',
+    username: 'institution',
+    password: 'admit2024',
+    description: '发布院校招生简章、查看关注考生并推送最新动态。',
+  },
 ];
 
 const Login = () => {

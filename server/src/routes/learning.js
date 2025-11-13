@@ -1423,28 +1423,40 @@ router.post('/schedule', requireAuth, async (req, res) => {
 
 router.post('/recommendations/universities', requireAuth, (req, res) => {
   const { totalScore, targetMajor, examSubjects } = req.body || {};
+  const sessionUser = req.session?.user || null;
+  const storedProfile = getExamProfile(sessionUser?.id || '');
 
-  const parsedScore = Number(totalScore);
-  if (!Number.isFinite(parsedScore) || parsedScore <= 0) {
+  const parseScore = (value) => {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+  };
+
+  const resolvedScore = parseScore(totalScore) ?? parseScore(storedProfile?.totalScore);
+  if (resolvedScore == null) {
     return res.status(400).json({ message: '请填写有效的初试总分（需为正数）。' });
   }
 
-  const mathPreference =
+  const resolvedMajor =
+    typeof targetMajor === 'string' && targetMajor.trim()
+      ? targetMajor.trim()
+      : storedProfile?.targetMajor || undefined;
+
+  const mathPreferenceRaw =
     examSubjects && typeof examSubjects.math === 'string' && examSubjects.math.trim()
       ? examSubjects.math.trim()
-      : undefined;
-  const englishPreference =
+      : storedProfile?.mathSubject || undefined;
+  const englishPreferenceRaw =
     examSubjects && typeof examSubjects.english === 'string' && examSubjects.english.trim()
       ? examSubjects.english.trim()
-      : undefined;
+      : storedProfile?.englishSubject || undefined;
 
   try {
     const payload = buildRecommendationResponse({
-      totalScore: Math.min(500, parsedScore),
-      major: targetMajor,
+      totalScore: Math.min(500, resolvedScore),
+      major: resolvedMajor,
       examPreferences: {
-        math: mathPreference,
-        english: englishPreference,
+        math: mathPreferenceRaw,
+        english: englishPreferenceRaw,
       },
     });
 

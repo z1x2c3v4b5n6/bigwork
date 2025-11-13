@@ -22,6 +22,7 @@ import TextSnippetIcon from '@mui/icons-material/TextSnippet';
 import LibraryBooksIcon from '@mui/icons-material/LibraryBooks';
 import RecordVoiceOverIcon from '@mui/icons-material/RecordVoiceOver';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
+import { useMemo } from 'react';
 import HeroBanner from '../components/HeroBanner';
 import StatCard from '../components/StatCard';
 import CourseCard from '../components/CourseCard';
@@ -67,6 +68,7 @@ const Home = () => {
   const { user } = useAuth();
   const { data, isFetching, isError, refetch } = useDashboardData(user);
   const isAdmin = user?.role?.toLowerCase() === 'admin';
+  const examProfile = user?.examProfile ?? null;
 
   const stats = data?.stats ?? [];
   const courses = data?.courses ?? [];
@@ -81,6 +83,62 @@ const Home = () => {
   const pushMessages = data?.pushMessages ?? [];
   const followedInstitutions = data?.followedInstitutions ?? [];
   const subjectHighlights = data?.subjectHighlights ?? [];
+
+  const recommendedCourses = useMemo(() => {
+    if (courses.length === 0) {
+      return [] as typeof courses;
+    }
+
+    if (!examProfile) {
+      return courses;
+    }
+
+    const { mathSubject, englishSubject, targetMajor, totalScore } = examProfile;
+    const normalizedMajor = targetMajor ? targetMajor.toLowerCase().replace(/\s+/g, '') : '';
+    const normalizedScore = typeof totalScore === 'number' && Number.isFinite(totalScore) ? totalScore : null;
+
+    const matches = courses.filter((course) => {
+      const suitability = course.suitability;
+      if (!suitability) {
+        return true;
+      }
+
+      const mathMatch = !suitability.mathSubjects?.length || !mathSubject
+        ? true
+        : suitability.mathSubjects.includes(mathSubject);
+      const englishMatch = !suitability.englishSubjects?.length || !englishSubject
+        ? true
+        : suitability.englishSubjects.includes(englishSubject);
+      const majorMatch = !suitability.majors?.length || !normalizedMajor
+        ? true
+        : suitability.majors.some((major) => major.toLowerCase().replace(/\s+/g, '').includes(normalizedMajor));
+      const scoreMatch = normalizedScore == null
+        ? true
+        : (suitability.scoreMin == null || normalizedScore >= suitability.scoreMin) &&
+          (suitability.scoreMax == null || normalizedScore <= suitability.scoreMax);
+
+      return mathMatch && englishMatch && majorMatch && scoreMatch;
+    });
+
+    if (matches.length === 0) {
+      return courses;
+    }
+
+    const intensityRank: Record<string, number> = { 冲刺: 0, 强化: 1, 基础: 2 };
+    return [...matches].sort((a, b) => {
+      const rankA = intensityRank[a.intensity ?? '强化'] ?? 3;
+      const rankB = intensityRank[b.intensity ?? '强化'] ?? 3;
+      if (rankA !== rankB) {
+        return rankA - rankB;
+      }
+      return (b.progress ?? 0) - (a.progress ?? 0);
+    });
+  }, [courses, examProfile]);
+
+  const displayCourses = (recommendedCourses.length > 0 ? recommendedCourses : courses).slice(0, 6);
+  const courseSubtitle = examProfile
+    ? '已根据你的分数与科目组合筛选匹配课程，优先安排当前阶段最合适的任务。'
+    : '继续保持节奏，完成系统推荐的任务。';
 
   return (
     <Box
@@ -453,15 +511,40 @@ const Home = () => {
                 )}
               </SectionCard>
 
-              <SectionCard title="正在学习的课程" subtitle="继续保持节奏，完成系统推荐的任务。">
-                {courses.length > 0 ? (
-                  <Grid container spacing={3}>
-                    {courses.map((course) => (
-                      <Grid item xs={12} md={4} key={course.id}>
-                        <CourseCard course={course} />
-                      </Grid>
-                    ))}
-                  </Grid>
+              <SectionCard title="正在学习的课程" subtitle={courseSubtitle}>
+                {displayCourses.length > 0 ? (
+                  <>
+                    {examProfile ? (
+                      <Stack
+                        direction={{ xs: 'column', sm: 'row' }}
+                        spacing={1}
+                        sx={{ mb: 2 }}
+                        alignItems={{ xs: 'flex-start', sm: 'center' }}
+                        flexWrap="wrap"
+                        useFlexGap
+                      >
+                        {examProfile.totalScore ? (
+                          <Chip label={`总分 ${examProfile.totalScore}`} color="primary" variant="outlined" />
+                        ) : null}
+                        {examProfile.mathSubject ? (
+                          <Chip label={`数学：${examProfile.mathSubject}`} size="small" variant="outlined" />
+                        ) : null}
+                        {examProfile.englishSubject ? (
+                          <Chip label={`英语：${examProfile.englishSubject}`} size="small" variant="outlined" />
+                        ) : null}
+                        {examProfile.targetMajor ? (
+                          <Chip label={`目标专业：${examProfile.targetMajor}`} size="small" variant="outlined" />
+                        ) : null}
+                      </Stack>
+                    ) : null}
+                    <Grid container spacing={3}>
+                      {displayCourses.map((course) => (
+                        <Grid item xs={12} md={4} key={course.id}>
+                          <CourseCard course={course} />
+                        </Grid>
+                      ))}
+                    </Grid>
+                  </>
                 ) : (
                   <Typography variant="body2" color="text.secondary">
                     还没有加入课程，去课程库选择合适的内容开始学习吧。

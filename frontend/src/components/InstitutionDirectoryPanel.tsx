@@ -148,7 +148,18 @@ const InstitutionDirectoryPanel = () => {
                 </Alert>
               )}
 
-              <Box sx={{ mt: 'auto', pt: 1 }}>
+              <Box sx={{ mt: 'auto', pt: 1, display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                {institution.officialWebsite ? (
+                  <Button
+                    variant="outlined"
+                    color="primary"
+                    href={institution.officialWebsite}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    访问官网
+                  </Button>
+                ) : null}
                 <Button
                   variant={institution.isFollowed ? 'contained' : 'outlined'}
                   color={institution.isFollowed ? 'secondary' : 'primary'}

@@ -41,6 +41,20 @@ const getExamProfile = (userId) => {
     : null;
 };
 
+const defaultExamProfiles = [
+  {
+    userId: 'user_student_1',
+    totalScore: 398,
+    targetMajor: '计算机科学与技术',
+    mathSubject: '数学一',
+    englishSubject: '英语一',
+  },
+];
+
+defaultExamProfiles.forEach((profile) => {
+  setExamProfile(profile.userId, profile);
+});
+
 module.exports = {
   setExamProfile,
   getExamProfile,

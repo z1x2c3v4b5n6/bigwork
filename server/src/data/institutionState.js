@@ -202,6 +202,15 @@ const registerInstitutionAccount = ({
   return clone(profile);
 };
 
+registerInstitutionAccount({
+  userId: 'user_institution_1',
+  name: '华清学院招生办',
+  location: '北京 · 朝阳区',
+  tags: ['官方入驻', '复试指导'],
+  officialWebsite: 'https://admission.hq.edu.cn',
+  focus: '发布硕士招生简章、复试日程与调剂公告，欢迎关注。',
+});
+
 const updateInstitutionProfile = (userId, payload = {}) => {
   const institutionId = institutionByUserMap.get(normalizeId(userId));
   if (!institutionId) {

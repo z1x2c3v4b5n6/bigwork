@@ -57,6 +57,7 @@ export interface RegisterPayload {
   role?: UserRole;
   totalScore?: number;
   targetMajor?: string;
+  majorId?: string;
   mathSubject?: string;
   englishSubject?: string;
   officialWebsite?: string;

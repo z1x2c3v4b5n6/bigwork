@@ -28,7 +28,7 @@ CREATE TABLE IF NOT EXISTS `users` (
   `username` VARCHAR(64) NOT NULL UNIQUE,
   `password` VARCHAR(255) NOT NULL,
   `display_name` VARCHAR(64) NOT NULL,
-  `role` ENUM('student', 'admin') NOT NULL DEFAULT 'student',
+  `role` ENUM('student', 'admin', 'institution') NOT NULL DEFAULT 'student',
   `email` VARCHAR(128) DEFAULT NULL,
   `phone` VARCHAR(32) DEFAULT NULL,
   `organization` VARCHAR(255) DEFAULT NULL,
@@ -291,6 +291,20 @@ VALUES
     'major_cs',
     '李',
     '负责数学、英语与专业课教研统筹，擅长课程建设与教学服务。'
+  ),
+  (
+    'user_institution_1',
+    'institution',
+    'admit2024',
+    '华清学院招生办',
+    'institution',
+    'admission@hq.edu.cn',
+    '010-88881234',
+    '华清学院招生办公室',
+    '发布招生简章与复试动态，及时提醒关注考生。',
+    'major_management',
+    '招',
+    '官方院校账号，提供招生政策解读、复试安排与调剂咨询。'
   )
 ON DUPLICATE KEY UPDATE
   `username` = VALUES(`username`),
@@ -373,6 +387,32 @@ VALUES
     '以算法题为主线，结合 AI 批改与诊断，强化薄弱知识点。',
     '计划 8 月上线',
     '2024.08-2024.10'
+  ),
+  (
+    'course_mba_case',
+    'major_management',
+    '管理类联考案例实战工坊',
+    '公共课',
+    '陈老师',
+    2.0,
+    52,
+    'published',
+    '分模块演练双语商业案例与面试答题策略，附带导师点评模板。',
+    '每周日晚 19:30 线上研讨',
+    '2024.06-2024.09'
+  ),
+  (
+    'course_english_speaking',
+    'major_english',
+    '英语口语听力提升营',
+    '公共课',
+    'Grace',
+    2.0,
+    58,
+    'published',
+    '覆盖听力跟读、口语即兴表达与复试常见问答，提供录音点评。',
+    '每周二、周四晚 19:30',
+    '2024.05-2024.08'
   )
 ON DUPLICATE KEY UPDATE
   `major_id` = VALUES(`major_id`),

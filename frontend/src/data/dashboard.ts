@@ -1,3 +1,11 @@
+export interface CourseSuitability {
+  mathSubjects?: string[];
+  englishSubjects?: string[];
+  majors?: string[];
+  scoreMin?: number;
+  scoreMax?: number;
+}
+
 export interface CourseProgress {
   id: string;
   title: string;
@@ -5,6 +13,10 @@ export interface CourseProgress {
   teacher: string;
   progress: number;
   nextTask: string;
+  intensity?: '基础' | '强化' | '冲刺';
+  tags?: string[];
+  suitability?: CourseSuitability;
+  highlight?: string;
 }
 
 export interface PracticeSet {
@@ -100,7 +112,151 @@ export interface DashboardFallbackData {
   subjectHighlights: SubjectHighlight[];
 }
 
-export const courseProgressData: CourseProgress[] = [
+const courseMetadata: Record<string, Partial<CourseProgress>> = {
+  english: {
+    intensity: '强化',
+    tags: ['英语一', '真题精讲', '写作'],
+    suitability: { englishSubjects: ['英语一'], scoreMin: 360 },
+  },
+  course_english: {
+    intensity: '强化',
+    tags: ['英语一', '写作', '真题'],
+    suitability: { englishSubjects: ['英语一'], scoreMin: 360 },
+  },
+  politics: {
+    intensity: '基础',
+    tags: ['政治', '时政热点'],
+    suitability: { scoreMin: 340 },
+  },
+  course_politics: {
+    intensity: '基础',
+    tags: ['政治', '热点'],
+    suitability: { scoreMin: 340 },
+  },
+  major: {
+    intensity: '强化',
+    tags: ['408', '数据结构', '算法'],
+    suitability: {
+      mathSubjects: ['数学一'],
+      majors: ['计算机科学与技术', '人工智能', '软件工程'],
+      scoreMin: 360,
+    },
+    highlight: '图论、动态规划专项强化，配套机试演练。',
+  },
+  course_algo: {
+    intensity: '强化',
+    tags: ['408', '数据结构', '算法'],
+    suitability: {
+      mathSubjects: ['数学一'],
+      majors: ['计算机科学与技术', '人工智能', '软件工程'],
+      scoreMin: 360,
+    },
+    highlight: '配套图论、动态规划专项训练，含机试点评。',
+  },
+  'math-advanced': {
+    intensity: '强化',
+    tags: ['数学一', '高数', '线代'],
+    suitability: {
+      mathSubjects: ['数学一', '数学二'],
+      scoreMin: 350,
+    },
+    nextTask: '推导线性代数特征值题型通法',
+  },
+  course_math: {
+    intensity: '强化',
+    tags: ['数学一', '冲刺'],
+    suitability: {
+      mathSubjects: ['数学一', '数学二'],
+      scoreMin: 350,
+    },
+  },
+  'ai-lab': {
+    intensity: '冲刺',
+    tags: ['计算机', '项目实战', '科研'],
+    suitability: {
+      mathSubjects: ['数学一'],
+      majors: ['计算机科学与技术', '人工智能'],
+      scoreMin: 380,
+    },
+    nextTask: '完善 CNN 图像分类实验记录并提交代码审阅',
+  },
+  course_ai: {
+    intensity: '冲刺',
+    tags: ['AI', '算法', '项目'],
+    suitability: {
+      mathSubjects: ['数学一'],
+      majors: ['计算机科学与技术', '人工智能'],
+      scoreMin: 380,
+    },
+  },
+  'mba-case': {
+    intensity: '冲刺',
+    tags: ['管理类联考', '面试', '口语'],
+    suitability: {
+      mathSubjects: ['不考数学'],
+      englishSubjects: ['英语二'],
+      majors: ['工商管理', '会计硕士', '金融'],
+      scoreMin: 360,
+    },
+    nextTask: '准备 2 个管理案例 STAR 答题稿',
+  },
+  course_mba_case: {
+    intensity: '冲刺',
+    tags: ['管理类联考', '面试'],
+    suitability: {
+      mathSubjects: ['不考数学'],
+      englishSubjects: ['英语二'],
+      majors: ['工商管理', '会计硕士', '金融'],
+      scoreMin: 360,
+    },
+  },
+  'english-speaking': {
+    intensity: '基础',
+    tags: ['英语口语', '听力', '表达'],
+    suitability: {
+      englishSubjects: ['英语一', '英语二'],
+    },
+    nextTask: '完成 15 分钟口语跟读与录音打卡',
+  },
+  course_english_speaking: {
+    intensity: '基础',
+    tags: ['英语口语', '听力'],
+    suitability: {
+      englishSubjects: ['英语一', '英语二'],
+    },
+  },
+  course_stat_modeling: {
+    intensity: '强化',
+    tags: ['统计建模', 'Python', '实战'],
+    suitability: {
+      mathSubjects: ['数学一', '数学三'],
+      majors: ['应用数学', '金融'],
+      scoreMin: 350,
+    },
+    highlight: '配套真实数据集建模案例与代码讲解。',
+  },
+  course_english_listening: {
+    intensity: '基础',
+    tags: ['英语二', '听力', '口语'],
+    suitability: {
+      englishSubjects: ['英语二', '英语一'],
+    },
+    highlight: '每周提供逐句纠错与口语点评音频。',
+  },
+  course_finance_case: {
+    intensity: '强化',
+    tags: ['金融', '案例分析', '量化'],
+    suitability: {
+      mathSubjects: ['数学三', '不考数学'],
+      englishSubjects: ['英语二'],
+      majors: ['金融', '工商管理'],
+      scoreMin: 355,
+    },
+    highlight: '结合财经热点进行量化推演与面试演练。',
+  },
+};
+
+const baseCourseProgressData: CourseProgress[] = [
   {
     id: 'english',
     title: '英语一真题精讲营',
@@ -125,7 +281,82 @@ export const courseProgressData: CourseProgress[] = [
     progress: 55,
     nextTask: '完成 栈与队列 章节刷题',
   },
+  {
+    id: 'math-advanced',
+    title: '数学一高阶题型精讲班',
+    category: '公共课',
+    teacher: '周老师',
+    progress: 33,
+    nextTask: '梳理极值问题常见题型',
+  },
+  {
+    id: 'ai-lab',
+    title: '人工智能工程实战营',
+    category: '专业课',
+    teacher: '刘老师',
+    progress: 24,
+    nextTask: '提交项目需求访谈纪要',
+  },
+  {
+    id: 'mba-case',
+    title: '管理类联考案例实战工坊',
+    category: '公共课',
+    teacher: '陈老师',
+    progress: 48,
+    nextTask: '完成双语商业案例陈述演练',
+  },
+  {
+    id: 'english-speaking',
+    title: '英语口语听力快速提升营',
+    category: '公共课',
+    teacher: 'Grace',
+    progress: 62,
+    nextTask: '完成本周配音作业并提交反馈',
+  },
+  {
+    id: 'course_stat_modeling',
+    title: '应用统计建模训练营',
+    category: '专业课',
+    teacher: '赵老师',
+    progress: 38,
+    nextTask: '完成回归诊断案例分析',
+  },
+  {
+    id: 'course_english_listening',
+    title: '英语听力口语突破营',
+    category: '公共课',
+    teacher: 'Anna',
+    progress: 44,
+    nextTask: '完成第 5 讲听力跟读作业',
+  },
+  {
+    id: 'course_finance_case',
+    title: '金融案例量化研讨班',
+    category: '专业课',
+    teacher: '孙老师',
+    progress: 29,
+    nextTask: '准备利率互换案例分析 PPT',
+  },
 ];
+
+export const attachCourseMetadata = (courses: CourseProgress[]): CourseProgress[] =>
+  courses.map((course) => {
+    const metadata = courseMetadata[course.id];
+    if (!metadata) {
+      return course;
+    }
+    return {
+      ...course,
+      ...metadata,
+      tags: metadata.tags ?? course.tags,
+      suitability: metadata.suitability ?? course.suitability,
+      intensity: metadata.intensity ?? course.intensity,
+      nextTask: course.nextTask || metadata.nextTask || '',
+      highlight: metadata.highlight ?? course.highlight,
+    };
+  });
+
+export const courseProgressData: CourseProgress[] = attachCourseMetadata(baseCourseProgressData);
 
 export const practiceSets: PracticeSet[] = [
   {

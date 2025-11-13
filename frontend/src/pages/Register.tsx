@@ -11,9 +11,11 @@ import {
   ToggleButtonGroup,
   Typography,
 } from '@mui/material';
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Link as RouterLink, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { fetchMajors, type MajorOption } from '../services/userService';
 
 interface LocationState {
   from?: {
@@ -35,7 +37,8 @@ const Register = () => {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [totalScore, setTotalScore] = useState('');
-  const [targetMajor, setTargetMajor] = useState('');
+  const [majorSelection, setMajorSelection] = useState('');
+  const [customMajor, setCustomMajor] = useState('');
   const [mathSubject, setMathSubject] = useState('');
   const [englishSubject, setEnglishSubject] = useState('');
   const [officialWebsite, setOfficialWebsite] = useState('');
@@ -43,6 +46,32 @@ const Register = () => {
   const [institutionTags, setInstitutionTags] = useState('');
   const [institutionFocus, setInstitutionFocus] = useState('');
   const [error, setError] = useState<string | null>(null);
+
+  const majorsQuery = useQuery({
+    queryKey: ['register', 'majors'],
+    queryFn: fetchMajors,
+    staleTime: 5 * 60 * 1000,
+  });
+  const majors = majorsQuery.data ?? [];
+  const CUSTOM_MAJOR_VALUE = '__custom__';
+
+  useEffect(() => {
+    if (role === 'student') {
+      return;
+    }
+    setMajorSelection('');
+    setCustomMajor('');
+    setTotalScore('');
+    setMathSubject('');
+    setEnglishSubject('');
+  }, [role]);
+
+  const selectedMajorOption = useMemo(() => {
+    if (!majorSelection || majorSelection === CUSTOM_MAJOR_VALUE) {
+      return null;
+    }
+    return majors.find((major) => major.id === majorSelection) ?? null;
+  }, [majorSelection, majors]);
 
   useEffect(() => {
     if (user) {
@@ -72,8 +101,24 @@ const Register = () => {
       const requestPayload: Parameters<typeof register>[0] = { ...payload };
 
       if (role === 'student') {
+        const trimmedCustomMajor = customMajor.trim();
+        if (majorSelection === CUSTOM_MAJOR_VALUE && !trimmedCustomMajor) {
+          setError('请选择或填写目标专业');
+          return;
+        }
+
+        const resolvedMajorName =
+          majorSelection === CUSTOM_MAJOR_VALUE
+            ? trimmedCustomMajor
+            : selectedMajorOption?.name ?? '';
+        const resolvedMajorId =
+          majorSelection && majorSelection !== CUSTOM_MAJOR_VALUE
+            ? selectedMajorOption?.id
+            : undefined;
+
         requestPayload.totalScore = totalScore ? Number(totalScore) : undefined;
-        requestPayload.targetMajor = targetMajor || undefined;
+        requestPayload.targetMajor = resolvedMajorName || undefined;
+        requestPayload.majorId = resolvedMajorId;
         requestPayload.mathSubject = mathSubject || undefined;
         requestPayload.englishSubject = englishSubject || undefined;
       } else {
@@ -182,11 +227,50 @@ const Register = () => {
                     helperText="用于生成个性化院校与科目推荐，可选"
                   />
                   <TextField
-                    label="目标专业（可选）"
-                    value={targetMajor}
-                    onChange={(event) => setTargetMajor(event.target.value)}
-                    helperText="填写后可匹配更精准的推荐"
-                  />
+                    select
+                    label="目标专业"
+                    value={majorSelection}
+                    onChange={(event) => {
+                      const value = event.target.value;
+                      setMajorSelection(value);
+                      if (value !== CUSTOM_MAJOR_VALUE) {
+                        setCustomMajor('');
+                      }
+                      setError(null);
+                    }}
+                    helperText="选择目标专业，或选择“其他专业”后手动填写"
+                    disabled={majorsQuery.isLoading}
+                  >
+                    <MenuItem value="">未选择</MenuItem>
+                    {majorsQuery.isLoading ? (
+                      <MenuItem value="__loading__" disabled>
+                        正在加载专业列表…
+                      </MenuItem>
+                    ) : null}
+                    {majors.map((major: MajorOption) => (
+                      <MenuItem key={major.id} value={major.id}>
+                        {major.name}
+                      </MenuItem>
+                    ))}
+                    <MenuItem value={CUSTOM_MAJOR_VALUE}>其他专业（手动填写）</MenuItem>
+                  </TextField>
+                  {majorSelection === CUSTOM_MAJOR_VALUE ? (
+                    <TextField
+                      label="自定义目标专业"
+                      value={customMajor}
+                      onChange={(event) => {
+                        setCustomMajor(event.target.value);
+                        setError(null);
+                      }}
+                      helperText="请输入完整的目标专业名称"
+                      required
+                    />
+                  ) : null}
+                  {majorsQuery.isError ? (
+                    <Typography variant="caption" color="error">
+                      无法加载专业列表，可选择“其他专业”后手动填写。
+                    </Typography>
+                  ) : null}
                   <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
                     <TextField
                       select
