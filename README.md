@@ -8,7 +8,6 @@
 | ---- | ------ | ---- | -------- |
 | 前端界面 | Vite + React 18 + React Router + MUI 组件库，辅以 React Query、Axios 管理数据请求 | `frontend/` | `npm install` → `npm run dev`（默认端口 5173） |
 | 后端服务 | Node.js (Express) + MySQL，会话管理使用 express-session + express-mysql-session，密码加密采用 bcryptjs | `server/` | `npm install` → `npm run dev` 或 `npm start`（默认端口 3000） |
-| 微信小程序 | 微信小程序原生框架 + TypeScript，复用服务端院校推荐算法并内置完整演示数据 | `miniprogram/` | 直接导入微信开发者工具，基础库 ≥ 2.33.0 |
 
 ### 前端结构与职责概述
 - `src/layouts/AppLayout.tsx`：负责整体导航框架、响应式抽屉与主题切换。
@@ -22,18 +21,6 @@
 - `src/database.js`：初始化 MySQL 连接与连接池，供业务层复用。
 - `src/routes/`：按功能拆分模块（`auth`、`learning`、`practice`、`forum`、`admin`），统一挂载在 `/api` 前缀下。
 - `src/middleware/`：包含认证、错误处理、会话持久化等通用逻辑。
-
-## 微信小程序实现概览
-
-小程序端定位为“移动复试资料助手”，复刻 Web 端核心能力并支持离线演示、在线联调双模式：
-
-- **页面结构**：`app.json` 中配置 12 个页面（概览、课程、刷题、日程、学习分析、院校顾问、论坛、个人中心、后台、复试资料三大分栏等），全局样式由 `app.ts` / `app.wxss` 控制，保证卡片式统一视觉。【F:miniprogram/README.md†L5-L35】
-- **数据来源**：默认读取 `data/` 目录内的 TypeScript 数据文件（如 `dashboard.ts`、`practice.ts`、`resources.ts`），借助 `utils/storage.ts` 写入本地存储，首次进入即可看到完整样例数据。【F:miniprogram/README.md†L37-L60】
-- **智能推荐**：`utils/universityAdvisor.ts` 重用了 Web/后端的推荐算法，结合 `data/universityProfiles.ts` 生成冲刺 / 稳妥 / 保底院校组合，并输出策略建议。【F:miniprogram/README.md†L61-L86】
-- **接口适配**：`config.ts` 提供 `baseUrl` 配置；小程序 API 封装在 `utils/api.ts` 中，自动附带 Express 会话 Cookie 并在 401 时清理缓存，保证与服务器联调时的登录态一致。【F:miniprogram/utils/api.ts†L1-L70】
-- **启动体验**：`app.ts` 中的登录检测逻辑会在冷启动时检查本地凭据，若会话失效则直接跳转到“个人中心/登录”页，避免未授权访问导致的 401 报错。【F:miniprogram/app.ts†L1-L37】
-
-> 微信端所有页面均基于原生组件实现，无需额外第三方 UI 库，可通过修改 `app.wxss` 与各页面样式快速适配院校主题色。
 
 ## 毕业论文撰写思路（示例）
 1. **背景与需求分析**：说明考研学习的痛点、目标用户、核心需求以及竞品调研结果。
