@@ -2,6 +2,7 @@ export interface CourseSuitability {
   mathSubjects?: string[];
   englishSubjects?: string[];
   majors?: string[];
+  majorIds?: string[];
   scoreMin?: number;
   scoreMax?: number;
 }
@@ -139,6 +140,7 @@ const courseMetadata: Record<string, Partial<CourseProgress>> = {
     tags: ['408', '数据结构', '算法'],
     suitability: {
       mathSubjects: ['数学一'],
+      majorIds: ['major_cs'],
       majors: ['计算机科学与技术', '人工智能', '软件工程'],
       scoreMin: 360,
     },
@@ -149,6 +151,7 @@ const courseMetadata: Record<string, Partial<CourseProgress>> = {
     tags: ['408', '数据结构', '算法'],
     suitability: {
       mathSubjects: ['数学一'],
+      majorIds: ['major_cs'],
       majors: ['计算机科学与技术', '人工智能', '软件工程'],
       scoreMin: 360,
     },
@@ -176,6 +179,7 @@ const courseMetadata: Record<string, Partial<CourseProgress>> = {
     tags: ['计算机', '项目实战', '科研'],
     suitability: {
       mathSubjects: ['数学一'],
+      majorIds: ['major_cs'],
       majors: ['计算机科学与技术', '人工智能'],
       scoreMin: 380,
     },
@@ -186,6 +190,7 @@ const courseMetadata: Record<string, Partial<CourseProgress>> = {
     tags: ['AI', '算法', '项目'],
     suitability: {
       mathSubjects: ['数学一'],
+      majorIds: ['major_cs'],
       majors: ['计算机科学与技术', '人工智能'],
       scoreMin: 380,
     },
@@ -196,6 +201,7 @@ const courseMetadata: Record<string, Partial<CourseProgress>> = {
     suitability: {
       mathSubjects: ['不考数学'],
       englishSubjects: ['英语二'],
+      majorIds: ['major_management'],
       majors: ['工商管理', '会计硕士', '金融'],
       scoreMin: 360,
     },
@@ -207,6 +213,7 @@ const courseMetadata: Record<string, Partial<CourseProgress>> = {
     suitability: {
       mathSubjects: ['不考数学'],
       englishSubjects: ['英语二'],
+      majorIds: ['major_management'],
       majors: ['工商管理', '会计硕士', '金融'],
       scoreMin: 360,
     },
@@ -231,6 +238,7 @@ const courseMetadata: Record<string, Partial<CourseProgress>> = {
     tags: ['统计建模', 'Python', '实战'],
     suitability: {
       mathSubjects: ['数学一', '数学三'],
+      majorIds: ['major_math'],
       majors: ['应用数学', '金融'],
       scoreMin: 350,
     },
@@ -250,6 +258,7 @@ const courseMetadata: Record<string, Partial<CourseProgress>> = {
     suitability: {
       mathSubjects: ['数学三', '不考数学'],
       englishSubjects: ['英语二'],
+      majorIds: ['major_management', 'major_math'],
       majors: ['金融', '工商管理'],
       scoreMin: 355,
     },

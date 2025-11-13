@@ -24,7 +24,7 @@ import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
 import PlayCircleIcon from '@mui/icons-material/PlayCircle';
 import AutoStoriesIcon from '@mui/icons-material/AutoStories';
 import SchoolIcon from '@mui/icons-material/School';
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import learningService, { CourseItem } from '../services/learningService';
 import { fetchMajors, type MajorOption } from '../services/userService';
@@ -41,6 +41,10 @@ const Courses = () => {
   const [nextTask, setNextTask] = useState('');
   const [description, setDescription] = useState('');
   const [majorId, setMajorId] = useState('');
+  const [tagsInput, setTagsInput] = useState('');
+  const [selectedMathSubjects, setSelectedMathSubjects] = useState<string[]>([]);
+  const [selectedEnglishSubjects, setSelectedEnglishSubjects] = useState<string[]>([]);
+  const [selectedMajorIds, setSelectedMajorIds] = useState<string[]>([]);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
 
   const {
@@ -63,14 +67,20 @@ const Courses = () => {
     if (!majorId) {
       if (user?.majorId) {
         setMajorId(user.majorId);
+        setSelectedMajorIds([user.majorId]);
       } else if (majorsQuery.data && majorsQuery.data.length > 0) {
-        setMajorId(majorsQuery.data[0].id);
+        const fallbackMajorId = majorsQuery.data[0].id;
+        setMajorId(fallbackMajorId);
+        setSelectedMajorIds(fallbackMajorId ? [fallbackMajorId] : []);
       }
     }
   }, [majorId, majorsQuery.data, user?.majorId]);
 
   const majors = majorsQuery.data ?? [];
+  const majorNameMap = useMemo(() => new Map(majors.map((item) => [item.id, item.name])), [majors]);
   const majorHelperText = majorsQuery.isError ? '无法加载专业列表，请稍后重试。' : '选择课程所属专业方向';
+  const mathSubjectOptions = ['数学一', '数学二', '数学三', '不考数学'];
+  const englishSubjectOptions = ['英语一', '英语二', '不考英语'];
 
   const resetForm = () => {
     setTitle('');
@@ -79,7 +89,12 @@ const Courses = () => {
     setProgress(0);
     setNextTask('');
     setDescription('');
-    setMajorId(user?.majorId ?? majorsQuery.data?.[0]?.id ?? '');
+    const defaultMajorId = user?.majorId ?? majorsQuery.data?.[0]?.id ?? '';
+    setMajorId(defaultMajorId);
+    setTagsInput('');
+    setSelectedMathSubjects([]);
+    setSelectedEnglishSubjects([]);
+    setSelectedMajorIds(defaultMajorId ? [defaultMajorId] : []);
   };
 
   const createCourseMutation = useMutation({
@@ -109,6 +124,22 @@ const Courses = () => {
       return;
     }
 
+    const normalizeList = (values: string[]) =>
+      Array.from(new Set(values.map((value) => value.trim()).filter((value) => value.length > 0)));
+
+    const tagList = normalizeList(
+      tagsInput
+        .split(/[，,]/)
+        .map((tag) => tag.trim())
+        .filter((tag) => tag.length > 0),
+    );
+    const majorNames = normalizeList(
+      selectedMajorIds.map((id) => (id === '__other__' ? '其他专业' : majorNameMap.get(id) ?? id)),
+    );
+    const majorIdsPayload = normalizeList(selectedMajorIds.filter((id) => id !== '__other__'));
+    const mathSubjectsPayload = normalizeList(selectedMathSubjects);
+    const englishSubjectsPayload = normalizeList(selectedEnglishSubjects);
+
     await createCourseMutation.mutateAsync({
       title: title.trim(),
       teacher: teacher.trim() || undefined,
@@ -117,12 +148,27 @@ const Courses = () => {
       nextTask: nextTask.trim() || undefined,
       description: description.trim() || undefined,
       majorId: majorId || undefined,
+      tags: tagList.length > 0 ? tagList : undefined,
+      mathSubjects: mathSubjectsPayload.length > 0 ? mathSubjectsPayload : undefined,
+      englishSubjects: englishSubjectsPayload.length > 0 ? englishSubjectsPayload : undefined,
+      visibleMajorIds: majorIdsPayload.length > 0 ? majorIdsPayload : undefined,
+      visibleMajorNames: majorNames.length > 0 ? majorNames : undefined,
     });
   };
 
   const handleOpenDialog = () => {
     setErrorMessage(null);
-    if (!title && !teacher && !description && !nextTask && !majorId) {
+    if (
+      !title &&
+      !teacher &&
+      !description &&
+      !nextTask &&
+      !majorId &&
+      !tagsInput &&
+      selectedMathSubjects.length === 0 &&
+      selectedEnglishSubjects.length === 0 &&
+      selectedMajorIds.length === 0
+    ) {
       resetForm();
     }
     setCreateDialogOpen(true);
@@ -184,7 +230,76 @@ const Courses = () => {
                       讲师：{course.teacher || '待补充'}
                     </Typography>
                   </Box>
-                  <Chip label={course.category || '公共课'} color="primary" variant="outlined" sx={{ alignSelf: 'flex-start' }} />
+                  <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                    <Chip label={course.category || '公共课'} color="primary" variant="outlined" />
+                    {course.intensity ? (
+                      <Chip label={course.intensity} color="secondary" variant="outlined" />
+                    ) : null}
+                  </Stack>
+                  {course.tags && course.tags.length > 0 ? (
+                    <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                      {course.tags.map((tag) => (
+                        <Chip key={tag} label={tag} size="small" variant="outlined" />
+                      ))}
+                    </Stack>
+                  ) : null}
+                  {course.highlight ? (
+                    <Typography variant="body2" color="text.secondary">
+                      {course.highlight}
+                    </Typography>
+                  ) : null}
+                  {course.suitability &&
+                  (course.suitability.mathSubjects?.length ||
+                    course.suitability.englishSubjects?.length ||
+                    course.suitability.majors?.length ||
+                    course.suitability.majorIds?.length) ? (
+                    <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                      {course.suitability.mathSubjects?.length ? (
+                        <Chip
+                          size="small"
+                          color="info"
+                          variant="outlined"
+                          label={`数学：${course.suitability.mathSubjects.join(' / ')}`}
+                        />
+                      ) : null}
+                      {course.suitability.englishSubjects?.length ? (
+                        <Chip
+                          size="small"
+                          color="info"
+                          variant="outlined"
+                          label={`英语：${course.suitability.englishSubjects.join(' / ')}`}
+                        />
+                      ) : null}
+                      {(() => {
+                        const majorsFromIds = (course.suitability?.majorIds || [])
+                          .map((id) => majorNameMap.get(id) ?? id)
+                          .filter((name) => !!name);
+                        const majorsFromNames = (course.suitability?.majors || []).filter(
+                          (name) => name !== '其他专业',
+                        );
+                        const merged = Array.from(new Set([...majorsFromIds, ...majorsFromNames]));
+                        const includeOthers = course.suitability?.majors?.includes('其他专业');
+                        if (merged.length === 0 && !includeOthers) {
+                          return null;
+                        }
+                        const labelParts = [];
+                        if (merged.length > 0) {
+                          labelParts.push(merged.join('、'));
+                        }
+                        if (includeOthers) {
+                          labelParts.push('其他专业');
+                        }
+                        return (
+                          <Chip
+                            size="small"
+                            color="success"
+                            variant="outlined"
+                            label={`专业：${labelParts.join('，')}`}
+                          />
+                        );
+                      })()}
+                    </Stack>
+                  ) : null}
                   <Typography variant="body2">当前进度：{course.progress ?? 0}%</Typography>
                   <Divider />
                   <Stack spacing={1}>
@@ -299,6 +414,101 @@ const Courses = () => {
                 placeholder="例如：完成第 3 讲课后习题"
                 fullWidth
               />
+              <TextField
+                label="课程标签（可选）"
+                value={tagsInput}
+                onChange={(event) => setTagsInput(event.target.value)}
+                placeholder="例如：英语二, 听力提升"
+                helperText="用逗号分隔，便于前台展示课程特色"
+                fullWidth
+              />
+              <TextField
+                label="适用数学科目"
+                value={selectedMathSubjects}
+                onChange={(event) =>
+                  setSelectedMathSubjects(
+                    typeof event.target.value === 'string'
+                      ? event.target.value.split(',')
+                      : (event.target.value as string[]),
+                  )
+                }
+                select
+                SelectProps={{
+                  multiple: true,
+                  renderValue: (selected) =>
+                    (selected as string[]).length > 0
+                      ? (selected as string[]).join('、')
+                      : '不限',
+                }}
+                helperText="不选择表示对所有数学科目开放"
+                fullWidth
+              >
+                {mathSubjectOptions.map((option) => (
+                  <MenuItem key={option} value={option}>
+                    {option}
+                  </MenuItem>
+                ))}
+              </TextField>
+              <TextField
+                label="适用英语科目"
+                value={selectedEnglishSubjects}
+                onChange={(event) =>
+                  setSelectedEnglishSubjects(
+                    typeof event.target.value === 'string'
+                      ? event.target.value.split(',')
+                      : (event.target.value as string[]),
+                  )
+                }
+                select
+                SelectProps={{
+                  multiple: true,
+                  renderValue: (selected) =>
+                    (selected as string[]).length > 0
+                      ? (selected as string[]).join('、')
+                      : '不限',
+                }}
+                helperText="不选择表示对所有英语科目开放"
+                fullWidth
+              >
+                {englishSubjectOptions.map((option) => (
+                  <MenuItem key={option} value={option}>
+                    {option}
+                  </MenuItem>
+                ))}
+              </TextField>
+              <TextField
+                label="适用专业范围"
+                value={selectedMajorIds}
+                onChange={(event) =>
+                  setSelectedMajorIds(
+                    typeof event.target.value === 'string'
+                      ? event.target.value.split(',')
+                      : (event.target.value as string[]),
+                  )
+                }
+                select
+                SelectProps={{
+                  multiple: true,
+                  renderValue: (selected) => {
+                    const values = selected as string[];
+                    if (values.length === 0) {
+                      return '不限';
+                    }
+                    return values
+                      .map((value) => (value === '__other__' ? '其他专业' : majorNameMap.get(value) ?? value))
+                      .join('、');
+                  },
+                }}
+                helperText="不选择表示适合所有专业，可加入“其他专业”覆盖跨考人群"
+                fullWidth
+              >
+                {majors.map((major) => (
+                  <MenuItem key={major.id} value={major.id}>
+                    {major.name}
+                  </MenuItem>
+                ))}
+                <MenuItem value="__other__">其他专业</MenuItem>
+              </TextField>
               <TextField
                 label="备注（可选）"
                 value={description}
