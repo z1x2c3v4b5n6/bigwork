@@ -13,6 +13,7 @@ const { getDefaultMajorId } = require('../utils/majors');
 const { buildRecommendationResponse, buildSubjectRecommendations } = require('../utils/universityAdvisor');
 const { listFollowedInstitutions, listPushMessages } = require('../data/institutionState');
 const { getExamProfile } = require('../data/userExtras');
+const { filterCoursesByProfile } = require('../utils/coursePreferences');
 const {
   getFallbackTaskForDate,
   recordFallbackCompletion,
@@ -1103,12 +1104,14 @@ router.get('/dashboard', requireAuth, async (req, res) => {
   try {
     const sessionUser = req.session?.user || null;
     const userName = sessionUser?.name || '同学';
-    const [courses, practiceSets, schedule, stats] = await Promise.all([
+    const [rawCourses, practiceSets, schedule, stats] = await Promise.all([
       loadCourses(6),
       loadPracticePreview(3),
-      loadSchedule(req.session?.user || null, 6),
+      loadSchedule(sessionUser, 6),
       buildStats(),
     ]);
+    const examProfile = getExamProfile(sessionUser?.id || '');
+    const courses = filterCoursesByProfile(rawCourses, { examProfile, sessionUser });
 
     const recommendation =
       practiceSets.length > 0
@@ -1117,7 +1120,6 @@ router.get('/dashboard', requireAuth, async (req, res) => {
 
     const followedInstitutions = listFollowedInstitutions(sessionUser?.id || '');
     const pushMessages = listPushMessages(sessionUser?.id || '');
-    const examProfile = getExamProfile(sessionUser?.id || '');
     const subjectHighlights = buildSubjectRecommendations({
       math: examProfile?.mathSubject,
       english: examProfile?.englishSubject,

@@ -15,6 +15,7 @@ export interface CourseProgress {
   nextTask: string;
   intensity?: '基础' | '强化' | '冲刺';
   tags?: string[];
+  subjectTags?: string[];
   suitability?: CourseSuitability;
   highlight?: string;
 }

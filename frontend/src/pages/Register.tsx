@@ -3,6 +3,7 @@ import {
   Alert,
   Box,
   Button,
+  Chip,
   MenuItem,
   Paper,
   Stack,
@@ -16,6 +17,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Link as RouterLink, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { fetchMajors, type MajorOption } from '../services/userService';
+import { resolveMajorTags } from '../data/majorTags';
 
 interface LocationState {
   from?: {
@@ -72,6 +74,16 @@ const Register = () => {
     }
     return majors.find((major) => major.id === majorSelection) ?? null;
   }, [majorSelection, majors]);
+
+  const majorTagPreview = useMemo(() => {
+    if (majorSelection === CUSTOM_MAJOR_VALUE) {
+      return resolveMajorTags(undefined, customMajor, []);
+    }
+    if (selectedMajorOption?.subjectTags?.length) {
+      return selectedMajorOption.subjectTags;
+    }
+    return resolveMajorTags(majorSelection, selectedMajorOption?.name ?? '', []);
+  }, [customMajor, majorSelection, selectedMajorOption]);
 
   useEffect(() => {
     if (user) {
@@ -270,6 +282,16 @@ const Register = () => {
                     <Typography variant="caption" color="error">
                       无法加载专业列表，可选择“其他专业”后手动填写。
                     </Typography>
+                  ) : null}
+                  {majorTagPreview.length > 0 ? (
+                    <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                      <Typography variant="caption" color="text.secondary">
+                        默认专业标签：
+                      </Typography>
+                      {majorTagPreview.map((tag) => (
+                        <Chip key={tag} label={tag} size="small" variant="outlined" />
+                      ))}
+                    </Stack>
                   ) : null}
                   <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
                     <TextField

@@ -1,3 +1,5 @@
+const { resolveMajorSubjects } = require('./majorSubjects');
+
 const examProfileStore = new Map(); // userId -> profile
 
 const normalizeId = (value) => {
@@ -12,6 +14,13 @@ const setExamProfile = (userId, payload = {}) => {
   if (!normalized) {
     return null;
   }
+  const resolvedMajor = resolveMajorSubjects({
+    majorId: payload.majorId,
+    majorName: payload.targetMajor,
+  });
+  const majorTags = Array.isArray(payload.majorTags) && payload.majorTags.length > 0
+    ? payload.majorTags
+    : resolvedMajor.tags || [];
   const profile = {
     totalScore:
       payload.totalScore != null && Number.isFinite(Number(payload.totalScore))
@@ -20,6 +29,8 @@ const setExamProfile = (userId, payload = {}) => {
     targetMajor: payload.targetMajor ? String(payload.targetMajor).trim() : null,
     mathSubject: payload.mathSubject ? String(payload.mathSubject).trim() : null,
     englishSubject: payload.englishSubject ? String(payload.englishSubject).trim() : null,
+    majorId: payload.majorId ? String(payload.majorId).trim() : resolvedMajor.id || null,
+    majorTags: majorTags,
   };
   examProfileStore.set(normalized, profile);
   return profile;
@@ -37,6 +48,8 @@ const getExamProfile = (userId) => {
         targetMajor: profile.targetMajor,
         mathSubject: profile.mathSubject,
         englishSubject: profile.englishSubject,
+        majorId: profile.majorId || null,
+        majorTags: Array.isArray(profile.majorTags) ? profile.majorTags : [],
       }
     : null;
 };
@@ -48,6 +61,7 @@ const defaultExamProfiles = [
     targetMajor: '计算机科学与技术',
     mathSubject: '数学一',
     englishSubject: '英语一',
+    majorId: 'major_cs',
   },
 ];
 

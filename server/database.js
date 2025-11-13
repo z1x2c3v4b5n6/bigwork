@@ -329,7 +329,7 @@ const seedDatabase = async () => {
   if (majorCount === 0) {
     for (const major of majorsSeed) {
       await runQuery(
-        `INSERT INTO majors (id, name, description) VALUES (:id, :name, :description)`,
+        `INSERT INTO majors (id, name, description, subject_tags) VALUES (:id, :name, :description, :subject_tags)`,
         major,
       );
     }

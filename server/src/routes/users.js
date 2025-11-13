@@ -9,7 +9,7 @@ const {
 const { requireAuth } = require('../middleware/auth');
 const { normalizeRole } = require('../utils/auth');
 const { normalizeIdentifier, normalizeValueForColumn } = require('../utils/db');
-const { getExamProfile } = require('../data/userExtras');
+const { getExamProfile, setExamProfile } = require('../data/userExtras');
 const { getInstitutionProfileForUser } = require('../data/institutionState');
 
 const router = express.Router();
@@ -229,6 +229,16 @@ router.patch('/:id', requireAuth, async (req, res) => {
     }
 
     await updateRecord(config.table, identifier, updates, { idColumn: config.id });
+
+    if (Object.prototype.hasOwnProperty.call(req.body || {}, 'majorId')) {
+      const currentProfile = getExamProfile(identifier);
+      if (currentProfile) {
+        setExamProfile(identifier, {
+          ...currentProfile,
+          majorId: req.body?.majorId ?? null,
+        });
+      }
+    }
 
     const profile = await loadUserProfile(identifier);
 

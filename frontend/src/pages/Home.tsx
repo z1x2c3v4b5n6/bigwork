@@ -34,6 +34,9 @@ import useGreeting from '../hooks/useGreeting';
 import useDashboardData from '../hooks/useDashboardData';
 import { useAuth } from '../context/AuthContext';
 import { Link as RouterLink } from 'react-router-dom';
+import { resolveMajorTags } from '../data/majorTags';
+
+const normalizeTag = (value: string) => value.trim().toLowerCase().replace(/[\s·\-_/]+/g, '');
 
 const statIconMap: Record<string, JSX.Element> = {
   studyTime: <AccessTimeIcon fontSize="inherit" />,
@@ -84,6 +87,20 @@ const Home = () => {
   const followedInstitutions = data?.followedInstitutions ?? [];
   const subjectHighlights = data?.subjectHighlights ?? [];
 
+  const majorTags = useMemo(() => {
+    if (!examProfile) {
+      return resolveMajorTags(user?.majorId ?? null, user?.majorName ?? null);
+    }
+    if (Array.isArray(examProfile.majorTags) && examProfile.majorTags.length > 0) {
+      return examProfile.majorTags.filter((tag): tag is string => typeof tag === 'string' && tag.trim().length > 0);
+    }
+    const fallback = resolveMajorTags(
+      examProfile.majorId ?? user?.majorId ?? null,
+      examProfile.targetMajor ?? user?.majorName ?? null,
+    );
+    return fallback;
+  }, [examProfile, user?.majorId, user?.majorName]);
+
   const recommendedCourses = useMemo(() => {
     if (courses.length === 0) {
       return [] as typeof courses;
@@ -94,6 +111,7 @@ const Home = () => {
     }
 
     const { mathSubject, englishSubject, targetMajor, totalScore } = examProfile;
+    const normalizedMajorTags = majorTags.map(normalizeTag).filter(Boolean);
     const normalizedMajor = targetMajor ? targetMajor.toLowerCase().replace(/\s+/g, '') : '';
     const normalizedScore = typeof totalScore === 'number' && Number.isFinite(totalScore) ? totalScore : null;
 
@@ -116,8 +134,17 @@ const Home = () => {
         ? true
         : (suitability.scoreMin == null || normalizedScore >= suitability.scoreMin) &&
           (suitability.scoreMax == null || normalizedScore <= suitability.scoreMax);
+      const isProfessionalCourse = course.category?.includes('专业');
+      const normalizedCourseTags = (course.tags ?? []).map(normalizeTag).filter(Boolean);
+      const tagMatch = !isProfessionalCourse
+        ? true
+        : normalizedMajorTags.length === 0 || normalizedCourseTags.length === 0
+        ? true
+        : normalizedCourseTags.some((tag) =>
+            normalizedMajorTags.some((majorTag) => tag.includes(majorTag) || majorTag.includes(tag)),
+          );
 
-      return mathMatch && englishMatch && majorMatch && scoreMatch;
+      return mathMatch && englishMatch && majorMatch && scoreMatch && tagMatch;
     });
 
     if (matches.length === 0) {
@@ -133,11 +160,13 @@ const Home = () => {
       }
       return (b.progress ?? 0) - (a.progress ?? 0);
     });
-  }, [courses, examProfile]);
+  }, [courses, examProfile, majorTags]);
 
   const displayCourses = (recommendedCourses.length > 0 ? recommendedCourses : courses).slice(0, 6);
   const courseSubtitle = examProfile
-    ? '已根据你的分数与科目组合筛选匹配课程，优先安排当前阶段最合适的任务。'
+    ? majorTags.length > 0
+      ? `已根据你的专业标签（${majorTags.join('、')}）和科目组合筛选匹配课程，优先安排当前阶段最合适的任务。`
+      : '已根据你的分数与科目组合筛选匹配课程，优先安排当前阶段最合适的任务。'
     : '继续保持节奏，完成系统推荐的任务。';
 
   return (
@@ -535,6 +564,23 @@ const Home = () => {
                         {examProfile.targetMajor ? (
                           <Chip label={`目标专业：${examProfile.targetMajor}`} size="small" variant="outlined" />
                         ) : null}
+                      </Stack>
+                    ) : null}
+                    {majorTags.length > 0 ? (
+                      <Stack
+                        direction={{ xs: 'column', sm: 'row' }}
+                        spacing={1}
+                        sx={{ mb: 2 }}
+                        alignItems={{ xs: 'flex-start', sm: 'center' }}
+                        flexWrap="wrap"
+                        useFlexGap
+                      >
+                        <Typography variant="body2" color="text.secondary">
+                          专业标签：
+                        </Typography>
+                        {majorTags.map((tag) => (
+                          <Chip key={tag} label={tag} size="small" color="primary" variant="outlined" />
+                        ))}
                       </Stack>
                     ) : null}
                     <Grid container spacing={3}>

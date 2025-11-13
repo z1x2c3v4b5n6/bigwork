@@ -227,8 +227,9 @@ router.post('/register', async (req, res) => {
       payload[map.role] = normalizedRole;
     }
 
+    let normalizedMajorId = null;
     if (map.majorId) {
-      const normalizedMajorId = normalizeIdentifier(majorId);
+      normalizedMajorId = normalizeIdentifier(majorId);
       if (normalizedMajorId) {
         payload[map.majorId] = normalizedMajorId;
       } else if (majorId === null) {
@@ -258,6 +259,7 @@ router.post('/register', async (req, res) => {
           typeof mathSubject === 'string' && mathSubject.trim() ? mathSubject.trim() : undefined,
         englishSubject:
           typeof englishSubject === 'string' && englishSubject.trim() ? englishSubject.trim() : undefined,
+        majorId: normalizedMajorId || user.majorId || undefined,
       });
       if (examProfile) {
         user.examProfile = examProfile;

@@ -5,21 +5,25 @@ export const majorsSeed = [
     id: 'major_cs',
     name: '计算机科学与技术',
     description: '涵盖数据结构、计算机组成原理、操作系统与计算机网络的系统备考路径。',
+    subject_tags: '计算机,408,算法,工程实践,数学一',
   },
   {
     id: 'major_math',
     name: '应用数学',
     description: '专注高等数学、线性代数与概率统计的强化与冲刺训练。',
+    subject_tags: '数学,统计建模,概率论,数学三',
   },
   {
     id: 'major_english',
     name: '英语语言文学',
     description: '从基础语法到写作实战，兼顾翻译与写作能力提升。',
+    subject_tags: '英语,口语,翻译,写作',
   },
   {
     id: 'major_management',
     name: '工商管理',
     description: '管理类联考数学、逻辑与写作的全阶段复习方案。',
+    subject_tags: '管理类联考,金融,案例分析,英语二',
   },
 ];
 

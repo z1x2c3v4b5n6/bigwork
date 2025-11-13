@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS `majors` (
   `id` VARCHAR(30) NOT NULL,
   `name` VARCHAR(100) NOT NULL UNIQUE,
   `description` TEXT,
+  `subject_tags` TEXT DEFAULT NULL,
   `created_at` TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
@@ -250,15 +251,36 @@ CREATE TABLE IF NOT EXISTS `ai_conversations` (
 -- 种子数据
 -- ------------------------------------------------------------
 
-INSERT INTO `majors` (`id`, `name`, `description`)
+INSERT INTO `majors` (`id`, `name`, `description`, `subject_tags`)
 VALUES
-  ('major_cs', '计算机科学与技术', '涵盖数据结构、计算机组成原理、操作系统与计算机网络的系统备考路径。'),
-  ('major_math', '应用数学', '专注高等数学、线性代数与概率统计的强化与冲刺训练。'),
-  ('major_english', '英语语言文学', '从基础语法到写作实战，兼顾翻译与写作能力提升。'),
-  ('major_management', '工商管理', '管理类联考数学、逻辑与写作的全阶段复习方案。')
+  (
+    'major_cs',
+    '计算机科学与技术',
+    '涵盖数据结构、计算机组成原理、操作系统与计算机网络的系统备考路径。',
+    '计算机,408,算法,工程实践,数学一'
+  ),
+  (
+    'major_math',
+    '应用数学',
+    '专注高等数学、线性代数与概率统计的强化与冲刺训练。',
+    '数学,统计建模,概率论,数学三'
+  ),
+  (
+    'major_english',
+    '英语语言文学',
+    '从基础语法到写作实战，兼顾翻译与写作能力提升。',
+    '英语,口语,翻译,写作'
+  ),
+  (
+    'major_management',
+    '工商管理',
+    '管理类联考数学、逻辑与写作的全阶段复习方案。',
+    '管理类联考,金融,案例分析,英语二'
+  )
 ON DUPLICATE KEY UPDATE
   `name` = VALUES(`name`),
-  `description` = VALUES(`description`);
+  `description` = VALUES(`description`),
+  `subject_tags` = VALUES(`subject_tags`);
 
 INSERT INTO `users` (
   `id`, `username`, `password`, `display_name`, `role`, `email`, `phone`, `organization`, `goal`, `major_id`, `avatar`, `bio`

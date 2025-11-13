@@ -16,6 +16,8 @@ export interface ExamProfile {
   targetMajor: string | null;
   mathSubject: string | null;
   englishSubject: string | null;
+  majorId?: string | null;
+  majorTags?: string[] | null;
 }
 
 export interface InstitutionProfile {
