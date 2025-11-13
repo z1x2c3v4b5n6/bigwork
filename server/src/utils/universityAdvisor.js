@@ -235,6 +235,138 @@ const buildRecommendations = (totalScore, major, examPreferences = {}) => {
   };
 };
 
+const subjectRecommendationMatrix = {
+  'math1|eng1': {
+    combination: '数学一 + 英语一',
+    majors: ['计算机科学与技术', '软件工程', '电子信息工程'],
+    suggestion: '适合冲刺计算机、电子信息等对数理和英语要求均高的专业，复试常见算法或项目深挖。',
+  },
+  'math1|eng2': {
+    combination: '数学一 + 英语二',
+    majors: ['自动化', '通信工程', '数据科学与大数据技术'],
+    suggestion: '偏理工交叉方向，可结合项目经历强调工程实现能力。',
+  },
+  'math2|eng1': {
+    combination: '数学二 + 英语一',
+    majors: ['机械工程', '控制工程', '仪器工程'],
+    suggestion: '建议突出力学与控制基础，关注联合培养或企业实践项目。',
+  },
+  'math2|eng2': {
+    combination: '数学二 + 英语二',
+    majors: ['管理科学与工程', '工业工程', '物流工程'],
+    suggestion: '适合工管交叉型专业，复试常结合案例分析与数据建模。',
+  },
+  'math3|eng1': {
+    combination: '数学三 + 英语一',
+    majors: ['数量经济学', '应用数学', '金融工程'],
+    suggestion: '兼顾数学与英语的复试考察，建议准备英文案例分析与建模题。',
+  },
+  'math3|eng2': {
+    combination: '数学三 + 英语二',
+    majors: ['金融学', '会计硕士', '应用统计'],
+    suggestion: '经管方向常见组合，复试关注财经热点与量化分析。',
+  },
+  'mathnone|eng1': {
+    combination: '不考数学 + 英语一',
+    majors: ['翻译硕士', '新闻与传播', '公共管理'],
+    suggestion: '突出语言能力与社会科学素养，准备跨文化沟通或政策分析案例。',
+  },
+  'mathnone|eng2': {
+    combination: '不考数学 + 英语二',
+    majors: ['法律硕士（非法学）', '教育学', '社会工作'],
+    suggestion: '注重综合素质与实践经验，复试常含案例面试与口述题。',
+  },
+  'math1|any': {
+    combination: '数学一',
+    majors: ['人工智能', '信息安全', '计算机技术'],
+    suggestion: '数学一通常搭配 408 等统考科目，可重点准备算法与数据结构。',
+  },
+  'math2|any': {
+    combination: '数学二',
+    majors: ['机械工程', '电气工程', '土木工程'],
+    suggestion: '适合传统工科方向，复试强调工程设计与实践能力。',
+  },
+  'math3|any': {
+    combination: '数学三',
+    majors: ['金融学', '应用统计', '物流工程'],
+    suggestion: '兼顾数学基础与实际应用，可准备案例分析与数据建模展示。',
+  },
+  'any|eng1': {
+    combination: '英语一',
+    majors: ['计算机科学', '金融学', '管理科学'],
+    suggestion: '英语一复试口语要求更高，建议准备英文自我介绍与问答。',
+  },
+  'any|eng2': {
+    combination: '英语二',
+    majors: ['会计硕士', '教育学', '新闻传播'],
+    suggestion: '英语二强调实用交流能力，可准备热点话题讨论。',
+  },
+};
+
+const fallbackSubjectRecommendation = {
+  combination: '公共课组合参考',
+  majors: ['计算机科学与技术', '金融学', '管理科学与工程'],
+  suggestion: '结合目标院校最新招生简章确认专业课要求，合理规划公共课与专业课的复习节奏。',
+};
+
+const buildSubjectRecommendations = ({ math, english, targetMajor, totalScore } = {}) => {
+  const normalizedMath = normalizeMathSubject(math) || '';
+  const normalizedEnglish = normalizeEnglishSubject(english) || '';
+  const mathKey = normalizedMath ? normalizedMath.toLowerCase() : 'any';
+  const englishKey = normalizedEnglish ? normalizedEnglish.toLowerCase() : 'any';
+  const key = `${mathKey}|${englishKey}`;
+  const recommendations = [];
+
+  const pushUnique = (entry) => {
+    if (!entry) {
+      return;
+    }
+    const exists = recommendations.some((item) => item.combination === entry.combination);
+    if (!exists) {
+      recommendations.push({ ...entry });
+    }
+  };
+
+  pushUnique(subjectRecommendationMatrix[key]);
+
+  if (!subjectRecommendationMatrix[key]) {
+    if (normalizedMath) {
+      pushUnique(subjectRecommendationMatrix[`${mathKey}|any`]);
+    }
+    if (normalizedEnglish) {
+      pushUnique(subjectRecommendationMatrix[`any|${englishKey}`]);
+    }
+  }
+
+  if (recommendations.length === 0) {
+    pushUnique(subjectRecommendationMatrix['math3|eng2']);
+    pushUnique(subjectRecommendationMatrix['math1|eng1']);
+  }
+
+  pushUnique(fallbackSubjectRecommendation);
+
+  return recommendations.map((item) => {
+    const notes = [item.suggestion];
+    if (targetMajor) {
+      notes.push(`结合目标专业「${targetMajor}」，优先核对复试科目与导师方向，准备差异化亮点。`);
+    }
+    if (Number.isFinite(totalScore)) {
+      if (totalScore >= 400) {
+        notes.push('当前分数段具备冲刺顶尖院校的条件，建议提前准备复试英语与科研展示。');
+      } else if (totalScore >= 370) {
+        notes.push('分数段适合搭配冲刺与稳妥院校，复试阶段突出实践案例。');
+      } else {
+        notes.push('建议在确保稳妥院校的同时准备调剂方案，关注院校补录信息。');
+      }
+    }
+    return {
+      combination: item.combination,
+      recommendedMajors: item.majors,
+      suggestion: notes.filter(Boolean).join(' '),
+    };
+  });
+};
+
 const buildInterviewPreparation = (focusTopics) => {
   const timeline = [
     {
@@ -345,9 +477,16 @@ const buildRecommendationResponse = ({ totalScore, major, examPreferences }) => 
     strategy,
     recommendedUniversities,
     interviewPreparation,
+    subjectRecommendations: buildSubjectRecommendations({
+      math: examPreferences?.math,
+      english: examPreferences?.english,
+      targetMajor: major,
+      totalScore,
+    }),
   };
 };
 
 module.exports = {
   buildRecommendationResponse,
+  buildSubjectRecommendations,
 };

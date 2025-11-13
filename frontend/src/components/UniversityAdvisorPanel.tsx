@@ -18,7 +18,7 @@ import {
 } from '@mui/material';
 import type { ChipProps } from '@mui/material/Chip';
 import { useMutation } from '@tanstack/react-query';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import SchoolIcon from '@mui/icons-material/School';
 import InsightsIcon from '@mui/icons-material/Insights';
 import TaskAltIcon from '@mui/icons-material/TaskAlt';
@@ -26,6 +26,7 @@ import InfoIcon from '@mui/icons-material/Info';
 import LaunchIcon from '@mui/icons-material/Launch';
 import type { RecommendationRequest, UniversityRecommendationResponse } from '../services/recommendationService';
 import { recommendUniversities } from '../services/recommendationService';
+import { useAuth } from '../context/AuthContext';
 
 const matchLevelColor: Record<
   UniversityRecommendationResponse['recommendedUniversities'][number]['matchLevel'],
@@ -38,15 +39,77 @@ const matchLevelColor: Record<
 };
 
 const UniversityAdvisorPanel = () => {
+  const { user } = useAuth();
+  const examProfile = user?.examProfile;
   const [score, setScore] = useState('');
   const [major, setMajor] = useState('');
   const [mathSubject, setMathSubject] = useState('');
   const [englishSubject, setEnglishSubject] = useState('');
   const [inputError, setInputError] = useState<string | null>(null);
+  const [autoTriggered, setAutoTriggered] = useState(false);
 
   const mutation = useMutation({
     mutationFn: recommendUniversities,
   });
+
+  useEffect(() => {
+    if (!examProfile) {
+      return;
+    }
+
+    if (examProfile.totalScore != null && Number.isFinite(Number(examProfile.totalScore))) {
+      setScore(String(examProfile.totalScore));
+    }
+    if (examProfile.targetMajor) {
+      setMajor(examProfile.targetMajor);
+    }
+    if (examProfile.mathSubject) {
+      setMathSubject(examProfile.mathSubject);
+    }
+    if (examProfile.englishSubject) {
+      setEnglishSubject(examProfile.englishSubject);
+    }
+  }, [examProfile]);
+
+  useEffect(() => {
+    if (!examProfile) {
+      setAutoTriggered(false);
+      return;
+    }
+    setAutoTriggered(false);
+  }, [examProfile?.totalScore, examProfile?.targetMajor, examProfile?.mathSubject, examProfile?.englishSubject]);
+
+  useEffect(() => {
+    if (!examProfile || autoTriggered) {
+      return;
+    }
+
+    const parsedScore = Number(examProfile.totalScore);
+    if (!Number.isFinite(parsedScore) || parsedScore <= 0) {
+      return;
+    }
+
+    const payload: RecommendationRequest = {
+      totalScore: Math.min(500, parsedScore),
+      targetMajor: examProfile.targetMajor?.trim() || undefined,
+    };
+
+    const mathValue = examProfile.mathSubject?.trim();
+    const englishValue = examProfile.englishSubject?.trim();
+    if (mathValue || englishValue) {
+      payload.examSubjects = {
+        math: mathValue || undefined,
+        english: englishValue || undefined,
+      };
+    }
+
+    if (mutation.isError) {
+      mutation.reset();
+    }
+    setInputError(null);
+    mutation.mutate(payload);
+    setAutoTriggered(true);
+  }, [examProfile, autoTriggered, mutation]);
 
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -62,7 +125,7 @@ const UniversityAdvisorPanel = () => {
       mutation.reset();
     }
     const payload: RecommendationRequest = {
-      totalScore: parsed,
+      totalScore: Math.min(500, parsed),
       targetMajor: major.trim() ? major.trim() : undefined,
     };
 
@@ -76,6 +139,7 @@ const UniversityAdvisorPanel = () => {
     }
 
     mutation.mutate(payload);
+    setAutoTriggered(true);
   };
 
   const recommendation = mutation.data;
@@ -84,43 +148,49 @@ const UniversityAdvisorPanel = () => {
     () => recommendation?.interviewPreparation.focusTopics ?? [],
     [recommendation?.interviewPreparation.focusTopics],
   );
+  const subjectRecommendations = recommendation?.subjectRecommendations ?? [];
 
   return (
     <Stack spacing={3}>
       <Box component="form" onSubmit={handleSubmit}>
         <Grid container spacing={2}>
           <Grid item xs={12} md={4}>
-            <TextField
-              fullWidth
-              label="初试总分"
-              type="number"
-              value={score}
-              onChange={(event) => setScore(event.target.value)}
-              placeholder="例如 398"
-              inputProps={{ min: 0, step: 1 }}
-              error={Boolean(inputError)}
-              helperText={inputError ?? '输入后将智能匹配冲刺/稳妥/保底院校'}
-            />
+          <TextField
+            fullWidth
+            label="初试总分"
+            type="number"
+            value={score}
+            onChange={(event) => {
+              setScore(event.target.value);
+              if (inputError) {
+                setInputError(null);
+              }
+            }}
+            placeholder="例如 398"
+            inputProps={{ min: 0, step: 1 }}
+            error={Boolean(inputError)}
+            helperText={inputError ?? '输入后将智能匹配冲刺/稳妥/保底院校'}
+          />
           </Grid>
           <Grid item xs={12} md={4}>
-            <TextField
-              fullWidth
-              label="目标专业（可选）"
-              value={major}
-              onChange={(event) => setMajor(event.target.value)}
-              placeholder="如 计算机、金融等"
-              helperText="填写后可优先推荐对口优势专业"
-            />
+          <TextField
+            fullWidth
+            label="目标专业（可选）"
+            value={major}
+            onChange={(event) => setMajor(event.target.value)}
+            placeholder="如 计算机、金融等"
+            helperText="填写后可优先推荐对口优势专业"
+          />
           </Grid>
           <Grid item xs={12} md={2}>
             <TextField
               fullWidth
               select
               label="数学科目"
-              value={mathSubject}
-              onChange={(event) => setMathSubject(event.target.value)}
-              helperText="选择报考的数学类别"
-            >
+            value={mathSubject}
+            onChange={(event) => setMathSubject(event.target.value)}
+            helperText="选择报考的数学类别"
+          >
               <MenuItem value="">不限</MenuItem>
               <MenuItem value="数学一">数学一</MenuItem>
               <MenuItem value="数学二">数学二</MenuItem>
@@ -133,10 +203,10 @@ const UniversityAdvisorPanel = () => {
               fullWidth
               select
               label="英语科目"
-              value={englishSubject}
-              onChange={(event) => setEnglishSubject(event.target.value)}
-              helperText="选择报考的英语类别"
-            >
+            value={englishSubject}
+            onChange={(event) => setEnglishSubject(event.target.value)}
+            helperText="选择报考的英语类别"
+          >
               <MenuItem value="">不限</MenuItem>
               <MenuItem value="英语一">英语一</MenuItem>
               <MenuItem value="英语二">英语二</MenuItem>
@@ -200,6 +270,39 @@ const UniversityAdvisorPanel = () => {
               </Stack>
             </Stack>
           </Paper>
+
+          {subjectRecommendations.length > 0 && (
+            <Stack spacing={1.5}>
+              <Typography variant="subtitle1" fontWeight={600}>
+                科目匹配建议
+              </Typography>
+              <Grid container spacing={2}>
+                {subjectRecommendations.map((item) => (
+                  <Grid item xs={12} md={6} key={item.combination}>
+                    <Paper
+                      variant="outlined"
+                      sx={{
+                        p: 2,
+                        borderRadius: 3,
+                        height: '100%',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 1,
+                      }}
+                    >
+                      <Chip label={item.combination} color="primary" variant="outlined" />
+                      <Typography variant="body2" color="text.secondary">
+                        适合专业：{item.recommendedMajors.slice(0, 4).join('、')}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        {item.suggestion}
+                      </Typography>
+                    </Paper>
+                  </Grid>
+                ))}
+              </Grid>
+            </Stack>
+          )}
 
           <Stack spacing={2}>
             <Typography variant="subtitle1" fontWeight={600}>

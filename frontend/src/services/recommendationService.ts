@@ -49,6 +49,7 @@ export interface UniversityRecommendationResponse {
   strategy: string[];
   recommendedUniversities: UniversityRecommendationItem[];
   interviewPreparation: InterviewPreparationPayload;
+  subjectRecommendations: SubjectHighlightRecommendation[];
 }
 
 export interface RecommendationRequest {
@@ -58,6 +59,12 @@ export interface RecommendationRequest {
     math?: string;
     english?: string;
   };
+}
+
+export interface SubjectHighlightRecommendation {
+  combination: string;
+  recommendedMajors: string[];
+  suggestion: string;
 }
 
 export const recommendUniversities = async (

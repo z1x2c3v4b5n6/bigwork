@@ -17,6 +17,8 @@ interface CourseCardProps {
 
 const CourseCard = ({ course }: CourseCardProps) => {
   const theme = useTheme();
+  const stageLabel = course.intensity ?? (course.progress >= 60 ? '进阶中' : '打基础');
+
   return (
     <Paper
       elevation={0}
@@ -48,22 +50,38 @@ const CourseCard = ({ course }: CourseCardProps) => {
         >
           {course.title.charAt(0)}
         </Avatar>
-        <Box>
+        <Box sx={{ flexGrow: 1 }}>
           <Typography variant="subtitle1" fontWeight={600}>
             {course.title}
           </Typography>
           <Typography variant="body2" color="text.secondary">
             {course.teacher} · {course.category}
           </Typography>
+          {course.highlight ? (
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+              {course.highlight}
+            </Typography>
+          ) : null}
         </Box>
-        <Chip label={course.progress >= 60 ? '进阶中' : '打基础'} color="primary" variant="outlined" sx={{ ml: 'auto' }} />
+        <Chip label={stageLabel} color="primary" variant="outlined" sx={{ ml: 'auto' }} />
       </Stack>
-      <Box sx={{
-        p: 2,
-        borderRadius: 3,
-        background: 'rgba(255,255,255,0.6)',
-        border: '1px dashed rgba(25,118,210,0.2)',
-      }}>
+
+      {course.tags?.length ? (
+        <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+          {course.tags.map((tag) => (
+            <Chip key={tag} label={tag} size="small" variant="outlined" />
+          ))}
+        </Stack>
+      ) : null}
+
+      <Box
+        sx={{
+          p: 2,
+          borderRadius: 3,
+          background: 'rgba(255,255,255,0.6)',
+          border: '1px dashed rgba(25,118,210,0.2)',
+        }}
+      >
         <Typography variant="body2" color="text.secondary">
           下一个任务
         </Typography>
@@ -71,6 +89,7 @@ const CourseCard = ({ course }: CourseCardProps) => {
           {course.nextTask}
         </Typography>
       </Box>
+
       <Box>
         <Stack direction="row" alignItems="center" spacing={1} mb={1}>
           <PlayArrowIcon fontSize="small" color="primary" />
