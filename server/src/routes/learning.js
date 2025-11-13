@@ -1165,8 +1165,18 @@ router.get('/dashboard', requireAuth, async (req, res) => {
 
 router.get('/courses', requireAuth, async (req, res) => {
   try {
+    const sessionUser = req.session?.user || null;
     const courses = await loadCourses();
-    res.json({ courses });
+    const isPrivilegedUser = sessionUser?.role === 'admin' || sessionUser?.role === 'institution';
+
+    if (isPrivilegedUser) {
+      res.json({ courses });
+      return;
+    }
+
+    const examProfile = getExamProfile(sessionUser?.id || '');
+    const filteredCourses = filterCoursesByProfile(courses, { examProfile, sessionUser });
+    res.json({ courses: filteredCourses });
   } catch (error) {
     console.error('获取课程列表失败', error);
     res.status(500).json({ message: '无法加载课程列表，请稍后重试' });
