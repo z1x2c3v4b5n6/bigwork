@@ -17,22 +17,37 @@ router.get('/', requireAuth, async (req, res) => {
     const idColumn = resolveColumn(columns, ['id', 'major_id']);
     const nameColumn = resolveColumn(columns, ['name', 'major_name', 'title']);
     const descriptionColumn = resolveColumn(columns, ['description', 'intro', 'summary']);
+    const subjectTagsColumn = resolveColumn(columns, ['subject_tags', 'tags', 'tag_list']);
 
     const selectFragments = [
       idColumn ? `m.\`${idColumn}\` AS id` : 'NULL AS id',
       nameColumn ? `m.\`${nameColumn}\` AS name` : 'NULL AS name',
       descriptionColumn ? `m.\`${descriptionColumn}\` AS description` : 'NULL AS description',
+      subjectTagsColumn ? `m.\`${subjectTagsColumn}\` AS subject_tags` : 'NULL AS subject_tags',
     ];
 
     const rows = await query(
       `SELECT ${selectFragments.join(', ')} FROM majors m ORDER BY ${nameColumn ? `m.\`${nameColumn}\`` : 'm.id'} ASC`,
     );
 
-    const majors = rows.map((row) => ({
-      id: row.id != null ? String(row.id) : '',
-      name: row.name || '未命名专业',
-      description: row.description || null,
-    }));
+    const majors = rows.map((row) => {
+      const rawTags = row.subject_tags;
+      const tags = Array.isArray(rawTags)
+        ? rawTags
+        : typeof rawTags === 'string'
+        ? rawTags
+            .split(/[,，;；\s]+/)
+            .map((tag) => tag.trim())
+            .filter((tag) => tag.length > 0)
+        : [];
+
+      return {
+        id: row.id != null ? String(row.id) : '',
+        name: row.name || '未命名专业',
+        description: row.description || null,
+        subjectTags: tags,
+      };
+    });
 
     return res.json(majors);
   } catch (error) {

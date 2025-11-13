@@ -5,6 +5,7 @@ export interface MajorOption {
   id: string;
   name: string;
   description?: string;
+  subjectTags?: string[];
 }
 
 export type UserProfile = AuthUser & {

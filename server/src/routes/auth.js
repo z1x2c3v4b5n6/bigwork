@@ -10,6 +10,9 @@ const {
   extractBearerToken,
   sanitizeSessionUser,
 } = require('../utils/auth');
+const { setExamProfile, getExamProfile } = require('../data/userExtras');
+const { registerInstitutionAccount, getInstitutionProfileForUser } = require('../data/institutionState');
+const { normalizeIdentifier } = require('../utils/db');
 
 const { SESSION_NAME = 'connect.sid' } = process.env;
 
@@ -104,8 +107,8 @@ const fetchUserByUsername = async (username) => {
   return { record: rows[0] || null, map };
 };
 
-const serializeUser = (row) =>
-  sanitizeSessionUser({
+const serializeUser = (row) => {
+  const base = sanitizeSessionUser({
     id: row?.id,
     name: row?.display_name || row?.username,
     role: row?.role,
@@ -117,7 +120,21 @@ const serializeUser = (row) =>
     majorName: row?.major_name,
     avatar: row?.avatar,
     bio: row?.bio,
+    examProfile: row?.examProfile,
   });
+
+  const examProfile = getExamProfile(base.id);
+  if (examProfile) {
+    base.examProfile = examProfile;
+  }
+
+  const institutionProfile = getInstitutionProfileForUser(base.id);
+  if (institutionProfile) {
+    base.institutionProfile = institutionProfile;
+  }
+
+  return base;
+};
 
 const resolveTokenFromRequest = (req) => {
   const header = req.headers?.authorization || req.headers?.Authorization;
@@ -155,7 +172,22 @@ router.get('/session', (req, res) => {
 });
 
 router.post('/register', async (req, res) => {
-  const { username, password, displayName, email } = req.body || {};
+  const {
+    username,
+    password,
+    displayName,
+    email,
+    role,
+    totalScore,
+    targetMajor,
+    majorId,
+    mathSubject,
+    englishSubject,
+    officialWebsite,
+    institutionLocation,
+    institutionTags,
+    institutionFocus,
+  } = req.body || {};
 
   if (!username || !password || !displayName) {
     return res.status(400).json({ message: '用户名、密码与姓名不能为空' });
@@ -176,6 +208,8 @@ router.post('/register', async (req, res) => {
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
+    const normalizedRole = typeof role === 'string' && role.trim().toLowerCase() === 'institution' ? 'institution' : 'student';
+
     const payload = {
       [map.username]: username,
       [map.password]: hashedPassword,
@@ -190,13 +224,64 @@ router.post('/register', async (req, res) => {
     }
 
     if (map.role) {
-      payload[map.role] = 'student';
+      payload[map.role] = normalizedRole;
+    }
+
+    let normalizedMajorId = null;
+    if (map.majorId) {
+      normalizedMajorId = normalizeIdentifier(majorId);
+      if (normalizedMajorId) {
+        payload[map.majorId] = normalizedMajorId;
+      } else if (majorId === null) {
+        payload[map.majorId] = null;
+      }
+    }
+
+    if (map.goal && targetMajor) {
+      payload[map.goal] = String(targetMajor).trim();
     }
 
     await insertRecord('users', payload);
 
     const { record: createdRecord } = await fetchUserByUsername(username);
-    const user = serializeUser(createdRecord || { username, display_name: displayName, email, role: 'student' });
+    const user = serializeUser(
+      createdRecord || { username, display_name: displayName, email, role: normalizedRole },
+    );
+
+    user.role = normalizedRole;
+
+    if (normalizedRole === 'student') {
+      const examProfile = setExamProfile(user.id, {
+        totalScore,
+        targetMajor:
+          typeof targetMajor === 'string' && targetMajor.trim() ? targetMajor.trim() : undefined,
+        mathSubject:
+          typeof mathSubject === 'string' && mathSubject.trim() ? mathSubject.trim() : undefined,
+        englishSubject:
+          typeof englishSubject === 'string' && englishSubject.trim() ? englishSubject.trim() : undefined,
+        majorId: normalizedMajorId || user.majorId || undefined,
+      });
+      if (examProfile) {
+        user.examProfile = examProfile;
+      }
+    } else if (normalizedRole === 'institution') {
+      const tags = Array.isArray(institutionTags)
+        ? institutionTags
+        : typeof institutionTags === 'string'
+        ? institutionTags.split(',').map((tag) => tag.trim()).filter(Boolean)
+        : [];
+      const profile = registerInstitutionAccount({
+        userId: user.id,
+        name: displayName,
+        location: institutionLocation,
+        tags,
+        officialWebsite,
+        focus: institutionFocus,
+      });
+      if (profile) {
+        user.institutionProfile = profile;
+      }
+    }
 
     const token = createAuthToken(user);
 

@@ -9,6 +9,8 @@ const {
 const { requireAuth } = require('../middleware/auth');
 const { normalizeRole } = require('../utils/auth');
 const { normalizeIdentifier, normalizeValueForColumn } = require('../utils/db');
+const { getExamProfile, setExamProfile } = require('../data/userExtras');
+const { getInstitutionProfileForUser } = require('../data/institutionState');
 
 const router = express.Router();
 
@@ -80,19 +82,27 @@ const buildUserSelect = (config) => {
   return fragments;
 };
 
-const formatUserProfile = (row) => ({
-  id: row?.id != null ? String(row.id) : '',
-  name: row?.display_name || row?.username || '未命名用户',
-  email: row?.email || null,
-  phone: row?.phone || null,
-  organization: row?.organization || null,
-  goal: row?.goal || null,
-  majorId: row?.major_id ? String(row.major_id) : null,
-  majorName: row?.major_name || null,
-  role: normalizeRole(row?.role),
-  avatar: row?.avatar || null,
-  bio: row?.bio || null,
-});
+const formatUserProfile = (row) => {
+  const id = row?.id != null ? String(row.id) : '';
+  const examProfile = id ? getExamProfile(id) : null;
+  const institutionProfile = id ? getInstitutionProfileForUser(id) : null;
+
+  return {
+    id,
+    name: row?.display_name || row?.username || '未命名用户',
+    email: row?.email || null,
+    phone: row?.phone || null,
+    organization: row?.organization || null,
+    goal: row?.goal || null,
+    majorId: row?.major_id ? String(row.major_id) : null,
+    majorName: row?.major_name || null,
+    role: normalizeRole(row?.role),
+    avatar: row?.avatar || null,
+    bio: row?.bio || null,
+    examProfile: examProfile || undefined,
+    institutionProfile: institutionProfile || undefined,
+  };
+};
 
 const loadUserProfile = async (identifier) => {
   const config = await getUserConfig();
@@ -219,6 +229,16 @@ router.patch('/:id', requireAuth, async (req, res) => {
     }
 
     await updateRecord(config.table, identifier, updates, { idColumn: config.id });
+
+    if (Object.prototype.hasOwnProperty.call(req.body || {}, 'majorId')) {
+      const currentProfile = getExamProfile(identifier);
+      if (currentProfile) {
+        setExamProfile(identifier, {
+          ...currentProfile,
+          majorId: req.body?.majorId ?? null,
+        });
+      }
+    }
 
     const profile = await loadUserProfile(identifier);
 

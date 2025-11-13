@@ -89,7 +89,7 @@ const createTables = async () => {
       username VARCHAR(50) NOT NULL UNIQUE,
       password VARCHAR(255) NOT NULL,
       display_name VARCHAR(100) NOT NULL,
-      role ENUM('student', 'admin') NOT NULL DEFAULT 'student',
+      role ENUM('student', 'admin', 'institution') NOT NULL DEFAULT 'student',
       email VARCHAR(255),
       phone VARCHAR(30),
       organization VARCHAR(255),
@@ -329,7 +329,7 @@ const seedDatabase = async () => {
   if (majorCount === 0) {
     for (const major of majorsSeed) {
       await runQuery(
-        `INSERT INTO majors (id, name, description) VALUES (:id, :name, :description)`,
+        `INSERT INTO majors (id, name, description, subject_tags) VALUES (:id, :name, :description, :subject_tags)`,
         major,
       );
     }

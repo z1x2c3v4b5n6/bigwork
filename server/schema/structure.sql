@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS `majors` (
   `id` VARCHAR(30) NOT NULL,
   `name` VARCHAR(100) NOT NULL UNIQUE,
   `description` TEXT,
+  `subject_tags` TEXT DEFAULT NULL,
   `created_at` TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
@@ -28,7 +29,7 @@ CREATE TABLE IF NOT EXISTS `users` (
   `username` VARCHAR(64) NOT NULL UNIQUE,
   `password` VARCHAR(255) NOT NULL,
   `display_name` VARCHAR(64) NOT NULL,
-  `role` ENUM('student', 'admin') NOT NULL DEFAULT 'student',
+  `role` ENUM('student', 'admin', 'institution') NOT NULL DEFAULT 'student',
   `email` VARCHAR(128) DEFAULT NULL,
   `phone` VARCHAR(32) DEFAULT NULL,
   `organization` VARCHAR(255) DEFAULT NULL,
@@ -250,15 +251,36 @@ CREATE TABLE IF NOT EXISTS `ai_conversations` (
 -- 种子数据
 -- ------------------------------------------------------------
 
-INSERT INTO `majors` (`id`, `name`, `description`)
+INSERT INTO `majors` (`id`, `name`, `description`, `subject_tags`)
 VALUES
-  ('major_cs', '计算机科学与技术', '涵盖数据结构、计算机组成原理、操作系统与计算机网络的系统备考路径。'),
-  ('major_math', '应用数学', '专注高等数学、线性代数与概率统计的强化与冲刺训练。'),
-  ('major_english', '英语语言文学', '从基础语法到写作实战，兼顾翻译与写作能力提升。'),
-  ('major_management', '工商管理', '管理类联考数学、逻辑与写作的全阶段复习方案。')
+  (
+    'major_cs',
+    '计算机科学与技术',
+    '涵盖数据结构、计算机组成原理、操作系统与计算机网络的系统备考路径。',
+    '计算机,408,算法,工程实践,数学一'
+  ),
+  (
+    'major_math',
+    '应用数学',
+    '专注高等数学、线性代数与概率统计的强化与冲刺训练。',
+    '数学,统计建模,概率论,数学三'
+  ),
+  (
+    'major_english',
+    '英语语言文学',
+    '从基础语法到写作实战，兼顾翻译与写作能力提升。',
+    '英语,口语,翻译,写作'
+  ),
+  (
+    'major_management',
+    '工商管理',
+    '管理类联考数学、逻辑与写作的全阶段复习方案。',
+    '管理类联考,金融,案例分析,英语二'
+  )
 ON DUPLICATE KEY UPDATE
   `name` = VALUES(`name`),
-  `description` = VALUES(`description`);
+  `description` = VALUES(`description`),
+  `subject_tags` = VALUES(`subject_tags`);
 
 INSERT INTO `users` (
   `id`, `username`, `password`, `display_name`, `role`, `email`, `phone`, `organization`, `goal`, `major_id`, `avatar`, `bio`
@@ -291,6 +313,20 @@ VALUES
     'major_cs',
     '李',
     '负责数学、英语与专业课教研统筹，擅长课程建设与教学服务。'
+  ),
+  (
+    'user_institution_1',
+    'institution',
+    'admit2024',
+    '华清学院招生办',
+    'institution',
+    'admission@hq.edu.cn',
+    '010-88881234',
+    '华清学院招生办公室',
+    '发布招生简章与复试动态，及时提醒关注考生。',
+    'major_management',
+    '招',
+    '官方院校账号，提供招生政策解读、复试安排与调剂咨询。'
   )
 ON DUPLICATE KEY UPDATE
   `username` = VALUES(`username`),
@@ -373,6 +409,32 @@ VALUES
     '以算法题为主线，结合 AI 批改与诊断，强化薄弱知识点。',
     '计划 8 月上线',
     '2024.08-2024.10'
+  ),
+  (
+    'course_mba_case',
+    'major_management',
+    '管理类联考案例实战工坊',
+    '公共课',
+    '陈老师',
+    2.0,
+    52,
+    'published',
+    '分模块演练双语商业案例与面试答题策略，附带导师点评模板。',
+    '每周日晚 19:30 线上研讨',
+    '2024.06-2024.09'
+  ),
+  (
+    'course_english_speaking',
+    'major_english',
+    '英语口语听力提升营',
+    '公共课',
+    'Grace',
+    2.0,
+    58,
+    'published',
+    '覆盖听力跟读、口语即兴表达与复试常见问答，提供录音点评。',
+    '每周二、周四晚 19:30',
+    '2024.05-2024.08'
   )
 ON DUPLICATE KEY UPDATE
   `major_id` = VALUES(`major_id`),

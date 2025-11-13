@@ -22,6 +22,7 @@ import TextSnippetIcon from '@mui/icons-material/TextSnippet';
 import LibraryBooksIcon from '@mui/icons-material/LibraryBooks';
 import RecordVoiceOverIcon from '@mui/icons-material/RecordVoiceOver';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
+import { useMemo } from 'react';
 import HeroBanner from '../components/HeroBanner';
 import StatCard from '../components/StatCard';
 import CourseCard from '../components/CourseCard';
@@ -33,6 +34,9 @@ import useGreeting from '../hooks/useGreeting';
 import useDashboardData from '../hooks/useDashboardData';
 import { useAuth } from '../context/AuthContext';
 import { Link as RouterLink } from 'react-router-dom';
+import { resolveMajorTags } from '../data/majorTags';
+
+const normalizeTag = (value: string) => value.trim().toLowerCase().replace(/[\s·\-_/]+/g, '');
 
 const statIconMap: Record<string, JSX.Element> = {
   studyTime: <AccessTimeIcon fontSize="inherit" />,
@@ -67,6 +71,7 @@ const Home = () => {
   const { user } = useAuth();
   const { data, isFetching, isError, refetch } = useDashboardData(user);
   const isAdmin = user?.role?.toLowerCase() === 'admin';
+  const examProfile = user?.examProfile ?? null;
 
   const stats = data?.stats ?? [];
   const courses = data?.courses ?? [];
@@ -78,6 +83,91 @@ const Home = () => {
   const courseDrafts = adminFocus?.courseDrafts ?? [];
   const reviewQueue = adminFocus?.reviewQueue ?? [];
   const recentRegistrations = adminFocus?.recentRegistrations ?? [];
+  const pushMessages = data?.pushMessages ?? [];
+  const followedInstitutions = data?.followedInstitutions ?? [];
+  const subjectHighlights = data?.subjectHighlights ?? [];
+
+  const majorTags = useMemo(() => {
+    if (!examProfile) {
+      return resolveMajorTags(user?.majorId ?? null, user?.majorName ?? null);
+    }
+    if (Array.isArray(examProfile.majorTags) && examProfile.majorTags.length > 0) {
+      return examProfile.majorTags.filter((tag): tag is string => typeof tag === 'string' && tag.trim().length > 0);
+    }
+    const fallback = resolveMajorTags(
+      examProfile.majorId ?? user?.majorId ?? null,
+      examProfile.targetMajor ?? user?.majorName ?? null,
+    );
+    return fallback;
+  }, [examProfile, user?.majorId, user?.majorName]);
+
+  const recommendedCourses = useMemo(() => {
+    if (courses.length === 0) {
+      return [] as typeof courses;
+    }
+
+    if (!examProfile) {
+      return courses;
+    }
+
+    const { mathSubject, englishSubject, targetMajor, totalScore } = examProfile;
+    const normalizedMajorTags = majorTags.map(normalizeTag).filter(Boolean);
+    const normalizedMajor = targetMajor ? targetMajor.toLowerCase().replace(/\s+/g, '') : '';
+    const normalizedScore = typeof totalScore === 'number' && Number.isFinite(totalScore) ? totalScore : null;
+
+    const matches = courses.filter((course) => {
+      const suitability = course.suitability;
+      if (!suitability) {
+        return true;
+      }
+
+      const mathMatch = !suitability.mathSubjects?.length || !mathSubject
+        ? true
+        : suitability.mathSubjects.includes(mathSubject);
+      const englishMatch = !suitability.englishSubjects?.length || !englishSubject
+        ? true
+        : suitability.englishSubjects.includes(englishSubject);
+      const majorMatch = !suitability.majors?.length || !normalizedMajor
+        ? true
+        : suitability.majors.some((major) => major.toLowerCase().replace(/\s+/g, '').includes(normalizedMajor));
+      const scoreMatch = normalizedScore == null
+        ? true
+        : (suitability.scoreMin == null || normalizedScore >= suitability.scoreMin) &&
+          (suitability.scoreMax == null || normalizedScore <= suitability.scoreMax);
+      const isProfessionalCourse = course.category?.includes('专业');
+      const normalizedCourseTags = (course.tags ?? []).map(normalizeTag).filter(Boolean);
+      const tagMatch = !isProfessionalCourse
+        ? true
+        : normalizedMajorTags.length === 0 || normalizedCourseTags.length === 0
+        ? true
+        : normalizedCourseTags.some((tag) =>
+            normalizedMajorTags.some((majorTag) => tag.includes(majorTag) || majorTag.includes(tag)),
+          );
+
+      return mathMatch && englishMatch && majorMatch && scoreMatch && tagMatch;
+    });
+
+    if (matches.length === 0) {
+      return courses;
+    }
+
+    const intensityRank: Record<string, number> = { 冲刺: 0, 强化: 1, 基础: 2 };
+    return [...matches].sort((a, b) => {
+      const rankA = intensityRank[a.intensity ?? '强化'] ?? 3;
+      const rankB = intensityRank[b.intensity ?? '强化'] ?? 3;
+      if (rankA !== rankB) {
+        return rankA - rankB;
+      }
+      return (b.progress ?? 0) - (a.progress ?? 0);
+    });
+  }, [courses, examProfile, majorTags]);
+
+  const displayCourses = (recommendedCourses.length > 0 ? recommendedCourses : courses).slice(0, 6);
+  const courseSubtitle = examProfile
+    ? majorTags.length > 0
+      ? `已根据你的专业标签（${majorTags.join('、')}）和科目组合筛选匹配课程，优先安排当前阶段最合适的任务。`
+      : '已根据你的分数与科目组合筛选匹配课程，优先安排当前阶段最合适的任务。'
+    : '继续保持节奏，完成系统推荐的任务。';
 
   return (
     <Box
@@ -116,6 +206,177 @@ const Home = () => {
           )}
 
           <HeroBanner greeting={greeting} userName={userName} />
+
+          {pushMessages.length > 0 && (
+            <SectionCard
+              title="最新院校推送"
+              subtitle="关注的院校发布招生简章或更新复试要求时，将在此提醒你及时查看。"
+            >
+              <Stack spacing={2}>
+                {pushMessages.map((message) => (
+                  <Alert
+                    key={message.id}
+                    severity="info"
+                    action={
+                      message.action?.url ? (
+                        <Button
+                          color="inherit"
+                          size="small"
+                          href={message.action.url}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          {message.action.label ?? '查看详情'}
+                        </Button>
+                      ) : null
+                    }
+                    sx={{ borderRadius: 3 }}
+                  >
+                    <Stack spacing={0.5}>
+                      <Typography variant="subtitle1" fontWeight={600}>
+                        {message.title}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        {message.content}
+                      </Typography>
+                      <Typography variant="caption" color="text.disabled">
+                        {new Date(message.createdAt).toLocaleString()}
+                      </Typography>
+                    </Stack>
+                  </Alert>
+                ))}
+              </Stack>
+            </SectionCard>
+          )}
+
+          {subjectHighlights.length > 0 && (
+            <SectionCard
+              title="科目匹配建议"
+              subtitle="基于你填写的考试科目，为你匹配适合的专业方向与备考提示。"
+            >
+              <Stack spacing={2}>
+                {subjectHighlights.map((highlight) => (
+                  <Paper
+                    key={highlight.combination}
+                    variant="outlined"
+                    sx={{ p: 2.5, borderRadius: 3, background: 'rgba(255,255,255,0.85)' }}
+                  >
+                    <Stack spacing={1.2}>
+                      <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
+                        <Chip label={highlight.combination} color="primary" variant="outlined" />
+                        {highlight.recommendedMajors.slice(0, 3).map((major) => (
+                          <Chip key={major} label={major} size="small" variant="outlined" />
+                        ))}
+                      </Stack>
+                      <Typography variant="body2" color="text.secondary">
+                        {highlight.suggestion}
+                      </Typography>
+                    </Stack>
+                  </Paper>
+                ))}
+              </Stack>
+            </SectionCard>
+          )}
+
+          {followedInstitutions.length > 0 && (
+            <SectionCard
+              title="已关注院校动态"
+              subtitle="查看院校最新招生简章与历年分数线，保持与官方要求同步。"
+            >
+              <Stack spacing={2.5}>
+                {followedInstitutions.map((institution) => (
+                  <Paper
+                    key={institution.id}
+                    variant="outlined"
+                    sx={{ p: 2.5, borderRadius: 3, background: 'linear-gradient(135deg, rgba(232,244,253,0.45), #fff)' }}
+                  >
+                    <Stack spacing={1.5}>
+                      <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" spacing={1.5}>
+                        <Box>
+                          <Typography variant="h6" fontWeight={700}>
+                            {institution.name}
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            {institution.location} · 已关注 {institution.followerCount} 人
+                          </Typography>
+                        </Box>
+                        <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                          {institution.tags.slice(0, 4).map((tag) => (
+                            <Chip key={tag} label={tag} size="small" variant="outlined" />
+                          ))}
+                          {institution.officialWebsite && (
+                            <Button
+                              size="small"
+                              variant="outlined"
+                              color="primary"
+                              href={institution.officialWebsite}
+                              target="_blank"
+                              rel="noreferrer"
+                            >
+                              官网
+                            </Button>
+                          )}
+                        </Stack>
+                      </Stack>
+                      <Typography variant="body2" color="text.secondary">
+                        {institution.focus}
+                      </Typography>
+                      {institution.latestBrochure && (
+                        <Alert
+                          severity="success"
+                          sx={{ borderRadius: 2 }}
+                          action={
+                            institution.latestBrochure.link ? (
+                              <Button
+                                color="inherit"
+                                size="small"
+                                href={institution.latestBrochure.link}
+                                target="_blank"
+                                rel="noreferrer"
+                              >
+                                查阅简章
+                              </Button>
+                            ) : null
+                          }
+                        >
+                          <Typography variant="subtitle2" fontWeight={600}>
+                            {institution.latestBrochure.title}
+                          </Typography>
+                          <Typography variant="body2">{institution.latestBrochure.summary}</Typography>
+                        </Alert>
+                      )}
+                      <Stack spacing={1}>
+                        <Typography variant="subtitle2" color="text.secondary">
+                          历年数据速览
+                        </Typography>
+                        <Stack direction="row" spacing={2} flexWrap="wrap" useFlexGap>
+                          {institution.historicalData.slice(0, 3).map((record) => (
+                            <Paper
+                              key={`${institution.id}-${record.year}`}
+                              variant="outlined"
+                              sx={{ p: 1.5, borderRadius: 2, minWidth: 160 }}
+                            >
+                              <Typography variant="subtitle2" fontWeight={600}>
+                                {record.year} 年
+                              </Typography>
+                              <Typography variant="body2" color="text.secondary">
+                                录取人数：{record.enrollment ?? '—'} · 分数线：{record.scoreLine ?? '—'}
+                              </Typography>
+                              {record.note && (
+                                <Typography variant="caption" color="text.secondary">
+                                  {record.note}
+                                </Typography>
+                              )}
+                            </Paper>
+                          ))}
+                        </Stack>
+                      </Stack>
+                    </Stack>
+                  </Paper>
+                ))}
+              </Stack>
+            </SectionCard>
+          )}
 
           {isAdmin ? (
             <Stack spacing={4}>
@@ -279,15 +540,57 @@ const Home = () => {
                 )}
               </SectionCard>
 
-              <SectionCard title="正在学习的课程" subtitle="继续保持节奏，完成系统推荐的任务。">
-                {courses.length > 0 ? (
-                  <Grid container spacing={3}>
-                    {courses.map((course) => (
-                      <Grid item xs={12} md={4} key={course.id}>
-                        <CourseCard course={course} />
-                      </Grid>
-                    ))}
-                  </Grid>
+              <SectionCard title="正在学习的课程" subtitle={courseSubtitle}>
+                {displayCourses.length > 0 ? (
+                  <>
+                    {examProfile ? (
+                      <Stack
+                        direction={{ xs: 'column', sm: 'row' }}
+                        spacing={1}
+                        sx={{ mb: 2 }}
+                        alignItems={{ xs: 'flex-start', sm: 'center' }}
+                        flexWrap="wrap"
+                        useFlexGap
+                      >
+                        {examProfile.totalScore ? (
+                          <Chip label={`总分 ${examProfile.totalScore}`} color="primary" variant="outlined" />
+                        ) : null}
+                        {examProfile.mathSubject ? (
+                          <Chip label={`数学：${examProfile.mathSubject}`} size="small" variant="outlined" />
+                        ) : null}
+                        {examProfile.englishSubject ? (
+                          <Chip label={`英语：${examProfile.englishSubject}`} size="small" variant="outlined" />
+                        ) : null}
+                        {examProfile.targetMajor ? (
+                          <Chip label={`目标专业：${examProfile.targetMajor}`} size="small" variant="outlined" />
+                        ) : null}
+                      </Stack>
+                    ) : null}
+                    {majorTags.length > 0 ? (
+                      <Stack
+                        direction={{ xs: 'column', sm: 'row' }}
+                        spacing={1}
+                        sx={{ mb: 2 }}
+                        alignItems={{ xs: 'flex-start', sm: 'center' }}
+                        flexWrap="wrap"
+                        useFlexGap
+                      >
+                        <Typography variant="body2" color="text.secondary">
+                          专业标签：
+                        </Typography>
+                        {majorTags.map((tag) => (
+                          <Chip key={tag} label={tag} size="small" color="primary" variant="outlined" />
+                        ))}
+                      </Stack>
+                    ) : null}
+                    <Grid container spacing={3}>
+                      {displayCourses.map((course) => (
+                        <Grid item xs={12} md={4} key={course.id}>
+                          <CourseCard course={course} />
+                        </Grid>
+                      ))}
+                    </Grid>
+                  </>
                 ) : (
                   <Typography variant="body2" color="text.secondary">
                     还没有加入课程，去课程库选择合适的内容开始学习吧。

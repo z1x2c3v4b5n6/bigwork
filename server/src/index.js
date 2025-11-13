@@ -15,6 +15,7 @@ const aiRoutes = require('./routes/ai');
 const userRoutes = require('./routes/users');
 const majorRoutes = require('./routes/majors');
 const uploadRoutes = require('./routes/uploads');
+const institutionRoutes = require('./routes/institutions');
 
 dotenv.config({ path: path.resolve(__dirname, '..', '.env') });
 
@@ -111,6 +112,7 @@ app.use('/api/ai', aiRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/majors', majorRoutes);
 app.use('/api/uploads', uploadRoutes);
+app.use('/api/institutions', institutionRoutes);
 
 app.get('/health', (req, res) => {
   res.json({ status: 'ok' });
