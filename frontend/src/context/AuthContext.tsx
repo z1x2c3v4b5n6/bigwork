@@ -9,7 +9,24 @@ import {
 } from 'react';
 import { resolveAssetUrl } from '../utils/url';
 
-export type UserRole = 'student' | 'admin';
+export type UserRole = 'student' | 'admin' | 'institution';
+
+export interface ExamProfile {
+  totalScore: number | null;
+  targetMajor: string | null;
+  mathSubject: string | null;
+  englishSubject: string | null;
+}
+
+export interface InstitutionProfile {
+  id: string;
+  name: string;
+  shortName?: string;
+  location?: string;
+  tags?: string[];
+  officialWebsite?: string;
+  focus?: string;
+}
 
 export interface AuthUser {
   id: string;
@@ -23,6 +40,8 @@ export interface AuthUser {
   majorName?: string | null;
   avatar?: string | null;
   bio?: string | null;
+  examProfile?: ExamProfile | null;
+  institutionProfile?: InstitutionProfile | null;
 }
 
 export interface LoginPayload {
@@ -35,6 +54,15 @@ export interface RegisterPayload {
   password: string;
   displayName: string;
   email?: string;
+  role?: UserRole;
+  totalScore?: number;
+  targetMajor?: string;
+  mathSubject?: string;
+  englishSubject?: string;
+  officialWebsite?: string;
+  institutionLocation?: string;
+  institutionTags?: string[];
+  institutionFocus?: string;
 }
 
 interface AuthContextValue {

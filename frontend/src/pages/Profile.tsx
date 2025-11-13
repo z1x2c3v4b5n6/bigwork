@@ -31,6 +31,7 @@ import {
 import uploadService from '../services/uploadService';
 import { readFileAsDataUrl } from '../utils/fileUtils';
 import { resolveAssetUrl } from '../utils/url';
+import InstitutionBrochureManager from '../components/InstitutionBrochureManager';
 
 const Profile = () => {
   const { user, refreshUser } = useAuth();
@@ -158,12 +159,17 @@ const Profile = () => {
 
   const profile = profileQuery.data ?? (user as UserProfile | null);
   const isAdmin = (profile?.role ?? user?.role) === 'admin';
+  const isInstitution = (profile?.role ?? user?.role) === 'institution';
   const majors = majorsQuery.data ?? [];
 
-  const goalLabel = isAdmin ? '教研重点' : '备考目标';
-  const organizationLabel = isAdmin ? '所在团队 / 目标院校' : '目标院校';
-  const majorLabel = isAdmin ? '负责专业' : '目标专业';
-  const bioLabel = isAdmin ? '个人简介' : '学习自述';
+  const goalLabel = isAdmin ? '教研重点' : isInstitution ? '招生重点' : '备考目标';
+  const organizationLabel = isAdmin
+    ? '所在团队 / 目标院校'
+    : isInstitution
+    ? '院校简称 / 办学单位'
+    : '目标院校';
+  const majorLabel = isAdmin ? '负责专业' : isInstitution ? '重点招生专业' : '目标专业';
+  const bioLabel = isAdmin ? '个人简介' : isInstitution ? '院校亮点介绍' : '学习自述';
 
   const tagChips = useMemo(() => {
     const source = formState.goal || profile?.goal || '';
@@ -175,8 +181,20 @@ const Profile = () => {
     if (tokens.length > 0) {
       return tokens;
     }
-    return isAdmin ? ['教学教研', '题库管理', '督学服务'] : ['效率提升', '自律打卡', '冲刺提分'];
-  }, [formState.goal, isAdmin, profile?.goal]);
+    if (isAdmin) {
+      return ['教学教研', '题库管理', '督学服务'];
+    }
+    if (isInstitution) {
+      return ['招生咨询', '复试指南', '宣讲活动'];
+    }
+    return ['效率提升', '自律打卡', '冲刺提分'];
+  }, [formState.goal, isAdmin, isInstitution, profile?.goal]);
+
+  const profileDescription = isAdmin
+    ? '管理教研账号信息、设置负责的课程与题库范围，并同步团队协作进度。'
+    : isInstitution
+    ? '完善院校介绍、招生重点与最新简章，系统将向关注的考生推送更新提醒。'
+    : '管理账号信息、学习偏好及目标院校。完善信息可获得更精准的学习规划推荐。';
 
   return (
     <Stack spacing={4}>
@@ -187,9 +205,7 @@ const Profile = () => {
           个人中心
         </Typography>
         <Typography variant="body1" color="text.secondary">
-          {isAdmin
-            ? '管理教研账号信息、设置负责的课程与题库范围，并同步团队协作进度。'
-            : '管理账号信息、学习偏好及目标院校。完善信息可获得更精准的学习规划推荐。'}
+          {profileDescription}
         </Typography>
       </Box>
 
@@ -227,8 +243,8 @@ const Profile = () => {
                 {profile?.name ?? '未登录用户'}
               </Typography>
               <Chip
-                label={isAdmin ? '教学管理员' : '考研学员'}
-                color={isAdmin ? 'warning' : 'primary'}
+                label={isAdmin ? '教学管理员' : isInstitution ? '院校官方号' : '考研学员'}
+                color={isAdmin ? 'warning' : isInstitution ? 'secondary' : 'primary'}
                 variant="outlined"
               />
               <Button
@@ -354,11 +370,11 @@ const Profile = () => {
             </Stack>
           </Paper>
 
-          <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid', borderColor: 'divider', mt: 3 }}>
-            <Stack spacing={2}>
-              <Typography variant="h6" fontWeight={600}>
-                {isAdmin ? '协同备忘录' : '学习偏好设置'}
-              </Typography>
+      <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid', borderColor: 'divider', mt: 3 }}>
+        <Stack spacing={2}>
+          <Typography variant="h6" fontWeight={600}>
+            {isAdmin ? '协同备忘录' : '学习偏好设置'}
+          </Typography>
               <Grid container spacing={2}>
                 <Grid item xs={12} sm={6}>
                   <TextField
@@ -385,10 +401,12 @@ const Profile = () => {
               <Button variant="outlined" sx={{ alignSelf: 'flex-end' }}>
                 {isAdmin ? '记录协同事项' : '更新学习偏好'}
               </Button>
-            </Stack>
-          </Paper>
-        </Grid>
-      </Grid>
+        </Stack>
+      </Paper>
+    </Grid>
+  </Grid>
+
+      {isInstitution && <InstitutionBrochureManager />}
     </Stack>
   );
 };

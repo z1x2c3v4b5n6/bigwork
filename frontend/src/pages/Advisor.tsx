@@ -1,6 +1,7 @@
 import { Box, Container, Stack, Typography } from '@mui/material';
 import SectionCard from '../components/SectionCard';
 import UniversityAdvisorPanel from '../components/UniversityAdvisorPanel';
+import InstitutionDirectoryPanel from '../components/InstitutionDirectoryPanel';
 
 const Advisor = () => (
   <Box
@@ -27,6 +28,13 @@ const Advisor = () => (
           subtitle="输入初试总分，系统将结合院校分数线与专业特点，提供差异化院校组合与复试策略建议。"
         >
           <UniversityAdvisorPanel />
+        </SectionCard>
+
+        <SectionCard
+          title="官方院校号"
+          subtitle="院校官方账号发布最新招生简章、复试要求与宣讲活动，关注后可在首页接收推送提醒。"
+        >
+          <InstitutionDirectoryPanel />
         </SectionCard>
       </Stack>
     </Container>
