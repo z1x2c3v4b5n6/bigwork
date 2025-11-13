@@ -77,6 +77,13 @@ const normalizeRole = (rawRole) => {
     return 'admin';
   }
 
+  if (
+    ['institution', 'university', 'college'].includes(lowerRole) ||
+    ['院校', '招生单位', '高校'].includes(role)
+  ) {
+    return 'institution';
+  }
+
   return 'student';
 };
 

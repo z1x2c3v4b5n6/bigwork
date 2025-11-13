@@ -84,6 +84,7 @@ const UniversityAdvisorPanel = () => {
     () => recommendation?.interviewPreparation.focusTopics ?? [],
     [recommendation?.interviewPreparation.focusTopics],
   );
+  const subjectRecommendations = recommendation?.subjectRecommendations ?? [];
 
   return (
     <Stack spacing={3}>
@@ -200,6 +201,39 @@ const UniversityAdvisorPanel = () => {
               </Stack>
             </Stack>
           </Paper>
+
+          {subjectRecommendations.length > 0 && (
+            <Stack spacing={1.5}>
+              <Typography variant="subtitle1" fontWeight={600}>
+                科目匹配建议
+              </Typography>
+              <Grid container spacing={2}>
+                {subjectRecommendations.map((item) => (
+                  <Grid item xs={12} md={6} key={item.combination}>
+                    <Paper
+                      variant="outlined"
+                      sx={{
+                        p: 2,
+                        borderRadius: 3,
+                        height: '100%',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 1,
+                      }}
+                    >
+                      <Chip label={item.combination} color="primary" variant="outlined" />
+                      <Typography variant="body2" color="text.secondary">
+                        适合专业：{item.recommendedMajors.slice(0, 4).join('、')}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        {item.suggestion}
+                      </Typography>
+                    </Paper>
+                  </Grid>
+                ))}
+              </Grid>
+            </Stack>
+          )}
 
           <Stack spacing={2}>
             <Typography variant="subtitle1" fontWeight={600}>

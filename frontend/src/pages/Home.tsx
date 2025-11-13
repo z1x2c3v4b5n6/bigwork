@@ -78,6 +78,9 @@ const Home = () => {
   const courseDrafts = adminFocus?.courseDrafts ?? [];
   const reviewQueue = adminFocus?.reviewQueue ?? [];
   const recentRegistrations = adminFocus?.recentRegistrations ?? [];
+  const pushMessages = data?.pushMessages ?? [];
+  const followedInstitutions = data?.followedInstitutions ?? [];
+  const subjectHighlights = data?.subjectHighlights ?? [];
 
   return (
     <Box
@@ -116,6 +119,177 @@ const Home = () => {
           )}
 
           <HeroBanner greeting={greeting} userName={userName} />
+
+          {pushMessages.length > 0 && (
+            <SectionCard
+              title="最新院校推送"
+              subtitle="关注的院校发布招生简章或更新复试要求时，将在此提醒你及时查看。"
+            >
+              <Stack spacing={2}>
+                {pushMessages.map((message) => (
+                  <Alert
+                    key={message.id}
+                    severity="info"
+                    action={
+                      message.action?.url ? (
+                        <Button
+                          color="inherit"
+                          size="small"
+                          href={message.action.url}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          {message.action.label ?? '查看详情'}
+                        </Button>
+                      ) : null
+                    }
+                    sx={{ borderRadius: 3 }}
+                  >
+                    <Stack spacing={0.5}>
+                      <Typography variant="subtitle1" fontWeight={600}>
+                        {message.title}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        {message.content}
+                      </Typography>
+                      <Typography variant="caption" color="text.disabled">
+                        {new Date(message.createdAt).toLocaleString()}
+                      </Typography>
+                    </Stack>
+                  </Alert>
+                ))}
+              </Stack>
+            </SectionCard>
+          )}
+
+          {subjectHighlights.length > 0 && (
+            <SectionCard
+              title="科目匹配建议"
+              subtitle="基于你填写的考试科目，为你匹配适合的专业方向与备考提示。"
+            >
+              <Stack spacing={2}>
+                {subjectHighlights.map((highlight) => (
+                  <Paper
+                    key={highlight.combination}
+                    variant="outlined"
+                    sx={{ p: 2.5, borderRadius: 3, background: 'rgba(255,255,255,0.85)' }}
+                  >
+                    <Stack spacing={1.2}>
+                      <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
+                        <Chip label={highlight.combination} color="primary" variant="outlined" />
+                        {highlight.recommendedMajors.slice(0, 3).map((major) => (
+                          <Chip key={major} label={major} size="small" variant="outlined" />
+                        ))}
+                      </Stack>
+                      <Typography variant="body2" color="text.secondary">
+                        {highlight.suggestion}
+                      </Typography>
+                    </Stack>
+                  </Paper>
+                ))}
+              </Stack>
+            </SectionCard>
+          )}
+
+          {followedInstitutions.length > 0 && (
+            <SectionCard
+              title="已关注院校动态"
+              subtitle="查看院校最新招生简章与历年分数线，保持与官方要求同步。"
+            >
+              <Stack spacing={2.5}>
+                {followedInstitutions.map((institution) => (
+                  <Paper
+                    key={institution.id}
+                    variant="outlined"
+                    sx={{ p: 2.5, borderRadius: 3, background: 'linear-gradient(135deg, rgba(232,244,253,0.45), #fff)' }}
+                  >
+                    <Stack spacing={1.5}>
+                      <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" spacing={1.5}>
+                        <Box>
+                          <Typography variant="h6" fontWeight={700}>
+                            {institution.name}
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            {institution.location} · 已关注 {institution.followerCount} 人
+                          </Typography>
+                        </Box>
+                        <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                          {institution.tags.slice(0, 4).map((tag) => (
+                            <Chip key={tag} label={tag} size="small" variant="outlined" />
+                          ))}
+                          {institution.officialWebsite && (
+                            <Button
+                              size="small"
+                              variant="outlined"
+                              color="primary"
+                              href={institution.officialWebsite}
+                              target="_blank"
+                              rel="noreferrer"
+                            >
+                              官网
+                            </Button>
+                          )}
+                        </Stack>
+                      </Stack>
+                      <Typography variant="body2" color="text.secondary">
+                        {institution.focus}
+                      </Typography>
+                      {institution.latestBrochure && (
+                        <Alert
+                          severity="success"
+                          sx={{ borderRadius: 2 }}
+                          action={
+                            institution.latestBrochure.link ? (
+                              <Button
+                                color="inherit"
+                                size="small"
+                                href={institution.latestBrochure.link}
+                                target="_blank"
+                                rel="noreferrer"
+                              >
+                                查阅简章
+                              </Button>
+                            ) : null
+                          }
+                        >
+                          <Typography variant="subtitle2" fontWeight={600}>
+                            {institution.latestBrochure.title}
+                          </Typography>
+                          <Typography variant="body2">{institution.latestBrochure.summary}</Typography>
+                        </Alert>
+                      )}
+                      <Stack spacing={1}>
+                        <Typography variant="subtitle2" color="text.secondary">
+                          历年数据速览
+                        </Typography>
+                        <Stack direction="row" spacing={2} flexWrap="wrap" useFlexGap>
+                          {institution.historicalData.slice(0, 3).map((record) => (
+                            <Paper
+                              key={`${institution.id}-${record.year}`}
+                              variant="outlined"
+                              sx={{ p: 1.5, borderRadius: 2, minWidth: 160 }}
+                            >
+                              <Typography variant="subtitle2" fontWeight={600}>
+                                {record.year} 年
+                              </Typography>
+                              <Typography variant="body2" color="text.secondary">
+                                录取人数：{record.enrollment ?? '—'} · 分数线：{record.scoreLine ?? '—'}
+                              </Typography>
+                              {record.note && (
+                                <Typography variant="caption" color="text.secondary">
+                                  {record.note}
+                                </Typography>
+                              )}
+                            </Paper>
+                          ))}
+                        </Stack>
+                      </Stack>
+                    </Stack>
+                  </Paper>
+                ))}
+              </Stack>
+            </SectionCard>
+          )}
 
           {isAdmin ? (
             <Stack spacing={4}>

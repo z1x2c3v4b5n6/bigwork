@@ -10,7 +10,9 @@ const { requireAuth } = require('../middleware/auth');
 const { normalizeDate, parseTags, stringifyTags, toMySqlDateTime } = require('../utils/formatters');
 const { normalizeIdentifier, normalizeValueForColumn } = require('../utils/db');
 const { getDefaultMajorId } = require('../utils/majors');
-const { buildRecommendationResponse } = require('../utils/universityAdvisor');
+const { buildRecommendationResponse, buildSubjectRecommendations } = require('../utils/universityAdvisor');
+const { listFollowedInstitutions, listPushMessages } = require('../data/institutionState');
+const { getExamProfile } = require('../data/userExtras');
 const {
   getFallbackTaskForDate,
   recordFallbackCompletion,
@@ -1099,7 +1101,8 @@ const buildStats = async () => {
 
 router.get('/dashboard', requireAuth, async (req, res) => {
   try {
-    const userName = req.session?.user?.name || '同学';
+    const sessionUser = req.session?.user || null;
+    const userName = sessionUser?.name || '同学';
     const [courses, practiceSets, schedule, stats] = await Promise.all([
       loadCourses(6),
       loadPracticePreview(3),
@@ -1112,6 +1115,16 @@ router.get('/dashboard', requireAuth, async (req, res) => {
         ? `推荐从「${practiceSets[0].name}」开始复习，并在完成后同步更新课程进度。`
         : '暂未检测到题库或课程数据，建议先在课程体系与刷题训练中新增内容。';
 
+    const followedInstitutions = listFollowedInstitutions(sessionUser?.id || '');
+    const pushMessages = listPushMessages(sessionUser?.id || '');
+    const examProfile = getExamProfile(sessionUser?.id || '');
+    const subjectHighlights = buildSubjectRecommendations({
+      math: examProfile?.mathSubject,
+      english: examProfile?.englishSubject,
+      targetMajor: examProfile?.targetMajor,
+      totalScore: examProfile?.totalScore,
+    });
+
     res.json({
       userName,
       stats,
@@ -1119,6 +1132,9 @@ router.get('/dashboard', requireAuth, async (req, res) => {
       practiceSets,
       schedule,
       recommendation,
+      pushMessages,
+      followedInstitutions,
+      subjectHighlights,
     });
   } catch (error) {
     console.error('加载学习看板失败', error);
