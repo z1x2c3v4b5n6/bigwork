@@ -1,6 +1,15 @@
 import dayjs from 'dayjs';
 import httpClient from './httpClient';
 
+export interface CourseSuitability {
+  mathSubjects?: string[];
+  englishSubjects?: string[];
+  majors?: string[];
+  majorIds?: string[];
+  scoreMin?: number;
+  scoreMax?: number;
+}
+
 export interface CourseItem {
   id: string;
   title: string;
@@ -8,6 +17,11 @@ export interface CourseItem {
   category: string;
   progress: number;
   nextTask: string;
+  intensity?: '基础' | '强化' | '冲刺';
+  highlight?: string;
+  tags?: string[];
+  suitability?: CourseSuitability;
+  subjectTags?: string[];
 }
 
 export interface ScheduleEntry {
@@ -35,6 +49,11 @@ export const createCourse = async (payload: {
   nextTask?: string;
   description?: string;
   majorId?: string;
+  tags?: string[];
+  mathSubjects?: string[];
+  englishSubjects?: string[];
+  visibleMajorIds?: string[];
+  visibleMajorNames?: string[];
 }): Promise<{ id: number }> => {
   const response = await httpClient.post<{ id: number }>('/api/learning/courses', payload);
   return response.data;

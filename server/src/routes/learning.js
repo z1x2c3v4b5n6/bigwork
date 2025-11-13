@@ -14,6 +14,7 @@ const { buildRecommendationResponse, buildSubjectRecommendations } = require('..
 const { listFollowedInstitutions, listPushMessages } = require('../data/institutionState');
 const { getExamProfile } = require('../data/userExtras');
 const { filterCoursesByProfile } = require('../utils/coursePreferences');
+const { applyCourseMetadata, setCourseMetadata } = require('../data/courseMetadata');
 const {
   getFallbackTaskForDate,
   recordFallbackCompletion,
@@ -640,14 +641,15 @@ const getCourseConfig = async () => {
   };
 };
 
-const formatCourseRow = (row, index = 0) => ({
-  id: String(row.id != null ? row.id : index + 1),
-  title: row.title || '课程待完善',
-  category: row.category || '公共课',
-  teacher: row.teacher || '待定讲师',
-  progress: row.progress != null ? Math.min(100, Math.max(0, Number(row.progress))) : 0,
-  nextTask: row.next_task || '请为课程安排下一次学习任务',
-});
+const formatCourseRow = (row, index = 0) =>
+  applyCourseMetadata({
+    id: String(row.id != null ? row.id : index + 1),
+    title: row.title || '课程待完善',
+    category: row.category || '公共课',
+    teacher: row.teacher || '待定讲师',
+    progress: row.progress != null ? Math.min(100, Math.max(0, Number(row.progress))) : 0,
+    nextTask: row.next_task || '请为课程安排下一次学习任务',
+  });
 
 const createCoursePayload = (
   config,
@@ -903,6 +905,23 @@ const normalizeLimit = (value, fallback) => {
   return Math.min(parsed, 100);
 };
 
+const normalizeStringList = (input) => {
+  if (Array.isArray(input)) {
+    return input
+      .map((value) => (value == null ? '' : String(value).trim()))
+      .filter((value) => value.length > 0);
+  }
+
+  if (typeof input === 'string') {
+    return input
+      .split(',')
+      .map((value) => value.trim())
+      .filter((value) => value.length > 0);
+  }
+
+  return [];
+};
+
 const loadCourses = async (limit = 12) => {
   const config = await getCourseConfig();
   if (!config) {
@@ -1155,7 +1174,20 @@ router.get('/courses', requireAuth, async (req, res) => {
 });
 
 router.post('/courses', requireAuth, async (req, res) => {
-  const { title, teacher, category, progress = 0, nextTask, description, majorId } = req.body || {};
+  const {
+    title,
+    teacher,
+    category,
+    progress = 0,
+    nextTask,
+    description,
+    majorId,
+    tags,
+    mathSubjects,
+    englishSubjects,
+    visibleMajorIds,
+    visibleMajorNames,
+  } = req.body || {};
 
   if (!title) {
     return res.status(400).json({ message: '课程标题不能为空' });
@@ -1203,6 +1235,51 @@ router.post('/courses', requireAuth, async (req, res) => {
     });
 
     const result = await insertRecord('courses', payload);
+
+    const normalizedTags = normalizeStringList(tags);
+    const normalizedMathSubjects = normalizeStringList(mathSubjects);
+    const normalizedEnglishSubjects = normalizeStringList(englishSubjects);
+    const normalizedMajorIds = normalizeStringList(visibleMajorIds).filter(
+      (value) => value !== '__other__',
+    );
+
+    const rawMajorNames = normalizeStringList(visibleMajorNames);
+    const includesOtherFlag = rawMajorNames.some(
+      (value) => value === '__other__' || value === '其他专业',
+    );
+    const normalizedMajorNames = rawMajorNames.filter((value) => value !== '__other__');
+    if (includesOtherFlag && !normalizedMajorNames.includes('其他专业')) {
+      normalizedMajorNames.push('其他专业');
+    }
+
+    const suitability = {};
+    if (normalizedMathSubjects.length > 0) {
+      suitability.mathSubjects = normalizedMathSubjects;
+    }
+    if (normalizedEnglishSubjects.length > 0) {
+      suitability.englishSubjects = normalizedEnglishSubjects;
+    }
+    if (normalizedMajorIds.length > 0) {
+      suitability.majorIds = normalizedMajorIds;
+    }
+    if (normalizedMajorNames.length > 0) {
+      suitability.majors = normalizedMajorNames;
+    }
+
+    const metadataPayload = {};
+    if (normalizedTags.length > 0) {
+      metadataPayload.tags = normalizedTags;
+    }
+    if (Object.keys(suitability).length > 0) {
+      metadataPayload.suitability = suitability;
+    }
+    if (nextTask) {
+      metadataPayload.nextTask = nextTask;
+    }
+
+    if (Object.keys(metadataPayload).length > 0) {
+      setCourseMetadata(result.insertId, metadataPayload);
+    }
 
     res.status(201).json({ id: result.insertId });
   } catch (error) {

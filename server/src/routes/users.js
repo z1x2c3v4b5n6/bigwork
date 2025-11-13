@@ -253,4 +253,51 @@ router.patch('/:id', requireAuth, async (req, res) => {
   }
 });
 
+router.put('/:id/exam-profile', requireAuth, async (req, res) => {
+  const identifier = normalizeIdentifier(req.params.id);
+
+  if (!identifier) {
+    return res.status(400).json({ message: '用户编号无效' });
+  }
+
+  const sessionUser = req.session?.user;
+  const isAdmin = sessionUser?.role === 'admin';
+
+  if (!isAdmin && sessionUser?.id !== identifier) {
+    return res.status(403).json({ message: '无权修改该用户资料' });
+  }
+
+  const {
+    totalScore,
+    targetMajor,
+    mathSubject,
+    englishSubject,
+    majorId,
+    majorTags,
+  } = req.body || {};
+
+  try {
+    const parsedScore = Number(totalScore);
+    const examProfile = setExamProfile(identifier, {
+      totalScore: Number.isFinite(parsedScore) ? parsedScore : undefined,
+      targetMajor,
+      mathSubject,
+      englishSubject,
+      majorId,
+      majorTags: Array.isArray(majorTags) ? majorTags : undefined,
+    });
+
+    const profile = await loadUserProfile(identifier);
+
+    if (profile && req.session?.user?.id === profile.id) {
+      req.session.user = { ...req.session.user, ...profile };
+    }
+
+    return res.json({ examProfile: examProfile ?? null, profile: profile ?? null });
+  } catch (error) {
+    console.error('更新考试档案失败', error);
+    return res.status(500).json({ message: '无法更新考试档案，请稍后重试' });
+  }
+});
+
 module.exports = router;

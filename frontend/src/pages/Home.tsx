@@ -110,9 +110,11 @@ const Home = () => {
       return courses;
     }
 
-    const { mathSubject, englishSubject, targetMajor, totalScore } = examProfile;
+    const { mathSubject, englishSubject, targetMajor, totalScore, majorId } = examProfile;
     const normalizedMajorTags = majorTags.map(normalizeTag).filter(Boolean);
-    const normalizedMajor = targetMajor ? targetMajor.toLowerCase().replace(/\s+/g, '') : '';
+    const fallbackMajorName = targetMajor ?? user?.majorName ?? '';
+    const normalizedMajorName = normalizeTag(fallbackMajorName);
+    const normalizedMajorId = majorId ?? user?.majorId ?? null;
     const normalizedScore = typeof totalScore === 'number' && Number.isFinite(totalScore) ? totalScore : null;
 
     const matches = courses.filter((course) => {
@@ -121,15 +123,55 @@ const Home = () => {
         return true;
       }
 
-      const mathMatch = !suitability.mathSubjects?.length || !mathSubject
-        ? true
-        : suitability.mathSubjects.includes(mathSubject);
-      const englishMatch = !suitability.englishSubjects?.length || !englishSubject
-        ? true
-        : suitability.englishSubjects.includes(englishSubject);
-      const majorMatch = !suitability.majors?.length || !normalizedMajor
-        ? true
-        : suitability.majors.some((major) => major.toLowerCase().replace(/\s+/g, '').includes(normalizedMajor));
+      const mathMatch = suitability.mathSubjects?.length
+        ? mathSubject
+          ? suitability.mathSubjects.includes(mathSubject)
+          : false
+        : true;
+      const englishMatch = suitability.englishSubjects?.length
+        ? englishSubject
+          ? suitability.englishSubjects.includes(englishSubject)
+          : false
+        : true;
+
+      const allowOtherMajor = suitability.majors?.includes('其他专业') ?? false;
+
+      let majorMatch = true;
+      if (suitability.majorIds?.length && !allowOtherMajor) {
+        const candidateMajorId = normalizedMajorId ?? '';
+        majorMatch = candidateMajorId
+          ? suitability.majorIds.includes(candidateMajorId)
+          : false;
+      }
+
+      if (
+        majorMatch &&
+        !allowOtherMajor &&
+        suitability.majors?.length &&
+        suitability.majors.filter((major) => major !== '其他专业').length > 0
+      ) {
+        if (!normalizedMajorName) {
+          majorMatch = false;
+        } else {
+          const normalizedAllowed = suitability.majors
+            .filter((major) => major !== '其他专业')
+            .map(normalizeTag)
+            .filter(Boolean);
+          if (
+            normalizedAllowed.length > 0 &&
+            !normalizedAllowed.some(
+              (value) => normalizedMajorName.includes(value) || value.includes(normalizedMajorName),
+            )
+          ) {
+            majorMatch = false;
+          }
+        }
+      }
+
+      if (allowOtherMajor) {
+        majorMatch = true;
+      }
+
       const scoreMatch = normalizedScore == null
         ? true
         : (suitability.scoreMin == null || normalizedScore >= suitability.scoreMin) &&

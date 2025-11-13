@@ -43,3 +43,24 @@ export const fetchMajors = async (): Promise<MajorOption[]> => {
   const response = await httpClient.get<MajorOption[]>('/api/majors');
   return response.data;
 };
+
+export const updateExamProfile = async (
+  userId: string,
+  payload: Partial<{
+    totalScore: number | null;
+    targetMajor: string | null;
+    mathSubject: string | null;
+    englishSubject: string | null;
+    majorId: string | null;
+    majorTags: string[];
+  }> = {},
+): Promise<UserProfile> => {
+  const response = await httpClient.put<{ profile?: UserProfile }>(
+    `/api/users/${userId}/exam-profile`,
+    payload,
+  );
+  if (response.data.profile) {
+    return response.data.profile;
+  }
+  return fetchUserProfile(userId);
+};
