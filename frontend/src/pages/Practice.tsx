@@ -14,8 +14,10 @@ import {
   Stack,
   TextField,
   Typography,
+  IconButton,
 } from '@mui/material';
 import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
+import CloseIcon from '@mui/icons-material/Close';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import practiceService, { PracticeQuestion, PracticeSetSummary } from '../services/practiceService';
@@ -34,6 +36,7 @@ const Practice = () => {
   const [setDialogOpen, setSetDialogOpen] = useState(false);
   const [questionDialogOpen, setQuestionDialogOpen] = useState(false);
   const [isPracticing, setIsPracticing] = useState(false);
+  const [isPracticeViewOpen, setIsPracticeViewOpen] = useState(false);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [userAnswers, setUserAnswers] = useState<Record<string, string>>({});
   const [practiceResult, setPracticeResult] = useState<
@@ -68,6 +71,10 @@ const Practice = () => {
   useEffect(() => {
     if (sets.length > 0 && selectedSetId === null) {
       setSelectedSetId(sets[0].id);
+      setIsPracticeViewOpen(true);
+    }
+    if (sets.length === 0) {
+      setIsPracticeViewOpen(false);
     }
   }, [sets, selectedSetId]);
 
@@ -227,6 +234,19 @@ const Practice = () => {
     setQuestionExplanation('');
   };
 
+  const openPracticeWorkspace = () => {
+    if (!selectedSetId) {
+      setErrorMessage('请先选择题单');
+      return;
+    }
+    setErrorMessage(null);
+    setIsPracticeViewOpen(true);
+  };
+
+  const closePracticeWorkspace = () => {
+    setIsPracticeViewOpen(false);
+  };
+
   const startPractice = () => {
     if (!selectedSetId) {
       setErrorMessage('请先选择题单');
@@ -237,6 +257,7 @@ const Practice = () => {
       return;
     }
     setErrorMessage(null);
+    setIsPracticeViewOpen(true);
     setIsPracticing(true);
     setCurrentQuestionIndex(0);
     setUserAnswers({});
@@ -326,6 +347,7 @@ const Practice = () => {
     setUserAnswers({});
     setPracticeResult(null);
     if (questions.length > 0) {
+      setIsPracticeViewOpen(true);
       setIsPracticing(true);
       setCurrentQuestionIndex(0);
     }
@@ -358,7 +380,7 @@ const Practice = () => {
       </Box>
 
       <Grid container spacing={3} alignItems="stretch">
-        <Grid item xs={12} lg={4}>
+        <Grid item xs={12} lg={4} sx={{ display: isPracticeViewOpen ? 'none' : 'block' }}>
           <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid', borderColor: 'divider', height: '100%' }}>
             <Stack spacing={2} sx={{ height: '100%' }}>
               <Stack
@@ -404,6 +426,7 @@ const Practice = () => {
                       onClick={() => {
                         setSelectedSetId(set.id);
                         setErrorMessage(null);
+                        setIsPracticeViewOpen(true);
                       }}
                     >
                       <Stack spacing={1}>
@@ -429,262 +452,198 @@ const Practice = () => {
             </Stack>
           </Paper>
         </Grid>
-        <Grid item xs={12} lg={8}>
+        <Grid item xs={12} lg={isPracticeViewOpen ? 12 : 8}>
           <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid', borderColor: 'divider', minHeight: 520 }}>
-            <Stack spacing={3} sx={{ height: '100%' }}>
-              <Box>
-                <Stack spacing={1.5}>
-                  <Stack
-                    direction={{ xs: 'column', sm: 'row' }}
-                    spacing={2}
-                    justifyContent="space-between"
-                    alignItems={{ xs: 'flex-start', sm: 'center' }}
-                  >
-                    <Typography variant="h6" fontWeight={600}>
-                      {selectedSet ? selectedSet.title : '选择题单查看题目'}
+            {isPracticeViewOpen && selectedSet ? (
+              <Stack spacing={3} sx={{ height: '100%' }} >
+                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} justifyContent="space-between" alignItems={{ xs: 'flex-start', sm: 'center' }} >
+                  <Box>
+                    <Typography variant="h5" fontWeight={700}>
+                      {selectedSet.title} · 写题模式
                     </Typography>
-                    <Button
-                      startIcon={<AddCircleOutlineIcon />}
-                      variant="contained"
-                      color="secondary"
-                      onClick={openQuestionDialog}
-                      disabled={selectedSetId === null}
-                      size="small"
+                    <Typography variant="body2" color="text.secondary" mt={0.5}>
+                      {selectedSet.description || '进入专注模式，仅保留当前题单的答题体验。'}
+                    </Typography>
+                  </Box>
+                  <Stack direction="row" spacing={1} alignItems="center">
+                    <IconButton
+                      onClick={closePracticeWorkspace}
+                      color="primary"
+                      sx={{ display: { xs: 'inline-flex', sm: 'none' } }}
                     >
+                      <CloseIcon />
+                    </IconButton>
+                    <Button
+                      variant="outlined"
+                      onClick={closePracticeWorkspace}
+                      sx={{ display: { xs: 'none', sm: 'inline-flex' } }}
+                    >
+                      返回题单
+                    </Button>
+                    <Button variant="contained" color="secondary" onClick={openQuestionDialog}>
                       录入题目
                     </Button>
                   </Stack>
-                  {selectedSet ? (
-                    <Typography variant="body2" color="text.secondary" mt={0.5}>
-                      {selectedSet.description || '暂无题单描述，可在左侧修改。'}
-                    </Typography>
-                  ) : (
-                    <Typography variant="body2" color="text.secondary" mt={0.5}>
-                      从左侧选择题单以查看题目列表或录入新题目。
-                    </Typography>
-                  )}
                 </Stack>
-                {questionsError ? (
-                  <Alert severity="error" sx={{ mt: 2 }} action={<Button color="inherit" onClick={() => refetchQuestions()}>重试</Button>}>
-                    无法加载题目列表。
-                  </Alert>
-                ) : null}
-              </Box>
-              <Divider />
-              <Stack spacing={2} sx={{ flexGrow: 1, overflow: 'auto' }}>
-                {questionsLoading ? (
-                  <Typography variant="body2" color="text.secondary">
-                    正在加载题目…
-                  </Typography>
-                ) : questions.length === 0 ? (
-                  <Typography variant="body2" color="text.secondary">
-                    暂无题目内容，请在下方添加。
-                  </Typography>
-                ) : (
-                  questions.map((question) => (
-                    <Paper key={question.id} variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
-                      <Stack spacing={1}>
-                        <Typography variant="subtitle1" fontWeight={600}>
-                          {question.questionText}
-                        </Typography>
-                        {question.answerText ? (
-                          <Typography variant="body2" color="text.secondary">
-                            正确答案：{question.answerText}
-                          </Typography>
-                        ) : null}
-                        {question.explanation ? (
-                          <Typography variant="body2" color="text.secondary">
-                            解题思路：{question.explanation}
-                          </Typography>
-                        ) : null}
-                        <Stack direction="row" spacing={1} flexWrap="wrap">
-                          {question.tags.map((tag) => (
-                            <Chip key={tag} label={tag} size="small" variant="outlined" />
-                          ))}
-                        </Stack>
-                      </Stack>
-                    </Paper>
-                  ))
-                )}
-              </Stack>
-              {selectedSet ? (
-                <Box
-                  sx={{
-                    borderRadius: 2,
-                    border: '1px dashed',
-                    borderColor: 'divider',
-                    p: { xs: 2, md: 3 },
-                    bgcolor: 'grey.50',
-                  }}
-                >
-                  <Stack spacing={2}>
-                    <Stack
-                      direction={{ xs: 'column', sm: 'row' }}
-                      alignItems={{ xs: 'flex-start', sm: 'center' }}
-                      justifyContent="space-between"
-                      spacing={2}
-                    >
-                      <Box>
-                        <Typography variant="subtitle1" fontWeight={600}>
-                          在线刷题
-                        </Typography>
-                        <Typography variant="body2" color="text.secondary" mt={0.5}>
-                          输入你的作答内容，系统会在提交后展示标准答案并生成学习建议。
-                        </Typography>
-                      </Box>
-                      <Chip
-                        color="secondary"
-                        variant="outlined"
-                        label={
-                          practiceResult
-                            ? `正确率 ${(practiceResult.accuracy * 100).toFixed(0)}%`
-                            : `共 ${totalQuestions} 题`
-                        }
-                      />
+                <Divider />
+                <Box sx={{ flexGrow: 1, overflow: 'auto' }}>
+                  {questionsLoading ? (
+                    <Typography variant="body2" color="text.secondary">正在加载题目…</Typography>
+                  ) : questions.length === 0 ? (
+                    <Stack spacing={2}>
+                      <Typography variant="body2" color="text.secondary">当前题单暂无题目，添加题目后即可进入刷题模式。</Typography>
+                      <Button variant="contained" onClick={openQuestionDialog}>录入第一道题</Button>
                     </Stack>
-
-                    {questionsLoading ? (
-                      <Typography variant="body2" color="text.secondary">
-                        题目数据加载中…
-                      </Typography>
-                    ) : totalQuestions === 0 ? (
-                      <Stack spacing={2}>
-                        <Typography variant="body2" color="text.secondary">
-                          当前题单暂无题目，请先录入题目后再开始刷题。
+                  ) : isPracticing && currentQuestion ? (
+                    <Stack spacing={3}>
+                      <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} justifyContent="space-between">
+                        <Typography variant="subtitle1" color="text.secondary">
+                          当前进度：第 {currentQuestionIndex + 1} / {totalQuestions} 题
                         </Typography>
-                        <Button variant="contained" disabled>
-                          开始答题
-                        </Button>
-                      </Stack>
-                    ) : practiceResult ? (
-                      <Stack spacing={2}>
-                        <Alert
-                          severity={
-                            practiceResult.accuracy >= 0.75
-                              ? 'success'
-                              : practiceResult.accuracy >= 0.5
-                              ? 'info'
-                              : 'warning'
-                          }
-                        >
-                          {`本次共答对 ${practiceResult.correct}/${practiceResult.total} 题。`}
-                        </Alert>
-                        <Stack spacing={1}>
-                          <Typography variant="body2" color="text.secondary">
-                            正确率进度
-                          </Typography>
-                          <LinearProgress
-                            variant="determinate"
-                            value={Math.round(practiceResult.accuracy * 100)}
-                            color={practiceResult.accuracy >= 0.75 ? 'success' : 'warning'}
-                          />
+                        <Stack direction="row" spacing={1}>
+                          <Button variant="outlined" onClick={goToPreviousQuestion} disabled={currentQuestionIndex === 0}>上一题</Button>
+                          <Button variant="outlined" onClick={goToNextQuestion} disabled={currentQuestionIndex >= totalQuestions - 1}>下一题</Button>
                         </Stack>
-                        <Typography variant="body1">{practiceResult.suggestion}</Typography>
-                        <Divider />
-                        <Stack spacing={1.5}>
-                          {practiceResult.details.map((detail) => (
-                            <Paper
-                              key={detail.questionId}
-                              variant="outlined"
-                              sx={{ p: 2, borderRadius: 2, borderColor: detail.isCorrect ? 'success.light' : 'warning.light' }}
-                            >
-                              <Stack spacing={0.75}>
-                                <Stack direction="row" spacing={1} alignItems="center">
-                                  <Chip
-                                    size="small"
-                                    color={detail.isCorrect ? 'success' : 'warning'}
-                                    label={detail.isCorrect ? '答对' : '待巩固'}
-                                  />
-                                  <Typography variant="subtitle2" fontWeight={600}>
-                                    {detail.questionText}
-                                  </Typography>
-                                </Stack>
-                                <Typography variant="body2" color="text.secondary">
-                                  我的作答：{detail.userAnswer || '（未填写）'}
-                                </Typography>
-                                {detail.correctAnswer ? (
-                                  <Typography variant="body2" color="text.secondary">
-                                    标准答案：{detail.correctAnswer}
-                                  </Typography>
-                                ) : null}
-                                {detail.explanation ? (
-                                  <Typography variant="body2" color="text.secondary">
-                                    解题思路：{detail.explanation}
-                                  </Typography>
-                                ) : null}
+                      </Stack>
+                      <Typography variant="h6" fontWeight={600}>{currentQuestion.questionText}</Typography>
+                      <TextField multiline minRows={5} placeholder="在此输入你的答案" value={userAnswers[currentQuestion.id] ?? ''} onChange={(event) => handleAnswerChange(currentQuestion.id, event.target.value)} />
+                      <Stack direction="row" spacing={1} flexWrap="wrap">
+                        {currentQuestion.tags.map((tag) => (
+                          <Chip key={tag} label={tag} size="small" />
+                        ))}
+                      </Stack>
+                      <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} justifyContent="space-between">
+                        <Button variant="outlined" color="secondary" onClick={retryPractice}>清空作答</Button>
+                        <Button variant="contained" onClick={handleSubmitPractice}>提交答卷</Button>
+                      </Stack>
+                    </Stack>
+                  ) : practiceResult ? (
+                    <Stack spacing={3}>
+                      <Box>
+                        <Typography variant="h6" fontWeight={600}>本次答题概览</Typography>
+                        <Typography variant="body2" color="text.secondary">共作答 {practiceResult.total} 题，答对 {practiceResult.correct} 题，正确率 {(practiceResult.accuracy * 100).toFixed(1)}%</Typography>
+                        <Typography variant="body2" mt={1}>{practiceResult.suggestion}</Typography>
+                      </Box>
+                      <Divider />
+                      <Stack spacing={1.5}>
+                        {practiceResult.details.map((detail) => (
+                          <Paper key={detail.questionId} variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
+                            <Stack spacing={1}>
+                              <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between">
+                                <Typography fontWeight={600}>{detail.questionText}</Typography>
+                                <Chip label={detail.isCorrect ? '正确' : '待巩固'} color={detail.isCorrect ? 'success' : 'warning'} size="small" />
                               </Stack>
-                            </Paper>
-                          ))}
-                        </Stack>
-                        <Stack direction="row" spacing={2} justifyContent="flex-end">
-                          <Button variant="outlined" onClick={retryPractice}>
-                            再练一次
-                          </Button>
-                        </Stack>
+                              <Typography variant="body2" color="text.secondary">你的答案：{detail.userAnswer || '未作答'}</Typography>
+                              {detail.correctAnswer ? (
+                                <Typography variant="body2" color="text.secondary">参考答案：{detail.correctAnswer}</Typography>
+                              ) : null}
+                              {detail.explanation ? (
+                                <Typography variant="body2" color="text.secondary">解题思路：{detail.explanation}</Typography>
+                              ) : null}
+                              <Stack direction="row" spacing={1} flexWrap="wrap">
+                                {detail.tags.map((tag) => (
+                                  <Chip key={tag} label={tag} size="small" variant="outlined" />
+                                ))}
+                              </Stack>
+                            </Stack>
+                          </Paper>
+                        ))}
                       </Stack>
-                    ) : isPracticing && currentQuestion ? (
-                      <Stack spacing={2}>
-                        <Stack direction="row" spacing={1} alignItems="center">
-                          <Chip
-                            label={`第 ${currentQuestionIndex + 1}/${totalQuestions} 题`}
-                            color="primary"
-                            variant="outlined"
-                            size="small"
-                          />
-                          <Typography variant="body2" color="text.secondary">
-                            完成所有题目后点击提交即可查看标准答案。
-                          </Typography>
-                        </Stack>
-                        <Typography variant="subtitle1" fontWeight={600}>
-                          {currentQuestion.questionText}
-                        </Typography>
-                        <TextField
-                          label="输入你的答案"
-                          value={userAnswers[currentQuestion.id] ?? ''}
-                          onChange={(event) => handleAnswerChange(currentQuestion.id, event.target.value)}
-                          multiline
-                          minRows={3}
-                          fullWidth
-                        />
-                        <Stack direction="row" spacing={2} justifyContent="space-between" flexWrap="wrap">
-                          <Button variant="text" onClick={goToPreviousQuestion} disabled={currentQuestionIndex === 0}>
-                            上一题
-                          </Button>
-                          <Stack direction="row" spacing={2}>
-                            <Button
-                              variant="text"
-                              onClick={goToNextQuestion}
-                              disabled={currentQuestionIndex === totalQuestions - 1}
-                            >
-                              下一题
-                            </Button>
-                            <Button variant="contained" onClick={handleSubmitPractice}>
-                              提交答卷
-                            </Button>
-                          </Stack>
-                        </Stack>
+                      <Stack direction="row" spacing={2}>
+                        <Button variant="contained" onClick={retryPractice}>再练一次</Button>
+                        <Button variant="text" onClick={() => setPracticeResult(null)}>关闭结果</Button>
                       </Stack>
+                    </Stack>
+                  ) : (
+                    <Stack spacing={2}>
+                      <Typography variant="body2" color="text.secondary">选择题单后立即开始刷题。点击“开始答题”进入沉浸式答题体验。</Typography>
+                      <Button variant="contained" onClick={startPractice} disabled={questions.length === 0}>
+                        开始答题
+                      </Button>
+                    </Stack>
+                  )}
+                </Box>
+              </Stack>
+            ) : (
+              <Stack spacing={3} sx={{ height: '100%' }} >
+                <Box>
+                  <Stack spacing={1.5}>
+                    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} justifyContent="space-between" alignItems={{ xs: 'flex-start', sm: 'center' }} >
+                      <Typography variant="h6" fontWeight={600}>
+                        {selectedSet ? selectedSet.title : '选择题单查看题目'}
+                      </Typography>
+                      <Stack direction="row" spacing={1}>
+                        <Button startIcon={<AddCircleOutlineIcon />} variant="contained" color="secondary" onClick={openQuestionDialog} disabled={selectedSetId === null} size="small">录入题目</Button>
+                        {selectedSet ? (
+                          <Button variant="outlined" size="small" onClick={openPracticeWorkspace}>打开写题模式</Button>
+                        ) : null}
+                      </Stack>
+                    </Stack>
+                    {selectedSet ? (
+                      <Typography variant="body2" color="text.secondary" mt={0.5}>
+                        {selectedSet.description || '暂无题单描述，可在左侧修改。'}
+                      </Typography>
                     ) : (
-                      <Stack spacing={2}>
-                        <Typography variant="body2" color="text.secondary">
-                          立即开始练习，系统会自动保存作答并生成个性化建议。
-                        </Typography>
-                        <Stack direction="row" spacing={2}>
-                          <Button variant="contained" onClick={startPractice}>
-                            开始答题
-                          </Button>
-                          {practiceResult ? (
-                            <Button variant="text" onClick={retryPractice}>
-                              重练当前题单
-                            </Button>
-                          ) : null}
-                        </Stack>
-                      </Stack>
+                      <Typography variant="body2" color="text.secondary" mt={0.5}>
+                        从左侧选择题单以查看题目列表或录入新题目。
+                      </Typography>
                     )}
                   </Stack>
+                  {questionsError ? (
+                    <Alert severity="error" sx={{ mt: 2 }} action={<Button color="inherit" onClick={() => refetchQuestions()}>重试</Button>}>
+                      无法加载题目列表。
+                    </Alert>
+                  ) : null}
                 </Box>
-              ) : null}
-            </Stack>
+                <Divider />
+                <Stack spacing={2} sx={{ flexGrow: 1, overflow: 'auto' }} >
+                  {questionsLoading ? (
+                    <Typography variant="body2" color="text.secondary">正在加载题目…</Typography>
+                  ) : questions.length === 0 ? (
+                    <Typography variant="body2" color="text.secondary">暂无题目内容，请在下方添加。</Typography>
+                  ) : (
+                    questions.map((question) => (
+                      <Paper key={question.id} variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
+                        <Stack spacing={1}>
+                          <Typography variant="subtitle1" fontWeight={600}>{question.questionText}</Typography>
+                          {question.answerText ? (
+                            <Typography variant="body2" color="text.secondary">正确答案：{question.answerText}</Typography>
+                          ) : null}
+                          {question.explanation ? (
+                            <Typography variant="body2" color="text.secondary">解题思路：{question.explanation}</Typography>
+                          ) : null}
+                          <Stack direction="row" spacing={1} flexWrap="wrap">
+                            {question.tags.map((tag) => (
+                              <Chip key={tag} label={tag} size="small" variant="outlined" />
+                            ))}
+                          </Stack>
+                        </Stack>
+                      </Paper>
+                    ))
+                  )}
+                </Stack>
+                {selectedSet ? (
+                  <Box sx={{ borderRadius: 2, border: '1px dashed', borderColor: 'divider', p: { xs: 2, md: 3 }, bgcolor: 'grey.50' }}>
+                    <Stack spacing={2}>
+                      <Typography variant="subtitle1" fontWeight={600}>写题模式</Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        点击“打开写题模式”后，页面将专注展示刷题区域，不再显示题单列表和题目详情。
+                      </Typography>
+                      <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
+                        <Button variant="contained" onClick={openPracticeWorkspace} disabled={questions.length === 0}>
+                          打开写题模式
+                        </Button>
+                        {practiceResult ? (
+                          <Button variant="text" onClick={() => setIsPracticeViewOpen(true)}>
+                            查看上次结果
+                          </Button>
+                        ) : null}
+                      </Stack>
+                    </Stack>
+                  </Box>
+                ) : null}
+              </Stack>
+            )}
           </Paper>
         </Grid>
       </Grid>
