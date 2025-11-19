@@ -33,6 +33,27 @@ const Practice = () => {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [setDialogOpen, setSetDialogOpen] = useState(false);
   const [questionDialogOpen, setQuestionDialogOpen] = useState(false);
+  const [isPracticing, setIsPracticing] = useState(false);
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  const [userAnswers, setUserAnswers] = useState<Record<string, string>>({});
+  const [practiceResult, setPracticeResult] = useState<
+    | null
+    | {
+        total: number;
+        correct: number;
+        accuracy: number;
+        suggestion: string;
+        details: Array<{
+          questionId: string;
+          questionText: string;
+          userAnswer: string;
+          correctAnswer: string;
+          explanation: string;
+          tags: string[];
+          isCorrect: boolean;
+        }>;
+      }
+  >(null);
 
   const {
     data: sets = [],
@@ -56,6 +77,14 @@ const Practice = () => {
     }
   }, [selectedSetId]);
 
+  useEffect(() => {
+    setIsPracticing(false);
+    setCurrentQuestionIndex(0);
+    setUserAnswers({});
+    setPracticeResult(null);
+  }, [selectedSetId]);
+
+
   const selectedSet = useMemo(
     () => sets.find((set) => set.id === selectedSetId) ?? null,
     [selectedSetId, sets],
@@ -71,6 +100,12 @@ const Practice = () => {
     queryFn: () => practiceService.fetchPracticeQuestions(selectedSetId as string),
     enabled: selectedSetId !== null,
   });
+
+  useEffect(() => {
+    if (currentQuestionIndex > 0 && currentQuestionIndex >= questions.length) {
+      setCurrentQuestionIndex(Math.max(questions.length - 1, 0));
+    }
+  }, [currentQuestionIndex, questions.length]);
 
   const createSetMutation = useMutation({
     mutationFn: practiceService.createPracticeSet,
@@ -191,6 +226,113 @@ const Practice = () => {
     setQuestionTags('');
     setQuestionExplanation('');
   };
+
+  const startPractice = () => {
+    if (!selectedSetId) {
+      setErrorMessage('请先选择题单');
+      return;
+    }
+    if (questions.length === 0) {
+      setErrorMessage('当前题单暂无题目，无法开始答题。');
+      return;
+    }
+    setErrorMessage(null);
+    setIsPracticing(true);
+    setCurrentQuestionIndex(0);
+    setUserAnswers({});
+    setPracticeResult(null);
+  };
+
+  const handleAnswerChange = (questionId: string, value: string) => {
+    setUserAnswers((prev) => ({
+      ...prev,
+      [questionId]: value,
+    }));
+  };
+
+  const goToPreviousQuestion = () => {
+    setCurrentQuestionIndex((prev) => Math.max(prev - 1, 0));
+  };
+
+  const goToNextQuestion = () => {
+    setCurrentQuestionIndex((prev) => Math.min(prev + 1, Math.max(questions.length - 1, 0)));
+  };
+
+  const normalizeAnswer = (value: string) => value.replace(/\s+/g, '').toLowerCase();
+
+  const handleSubmitPractice = () => {
+    if (questions.length === 0) {
+      return;
+    }
+
+    const details = questions.map((question) => {
+      const answer = userAnswers[question.id] ?? '';
+      const reference = question.answerText ?? '';
+      const isComparable = Boolean(reference);
+      const isCorrect = isComparable
+        ? normalizeAnswer(answer) === normalizeAnswer(reference)
+        : Boolean(answer.trim());
+
+      return {
+        questionId: question.id,
+        questionText: question.questionText,
+        userAnswer: answer.trim(),
+        correctAnswer: reference,
+        explanation: question.explanation,
+        tags: question.tags,
+        isCorrect,
+      };
+    });
+
+    const correct = details.filter((detail) => detail.isCorrect).length;
+    const total = details.length;
+    const accuracy = total === 0 ? 0 : correct / total;
+
+    let suggestion = '';
+    if (accuracy >= 0.9) {
+      suggestion = '正确率超过 90%，保持当前节奏，并尝试挑战更高难度的套卷。';
+    } else if (accuracy >= 0.75) {
+      suggestion = '整体表现不错，可针对错题进行巩固，并安排一次计时模拟以提升速度。';
+    } else if (accuracy >= 0.5) {
+      suggestion = '正确率有提升空间，建议先复习错题涉及的考点，再重新练习本套题目。';
+    } else {
+      suggestion = '正确率偏低，建议回顾教材或课程笔记，优先突破高频考点后再刷题。';
+    }
+
+    const weakTags = Array.from(
+      new Set(
+        details
+          .filter((detail) => !detail.isCorrect)
+          .flatMap((detail) => detail.tags)
+          .filter(Boolean),
+      ),
+    );
+
+    if (weakTags.length > 0) {
+      suggestion += ` 可重点复习：${weakTags.join('、')}。`;
+    }
+
+    setPracticeResult({
+      total,
+      correct,
+      accuracy,
+      suggestion,
+      details,
+    });
+    setIsPracticing(false);
+  };
+
+  const retryPractice = () => {
+    setUserAnswers({});
+    setPracticeResult(null);
+    if (questions.length > 0) {
+      setIsPracticing(true);
+      setCurrentQuestionIndex(0);
+    }
+  };
+
+  const currentQuestion = isPracticing && questions.length > 0 ? questions[currentQuestionIndex] : null;
+  const totalQuestions = questions.length;
 
   return (
     <Stack spacing={4}>
@@ -365,6 +507,183 @@ const Practice = () => {
                   ))
                 )}
               </Stack>
+              {selectedSet ? (
+                <Box
+                  sx={{
+                    borderRadius: 2,
+                    border: '1px dashed',
+                    borderColor: 'divider',
+                    p: { xs: 2, md: 3 },
+                    bgcolor: 'grey.50',
+                  }}
+                >
+                  <Stack spacing={2}>
+                    <Stack
+                      direction={{ xs: 'column', sm: 'row' }}
+                      alignItems={{ xs: 'flex-start', sm: 'center' }}
+                      justifyContent="space-between"
+                      spacing={2}
+                    >
+                      <Box>
+                        <Typography variant="subtitle1" fontWeight={600}>
+                          在线刷题
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary" mt={0.5}>
+                          输入你的作答内容，系统会在提交后展示标准答案并生成学习建议。
+                        </Typography>
+                      </Box>
+                      <Chip
+                        color="secondary"
+                        variant="outlined"
+                        label={
+                          practiceResult
+                            ? `正确率 ${(practiceResult.accuracy * 100).toFixed(0)}%`
+                            : `共 ${totalQuestions} 题`
+                        }
+                      />
+                    </Stack>
+
+                    {questionsLoading ? (
+                      <Typography variant="body2" color="text.secondary">
+                        题目数据加载中…
+                      </Typography>
+                    ) : totalQuestions === 0 ? (
+                      <Stack spacing={2}>
+                        <Typography variant="body2" color="text.secondary">
+                          当前题单暂无题目，请先录入题目后再开始刷题。
+                        </Typography>
+                        <Button variant="contained" disabled>
+                          开始答题
+                        </Button>
+                      </Stack>
+                    ) : practiceResult ? (
+                      <Stack spacing={2}>
+                        <Alert
+                          severity={
+                            practiceResult.accuracy >= 0.75
+                              ? 'success'
+                              : practiceResult.accuracy >= 0.5
+                              ? 'info'
+                              : 'warning'
+                          }
+                        >
+                          {`本次共答对 ${practiceResult.correct}/${practiceResult.total} 题。`}
+                        </Alert>
+                        <Stack spacing={1}>
+                          <Typography variant="body2" color="text.secondary">
+                            正确率进度
+                          </Typography>
+                          <LinearProgress
+                            variant="determinate"
+                            value={Math.round(practiceResult.accuracy * 100)}
+                            color={practiceResult.accuracy >= 0.75 ? 'success' : 'warning'}
+                          />
+                        </Stack>
+                        <Typography variant="body1">{practiceResult.suggestion}</Typography>
+                        <Divider />
+                        <Stack spacing={1.5}>
+                          {practiceResult.details.map((detail) => (
+                            <Paper
+                              key={detail.questionId}
+                              variant="outlined"
+                              sx={{ p: 2, borderRadius: 2, borderColor: detail.isCorrect ? 'success.light' : 'warning.light' }}
+                            >
+                              <Stack spacing={0.75}>
+                                <Stack direction="row" spacing={1} alignItems="center">
+                                  <Chip
+                                    size="small"
+                                    color={detail.isCorrect ? 'success' : 'warning'}
+                                    label={detail.isCorrect ? '答对' : '待巩固'}
+                                  />
+                                  <Typography variant="subtitle2" fontWeight={600}>
+                                    {detail.questionText}
+                                  </Typography>
+                                </Stack>
+                                <Typography variant="body2" color="text.secondary">
+                                  我的作答：{detail.userAnswer || '（未填写）'}
+                                </Typography>
+                                {detail.correctAnswer ? (
+                                  <Typography variant="body2" color="text.secondary">
+                                    标准答案：{detail.correctAnswer}
+                                  </Typography>
+                                ) : null}
+                                {detail.explanation ? (
+                                  <Typography variant="body2" color="text.secondary">
+                                    解题思路：{detail.explanation}
+                                  </Typography>
+                                ) : null}
+                              </Stack>
+                            </Paper>
+                          ))}
+                        </Stack>
+                        <Stack direction="row" spacing={2} justifyContent="flex-end">
+                          <Button variant="outlined" onClick={retryPractice}>
+                            再练一次
+                          </Button>
+                        </Stack>
+                      </Stack>
+                    ) : isPracticing && currentQuestion ? (
+                      <Stack spacing={2}>
+                        <Stack direction="row" spacing={1} alignItems="center">
+                          <Chip
+                            label={`第 ${currentQuestionIndex + 1}/${totalQuestions} 题`}
+                            color="primary"
+                            variant="outlined"
+                            size="small"
+                          />
+                          <Typography variant="body2" color="text.secondary">
+                            完成所有题目后点击提交即可查看标准答案。
+                          </Typography>
+                        </Stack>
+                        <Typography variant="subtitle1" fontWeight={600}>
+                          {currentQuestion.questionText}
+                        </Typography>
+                        <TextField
+                          label="输入你的答案"
+                          value={userAnswers[currentQuestion.id] ?? ''}
+                          onChange={(event) => handleAnswerChange(currentQuestion.id, event.target.value)}
+                          multiline
+                          minRows={3}
+                          fullWidth
+                        />
+                        <Stack direction="row" spacing={2} justifyContent="space-between" flexWrap="wrap">
+                          <Button variant="text" onClick={goToPreviousQuestion} disabled={currentQuestionIndex === 0}>
+                            上一题
+                          </Button>
+                          <Stack direction="row" spacing={2}>
+                            <Button
+                              variant="text"
+                              onClick={goToNextQuestion}
+                              disabled={currentQuestionIndex === totalQuestions - 1}
+                            >
+                              下一题
+                            </Button>
+                            <Button variant="contained" onClick={handleSubmitPractice}>
+                              提交答卷
+                            </Button>
+                          </Stack>
+                        </Stack>
+                      </Stack>
+                    ) : (
+                      <Stack spacing={2}>
+                        <Typography variant="body2" color="text.secondary">
+                          立即开始练习，系统会自动保存作答并生成个性化建议。
+                        </Typography>
+                        <Stack direction="row" spacing={2}>
+                          <Button variant="contained" onClick={startPractice}>
+                            开始答题
+                          </Button>
+                          {practiceResult ? (
+                            <Button variant="text" onClick={retryPractice}>
+                              重练当前题单
+                            </Button>
+                          ) : null}
+                        </Stack>
+                      </Stack>
+                    )}
+                  </Stack>
+                </Box>
+              ) : null}
             </Stack>
           </Paper>
         </Grid>
