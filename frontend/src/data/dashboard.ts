@@ -45,6 +45,7 @@ export interface ScheduleItem {
   focus?: string;
   tags?: string[];
   createdAt?: string;
+  status?: '未开始' | '进行中' | '已完成';
 }
 
 export type DashboardStatId = 'studyTime' | 'questionDrill' | 'courseFocus' | 'mockRank';
@@ -420,6 +421,7 @@ export const schedule: ScheduleItem[] = [
     location: '腾讯会议 938-102-xxx',
     focus: '高频错题解析',
     tags: ['直播', '数学'],
+    status: '进行中',
   },
   {
     id: 'schedule_002',
@@ -429,6 +431,7 @@ export const schedule: ScheduleItem[] = [
     end: '2024-04-13T07:30:00.000Z',
     focus: '英语单词复盘',
     tags: ['晨读', '打卡'],
+    status: '已完成',
   },
   {
     id: 'schedule_003',
@@ -439,6 +442,7 @@ export const schedule: ScheduleItem[] = [
     location: '线下教室 A301',
     focus: '全真模拟',
     tags: ['模考', '英语'],
+    status: '未开始',
   },
   {
     id: 'schedule_004',
@@ -448,6 +452,7 @@ export const schedule: ScheduleItem[] = [
     end: '2024-04-12T22:30:00.000Z',
     focus: '整理数学错题',
     tags: ['错题', '整理'],
+    status: '未开始',
   },
 ];
 

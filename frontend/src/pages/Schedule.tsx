@@ -24,7 +24,7 @@ import AddCircleIcon from '@mui/icons-material/AddCircle';
 import EventAvailableIcon from '@mui/icons-material/EventAvailable';
 import dayjs from 'dayjs';
 import axios from 'axios';
-import { FormEvent, useMemo, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import learningService, { ScheduleEntry } from '../services/learningService';
 import ScheduleTimeline from '../components/ScheduleTimeline';
@@ -40,6 +40,7 @@ const Schedule = () => {
   const [allDay, setAllDay] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [isDialogOpen, setDialogOpen] = useState(false);
+  const [statusMap, setStatusMap] = useState<Record<string, ScheduleEntry['status']>>({});
   const createInitialDialogState = () => ({
     title: '',
     date: dayjs().format('YYYY-MM-DD'),
@@ -179,6 +180,28 @@ const Schedule = () => {
 
   const liveSessions = useMemo(() => schedule.filter((item) => item.type === '直播课').length, [schedule]);
 
+  useEffect(() => {
+    if (schedule.length === 0) {
+      setStatusMap({});
+      return;
+    }
+    setStatusMap((prev) => {
+      const next: Record<string, ScheduleEntry['status']> = { ...prev };
+      schedule.forEach((item) => {
+        next[item.id] = item.status ?? '未开始';
+      });
+      return next;
+    });
+  }, [schedule]);
+
+  const handleStatusChange = (id: string) => {
+    setStatusMap((prev) => {
+      const current = prev[id] ?? '未开始';
+      const nextStatus = current === '未开始' ? '进行中' : current === '进行中' ? '已完成' : '未开始';
+      return { ...prev, [id]: nextStatus };
+    });
+  };
+
   const upcomingEvent = useMemo(() => {
     if (schedule.length === 0) {
       return null;
@@ -207,7 +230,14 @@ const Schedule = () => {
       .slice(0, 6);
   }, [schedule]);
 
-  const timelineItems = useMemo(() => sortedSchedule.slice(0, 6), [sortedSchedule]);
+  const timelineItems = useMemo(
+    () =>
+      sortedSchedule.slice(0, 6).map((item) => ({
+        ...item,
+        status: statusMap[item.id] ?? item.status ?? '未开始',
+      })),
+    [sortedSchedule, statusMap],
+  );
 
   return (
     <Stack spacing={4}>
@@ -240,9 +270,14 @@ const Schedule = () => {
             通过日程规划实现复习节奏可视化，可同步导入日历并设置番茄钟提醒。
           </Typography>
         </Box>
-        <Button startIcon={<AddCircleIcon />} variant="contained" onClick={() => setDialogOpen(true)}>
-          新增学习安排
-        </Button>
+        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} alignItems="center">
+          <Button variant="outlined" color="secondary" startIcon={<EventAvailableIcon />}>
+            导出到日历
+          </Button>
+          <Button startIcon={<AddCircleIcon />} variant="contained" onClick={() => setDialogOpen(true)}>
+            新增学习安排
+          </Button>
+        </Stack>
       </Stack>
 
       <Grid container spacing={4} alignItems="stretch">
@@ -281,6 +316,52 @@ const Schedule = () => {
                 </Stack>
                 <Divider />
                 <ScheduleTimeline items={timelineItems} />
+              </Stack>
+            </Paper>
+
+            <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid', borderColor: 'divider' }}>
+              <Stack spacing={2}>
+                <Typography variant="h6" fontWeight={600}>
+                  日程状态联动
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  点击切换“未开始 → 进行中 → 已完成”，完成后会在首页和学习建议里同步展示。
+                </Typography>
+                <Stack spacing={1.5}>
+                  {sortedSchedule.slice(0, 6).map((item) => {
+                    const status = statusMap[item.id] ?? item.status ?? '未开始';
+                    return (
+                      <Paper
+                        key={item.id}
+                        variant="outlined"
+                        sx={{
+                          p: 1.5,
+                          borderRadius: 2,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: 1.5,
+                        }}
+                      >
+                        <Stack spacing={0.5}>
+                          <Typography variant="subtitle2" fontWeight={600}>
+                            {item.title}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {dayjs(item.start).format('MM月DD日 HH:mm')} · {item.type}
+                          </Typography>
+                        </Stack>
+                        <Chip
+                          label={status}
+                          color={status === '已完成' ? 'success' : status === '进行中' ? 'warning' : 'default'}
+                          variant={status === '未开始' ? 'outlined' : 'filled'}
+                          onClick={() => handleStatusChange(item.id)}
+                          clickable
+                        />
+                      </Paper>
+                    );
+                  })}
+                </Stack>
               </Stack>
             </Paper>
 

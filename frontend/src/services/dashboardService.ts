@@ -24,6 +24,8 @@ export interface InstitutionBrochurePreview {
   summary: string;
   publishedAt: string;
   link?: string;
+  status?: 'published' | 'offline';
+  featured?: boolean;
 }
 
 export interface FollowedInstitutionSummary {

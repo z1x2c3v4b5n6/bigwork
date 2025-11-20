@@ -51,6 +51,8 @@ const Forum = () => {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [topicDialogOpen, setTopicDialogOpen] = useState(false);
   const [postDialogOpen, setPostDialogOpen] = useState(false);
+  const [activeTag, setActiveTag] = useState<string>('全部');
+  const [sortMode, setSortMode] = useState<'latest' | 'hot'>('latest');
 
   const {
     data: topics = [],
@@ -66,6 +68,24 @@ const Forum = () => {
     () => topics.find((topic) => topic.id === selectedTopicId) ?? null,
     [selectedTopicId, topics],
   );
+
+  const availableTags = useMemo(() => {
+    const tagSet = new Set<string>();
+    topics.forEach((topic) => topic.tags.forEach((tag) => tagSet.add(tag)));
+    return ['全部', ...Array.from(tagSet)];
+  }, [topics]);
+
+  const filteredTopics = useMemo(() => {
+    const list = activeTag === '全部' ? topics : topics.filter((topic) => topic.tags.includes(activeTag));
+    return [...list].sort((a, b) => {
+      if (sortMode === 'hot') {
+        return b.likes - a.likes;
+      }
+      const timeA = new Date(a.updatedAt ?? a.createdAt ?? '').valueOf();
+      const timeB = new Date(b.updatedAt ?? b.createdAt ?? '').valueOf();
+      return timeB - timeA;
+    });
+  }, [activeTag, sortMode, topics]);
 
   const {
     data: posts = [],
@@ -288,14 +308,36 @@ const Forum = () => {
                   无法加载话题，请检查后端接口。
                 </Alert>
               ) : null}
+              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} alignItems={{ xs: 'flex-start', sm: 'center' }}>
+                <Stack direction="row" spacing={1} flexWrap="wrap">
+                  {availableTags.map((tag) => (
+                    <Chip
+                      key={tag}
+                      label={tag}
+                      clickable
+                      color={activeTag === tag ? 'primary' : 'default'}
+                      variant={activeTag === tag ? 'filled' : 'outlined'}
+                      onClick={() => setActiveTag(tag)}
+                    />
+                  ))}
+                </Stack>
+                <Stack direction="row" spacing={1}>
+                  <Button size="small" variant={sortMode === 'latest' ? 'contained' : 'outlined'} onClick={() => setSortMode('latest')}>
+                    按最新
+                  </Button>
+                  <Button size="small" variant={sortMode === 'hot' ? 'contained' : 'outlined'} onClick={() => setSortMode('hot')}>
+                    按热度
+                  </Button>
+                </Stack>
+              </Stack>
               <Divider />
               <List sx={{ flexGrow: 1, overflow: 'auto' }}>
                 {topicsLoading ? (
                   <ListItem>加载中…</ListItem>
-                ) : topics.length === 0 ? (
+                ) : filteredTopics.length === 0 ? (
                   <ListItem>暂无话题，欢迎率先发起讨论。</ListItem>
                 ) : (
-                  topics.map((topic) => (
+                  filteredTopics.map((topic) => (
                     <ListItem disablePadding key={topic.id}>
                       <ListItemButton
                         selected={selectedTopicId === topic.id}

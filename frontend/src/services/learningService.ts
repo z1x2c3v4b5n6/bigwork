@@ -34,6 +34,7 @@ export interface ScheduleEntry {
   focus?: string;
   tags: string[];
   allDay: boolean;
+  status?: '未开始' | '进行中' | '已完成';
 }
 
 export const fetchCourses = async (): Promise<CourseItem[]> => {
@@ -70,6 +71,13 @@ export const fetchSchedule = async (): Promise<ScheduleEntry[]> => {
       ...item,
       id: item.id != null && item.id !== '' ? String(item.id) : fallbackId,
       allDay: Boolean((item as { allDay?: boolean }).allDay),
+      status: (() => {
+        const status = (item as { status?: string }).status;
+        if (status === '进行中' || status === '已完成' || status === '未开始') {
+          return status;
+        }
+        return '未开始' as const;
+      })(),
       tags: (() => {
         const source = (item as { tags?: unknown }).tags;
         if (Array.isArray(source)) {
@@ -106,6 +114,7 @@ export const createScheduleEntry = async (payload: {
     ...payload,
     start: formatDateTime(payload.start),
     end: formatDateTime(payload.end),
+    status: '未开始' as const,
   };
 
   const response = await httpClient.post<{ id: number | string }>('/api/learning/schedule', requestBody);
