@@ -2,6 +2,7 @@ import {
   Alert,
   Box,
   Button,
+  Chip,
   Paper,
   Stack,
   TextField,
@@ -39,6 +40,7 @@ const InstitutionBrochureManager = () => {
   const [summary, setSummary] = useState('');
   const [link, setLink] = useState('');
   const [formError, setFormError] = useState<string | null>(null);
+  const [syncToFeed, setSyncToFeed] = useState(true);
 
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -52,10 +54,13 @@ const InstitutionBrochureManager = () => {
       summary: summary.trim() || undefined,
       link: link.trim() || undefined,
       publishedAt: new Date().toISOString(),
+      featured: syncToFeed,
+      status: 'published',
     });
     setTitle('');
     setSummary('');
     setLink('');
+    setSyncToFeed(true);
   };
 
   if (isLoading) {
@@ -139,6 +144,14 @@ const InstitutionBrochureManager = () => {
             onChange={(event) => setLink(event.target.value)}
             placeholder="https://"
           />
+          <Stack direction="row" spacing={1} alignItems="center">
+            <Typography variant="body2" color="text.secondary">
+              是否同步到推荐区
+            </Typography>
+            <Button variant={syncToFeed ? 'contained' : 'outlined'} onClick={() => setSyncToFeed((prev) => !prev)} size="small">
+              {syncToFeed ? '已同步首页' : '暂不同步'}
+            </Button>
+          </Stack>
           <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1.5 }}>
             <Button type="submit" variant="contained" disabled={publishMutation.isPending}>
               {publishMutation.isPending ? '发布中…' : '发布简章'}
@@ -164,11 +177,17 @@ const InstitutionBrochureManager = () => {
                     primary={item.title}
                     secondary={`${dayjs(item.publishedAt).format('YYYY-MM-DD')} · ${item.summary ?? '暂无简介'}`}
                   />
-                  {item.link ? (
-                    <Button href={item.link} target="_blank" rel="noreferrer" size="small">
-                      查看
-                    </Button>
-                  ) : null}
+                  <Stack direction="row" spacing={1} alignItems="center">
+                    {item.link ? (
+                      <Button href={item.link} target="_blank" rel="noreferrer" size="small">
+                        查看
+                      </Button>
+                    ) : null}
+                    <Typography variant="caption" color="text.secondary">
+                      {item.status === 'offline' ? '已下架' : '已发布'}
+                    </Typography>
+                    {item.featured ? <Chip label="同步推荐区" size="small" color="primary" variant="outlined" /> : null}
+                  </Stack>
                 </ListItem>
               ))}
             </List>

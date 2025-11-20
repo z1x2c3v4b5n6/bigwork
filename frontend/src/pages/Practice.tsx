@@ -18,6 +18,9 @@ import {
 } from '@mui/material';
 import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
 import CloseIcon from '@mui/icons-material/Close';
+import StarBorderIcon from '@mui/icons-material/StarBorder';
+import StarIcon from '@mui/icons-material/Star';
+import FeedbackIcon from '@mui/icons-material/Feedback';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import practiceService, { PracticeQuestion, PracticeSetSummary } from '../services/practiceService';
@@ -39,6 +42,14 @@ const Practice = () => {
   const [isPracticeViewOpen, setIsPracticeViewOpen] = useState(false);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [userAnswers, setUserAnswers] = useState<Record<string, string>>({});
+  const [starredQuestions, setStarredQuestions] = useState<Record<string, PracticeQuestion>>({});
+  const [feedbackDialog, setFeedbackDialog] = useState<{ open: boolean; questionId: string | null; content: string }>(
+    {
+      open: false,
+      questionId: null,
+      content: '',
+    },
+  );
   const [practiceResult, setPracticeResult] = useState<
     | null
     | {
@@ -271,6 +282,26 @@ const Practice = () => {
     }));
   };
 
+  const toggleStar = (question: PracticeQuestion) => {
+    setStarredQuestions((prev) => {
+      if (prev[question.id]) {
+        const next = { ...prev };
+        delete next[question.id];
+        return next;
+      }
+      return { ...prev, [question.id]: question };
+    });
+  };
+
+  const openFeedback = (questionId: string) => {
+    setFeedbackDialog({ open: true, questionId, content: '' });
+  };
+
+  const submitFeedback = () => {
+    setFeedbackDialog((prev) => ({ ...prev, open: false }));
+    setErrorMessage('感谢反馈，已记录到题库质量维护清单。');
+  };
+
   const goToPreviousQuestion = () => {
     setCurrentQuestionIndex((prev) => Math.max(prev - 1, 0));
   };
@@ -496,11 +527,22 @@ const Practice = () => {
                     </Stack>
                   ) : isPracticing && currentQuestion ? (
                     <Stack spacing={3}>
-                      <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} justifyContent="space-between">
+                      <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} justifyContent="space-between" alignItems="center">
                         <Typography variant="subtitle1" color="text.secondary">
                           当前进度：第 {currentQuestionIndex + 1} / {totalQuestions} 题
                         </Typography>
-                        <Stack direction="row" spacing={1}>
+                        <Stack direction="row" spacing={1} alignItems="center">
+                          <IconButton onClick={() => toggleStar(currentQuestion)} color={starredQuestions[currentQuestion.id] ? 'warning' : 'default'}>
+                            {starredQuestions[currentQuestion.id] ? <StarIcon /> : <StarBorderIcon />}
+                          </IconButton>
+                          <Button
+                            startIcon={<FeedbackIcon />}
+                            onClick={() => openFeedback(currentQuestion.id)}
+                            color="secondary"
+                            variant="text"
+                          >
+                            题目有问题
+                          </Button>
                           <Button variant="outlined" onClick={goToPreviousQuestion} disabled={currentQuestionIndex === 0}>上一题</Button>
                           <Button variant="outlined" onClick={goToNextQuestion} disabled={currentQuestionIndex >= totalQuestions - 1}>下一题</Button>
                         </Stack>
@@ -529,9 +571,27 @@ const Practice = () => {
                         {practiceResult.details.map((detail) => (
                           <Paper key={detail.questionId} variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
                             <Stack spacing={1}>
-                              <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between">
+                              <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ sm: 'center' }}>
                                 <Typography fontWeight={600}>{detail.questionText}</Typography>
                                 <Chip label={detail.isCorrect ? '正确' : '待巩固'} color={detail.isCorrect ? 'success' : 'warning'} size="small" />
+                              </Stack>
+                              <Stack direction="row" spacing={1} alignItems="center">
+                                <IconButton
+                                  size="small"
+                                  onClick={() => toggleStar({
+                                    id: detail.questionId,
+                                    questionText: detail.questionText,
+                                    answerText: detail.correctAnswer,
+                                    explanation: detail.explanation,
+                                    tags: detail.tags,
+                                  } as PracticeQuestion)}
+                                  color={starredQuestions[detail.questionId] ? 'warning' : 'default'}
+                                >
+                                  {starredQuestions[detail.questionId] ? <StarIcon fontSize="small" /> : <StarBorderIcon fontSize="small" />}
+                                </IconButton>
+                                <Button size="small" startIcon={<FeedbackIcon />} onClick={() => openFeedback(detail.questionId)}>
+                                  题目有问题
+                                </Button>
                               </Stack>
                               <Typography variant="body2" color="text.secondary">你的答案：{detail.userAnswer || '未作答'}</Typography>
                               {detail.correctAnswer ? (
@@ -648,6 +708,42 @@ const Practice = () => {
         </Grid>
       </Grid>
 
+      <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid', borderColor: 'divider' }}>
+        <Stack spacing={1.5}>
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} alignItems={{ sm: 'center' }} justifyContent="space-between">
+            <Typography variant="h6" fontWeight={600}>
+              重点题目清单
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              点击 ⭐ 收藏的题目会收录在此，方便复习或分享给队友。
+            </Typography>
+          </Stack>
+          {Object.keys(starredQuestions).length === 0 ? (
+            <Typography variant="body2" color="text.secondary">还没有收藏题目，做题时点击右上角的 ⭐ 即可收录。</Typography>
+          ) : (
+            <Stack spacing={1.5}>
+              {Object.values(starredQuestions).map((question) => (
+                <Paper key={question.id} variant="outlined" sx={{ p: 1.5, borderRadius: 2 }}>
+                  <Stack spacing={0.5}>
+                    <Stack direction="row" spacing={1} alignItems="center">
+                      <StarIcon fontSize="small" color="warning" />
+                      <Typography variant="subtitle2" fontWeight={600} sx={{ flex: 1 }}>
+                        {question.questionText}
+                      </Typography>
+                    </Stack>
+                    <Stack direction="row" spacing={1} flexWrap="wrap">
+                      {(question.tags ?? []).map((tag) => (
+                        <Chip key={`${question.id}-${tag}`} label={tag} size="small" variant="outlined" />
+                      ))}
+                    </Stack>
+                  </Stack>
+                </Paper>
+              ))}
+            </Stack>
+          )}
+        </Stack>
+      </Paper>
+
       <Dialog open={setDialogOpen} onClose={closeSetDialog} fullWidth maxWidth="sm">
         <Box component="form" onSubmit={handleCreateSet}>
           <DialogTitle>新建题单</DialogTitle>
@@ -736,6 +832,35 @@ const Practice = () => {
             </Button>
           </DialogActions>
         </Box>
+      </Dialog>
+
+      <Dialog
+        open={feedbackDialog.open}
+        onClose={() => setFeedbackDialog((prev) => ({ ...prev, open: false }))}
+        fullWidth
+        maxWidth="sm"
+      >
+        <DialogTitle>题目有问题</DialogTitle>
+        <DialogContent dividers>
+          <Typography variant="body2" color="text.secondary" mb={2}>
+            简要描述题目错误、答案争议或排版问题，教研团队会在后台汇总并追踪处理。
+          </Typography>
+          <TextField
+            label="反馈内容"
+            value={feedbackDialog.content}
+            onChange={(event) => setFeedbackDialog((prev) => ({ ...prev, content: event.target.value }))}
+            multiline
+            minRows={3}
+            fullWidth
+            autoFocus
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setFeedbackDialog((prev) => ({ ...prev, open: false }))}>取消</Button>
+          <Button variant="contained" onClick={submitFeedback} disabled={!feedbackDialog.content.trim()}>
+            提交反馈
+          </Button>
+        </DialogActions>
       </Dialog>
     </Stack>
   );

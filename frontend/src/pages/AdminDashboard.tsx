@@ -145,6 +145,7 @@ const AdminDashboard = () => {
   const [courseDialogOpen, setCourseDialogOpen] = useState(false);
   const [materialDialogOpen, setMaterialDialogOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
+  const [progressRange, setProgressRange] = useState<'week' | 'month'>('week');
 
   const getErrorMessage = (error: unknown, fallback: string) => {
     if (error && typeof error === 'object') {
@@ -708,7 +709,17 @@ const AdminDashboard = () => {
               <Grid item xs={12} md={3} key={item.key}>
                 <Paper
                   elevation={0}
-                  sx={{ p: 3, borderRadius: 3, border: '1px solid', borderColor: 'divider', height: '100%' }}
+                  sx={{
+                    p: 3,
+                    borderRadius: 3,
+                    border: '1px solid',
+                    borderColor: 'divider',
+                    height: '100%',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease',
+                    '&:hover': { boxShadow: 4 },
+                  }}
+                  onClick={() => setActiveTab(item.key === 'activeStudents' ? 'users' : item.key === 'tasksCompletedToday' ? 'courses' : 'statistics')}
                 >
                   <Stack direction="row" spacing={2} alignItems="center">
                     <Avatar sx={{ bgcolor: item.color }}>{item.icon}</Avatar>
@@ -737,7 +748,22 @@ const AdminDashboard = () => {
                     <Typography variant="h6" fontWeight={600}>
                       学员学习进度
                     </Typography>
-                    <Chip label="本周" color="primary" variant="outlined" />
+                    <Stack direction="row" spacing={1}>
+                      <Chip
+                        label="本周"
+                        color={progressRange === 'week' ? 'primary' : 'default'}
+                        variant={progressRange === 'week' ? 'filled' : 'outlined'}
+                        onClick={() => setProgressRange('week')}
+                        clickable
+                      />
+                      <Chip
+                        label="本月"
+                        color={progressRange === 'month' ? 'primary' : 'default'}
+                        variant={progressRange === 'month' ? 'filled' : 'outlined'}
+                        onClick={() => setProgressRange('month')}
+                        clickable
+                      />
+                    </Stack>
                   </Box>
                   {students.length === 0 ? (
                     <Box sx={{ py: 8, textAlign: 'center' }}>

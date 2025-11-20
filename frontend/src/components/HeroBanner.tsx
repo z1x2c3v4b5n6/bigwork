@@ -1,4 +1,4 @@
-import { Box, Button, Paper, Stack, Typography } from '@mui/material';
+import { Box, Button, Chip, Paper, Stack, Typography } from '@mui/material';
 import RocketLaunchIcon from '@mui/icons-material/RocketLaunch';
 import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 import { Link as RouterLink } from 'react-router-dom';
@@ -6,9 +6,13 @@ import { Link as RouterLink } from 'react-router-dom';
 interface HeroBannerProps {
   greeting: string;
   userName: string;
+  onCheckIn?: () => void;
+  checkedIn?: boolean;
+  nextStepLabel?: string;
+  nextStepLink?: string;
 }
 
-const HeroBanner = ({ greeting, userName }: HeroBannerProps) => {
+const HeroBanner = ({ greeting, userName, onCheckIn, checkedIn, nextStepLabel, nextStepLink }: HeroBannerProps) => {
   return (
     <Paper
       elevation={0}
@@ -54,6 +58,17 @@ const HeroBanner = ({ greeting, userName }: HeroBannerProps) => {
             >
               查看一周安排
             </Button>
+            {nextStepLabel && nextStepLink ? (
+              <Button
+                variant="outlined"
+                color="inherit"
+                endIcon={<RocketLaunchIcon />}
+                component={RouterLink}
+                to={nextStepLink}
+              >
+                {nextStepLabel}
+              </Button>
+            ) : null}
           </Stack>
         </Box>
         <Box
@@ -70,6 +85,19 @@ const HeroBanner = ({ greeting, userName }: HeroBannerProps) => {
           <Typography variant="h6" fontWeight={600}>
             今日目标
           </Typography>
+          <Stack direction="row" spacing={1} alignItems="center" mt={1}>
+            <Button
+              variant={checkedIn ? 'outlined' : 'contained'}
+              color="secondary"
+              size="small"
+              onClick={onCheckIn}
+              disabled={checkedIn}
+              sx={{ borderRadius: 999 }}
+            >
+              {checkedIn ? '已完成今日学习' : '完成今日学习'}
+            </Button>
+            {checkedIn ? <Chip label="今日已打卡" color="success" size="small" /> : null}
+          </Stack>
           <Typography variant="body1" mt={2}>
             · 完成 2 讲数学高频题精练
           </Typography>

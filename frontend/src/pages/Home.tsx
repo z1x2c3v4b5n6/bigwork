@@ -22,7 +22,7 @@ import TextSnippetIcon from '@mui/icons-material/TextSnippet';
 import LibraryBooksIcon from '@mui/icons-material/LibraryBooks';
 import RecordVoiceOverIcon from '@mui/icons-material/RecordVoiceOver';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import HeroBanner from '../components/HeroBanner';
 import StatCard from '../components/StatCard';
 import CourseCard from '../components/CourseCard';
@@ -86,6 +86,19 @@ const Home = () => {
   const pushMessages = data?.pushMessages ?? [];
   const followedInstitutions = data?.followedInstitutions ?? [];
   const subjectHighlights = data?.subjectHighlights ?? [];
+  const [checkedInToday, setCheckedInToday] = useState(false);
+
+  useEffect(() => {
+    const cached = localStorage.getItem('dashboard-checkin-date');
+    const today = new Date().toISOString().slice(0, 10);
+    setCheckedInToday(cached === today);
+  }, []);
+
+  const handleCheckIn = () => {
+    const today = new Date().toISOString().slice(0, 10);
+    localStorage.setItem('dashboard-checkin-date', today);
+    setCheckedInToday(true);
+  };
 
   const majorTags = useMemo(() => {
     if (!examProfile) {
@@ -211,6 +224,11 @@ const Home = () => {
       : '已根据你的分数与科目组合筛选匹配课程，优先安排当前阶段最合适的任务。'
     : '继续保持节奏，完成系统推荐的任务。';
 
+  const nextPractice = useMemo(() => {
+    const target = practiceSets.find((item) => item.name.includes('数据结构'));
+    return target ?? practiceSets[0];
+  }, [practiceSets]);
+
   return (
     <Box
       sx={{
@@ -247,7 +265,50 @@ const Home = () => {
             </Alert>
           )}
 
-          <HeroBanner greeting={greeting} userName={userName} />
+          <HeroBanner
+            greeting={greeting}
+            userName={userName}
+            onCheckIn={handleCheckIn}
+            checkedIn={checkedInToday}
+            nextStepLabel={nextPractice ? '一键进入下一步' : undefined}
+            nextStepLink={nextPractice ? '/practice' : undefined}
+          />
+
+          {checkedInToday && (
+            <Alert icon={<EmojiEventsIcon />} severity="success" sx={{ borderRadius: 3 }}>
+              今日学习已完成，已为你点亮“自律打卡”徽章，积分将在明日刷新。
+            </Alert>
+          )}
+
+          {nextPractice && (
+            <SectionCard
+              title="一键进入下一步"
+              subtitle="下一步建议：继续完成【数据结构刷题集】或直接跳转到当前题单。"
+              action={
+                <Button component={RouterLink} to="/practice" endIcon={<ArrowForwardIcon />} variant="contained">
+                  前往刷题
+                </Button>
+              }
+            >
+              <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} alignItems={{ md: 'center' }}>
+                <Box sx={{ p: 2, borderRadius: 2, bgcolor: 'grey.50', flex: 1 }}>
+                  <Typography variant="subtitle1" fontWeight={700}>
+                    {nextPractice.name}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary" mt={0.5}>
+                    题量 {nextPractice.questions} · 最近正确率 {(nextPractice.accuracy * 100).toFixed(1)}% · 侧重 {nextPractice.focus ??
+                      '核心知识点'}
+                  </Typography>
+                </Box>
+                <Stack spacing={1}>
+                  <Chip label={nextPractice.difficulty ?? '基础'} color="primary" variant="outlined" />
+                  <Typography variant="body2" color="text.secondary">
+                    点击按钮即可恢复到上次刷题进度，并同步错题与重点题目。
+                  </Typography>
+                </Stack>
+              </Stack>
+            </SectionCard>
+          )}
 
           {pushMessages.length > 0 && (
             <SectionCard

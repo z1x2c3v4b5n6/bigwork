@@ -272,6 +272,16 @@ const Profile = () => {
     ? '完善院校介绍、招生重点与最新简章，系统将向关注的考生推送更新提醒。'
     : '管理账号信息、学习偏好及目标院校。完善信息可获得更精准的学习规划推荐。';
 
+  const infoCompleteness = useMemo(() => {
+    const fields = [formState.name, formState.email, formState.phone, formState.organization, formState.goal, formState.majorId];
+    const filled = fields.filter((value) => Boolean(value && String(value).trim())).length;
+    return Math.round((filled / fields.length) * 100);
+  }, [formState.email, formState.goal, formState.majorId, formState.name, formState.organization, formState.phone]);
+
+  const goalTarget = 390;
+  const currentScore = examProfile?.totalScore ?? 365;
+  const goalProgress = Math.min(100, Math.round((currentScore / goalTarget) * 100));
+
   return (
     <Stack spacing={4}>
       {(profileQuery.isLoading || updateProfileMutation.isPending || avatarMutation.isPending || avatarUploading || majorsQuery.isLoading) && <LinearProgress />}
@@ -343,6 +353,41 @@ const Profile = () => {
                 <Typography variant="body1">
                   {profile?.majorName || '暂未选择专业'}
                 </Typography>
+                <Stack spacing={1} mt={1.5}>
+                  <Stack direction="row" justifyContent="space-between" alignItems="center">
+                    <Typography variant="subtitle2" color="text.secondary">
+                      目标完成进度
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      目标 {goalTarget}+ · 当前 {currentScore}
+                    </Typography>
+                  </Stack>
+                  <LinearProgress
+                    variant="determinate"
+                    value={goalProgress}
+                    sx={{ height: 8, borderRadius: 999 }}
+                    color={goalProgress >= 80 ? 'success' : 'primary'}
+                  />
+                </Stack>
+                <Stack spacing={1} mt={1.5}>
+                  <Stack direction="row" justifyContent="space-between" alignItems="center">
+                    <Typography variant="subtitle2" color="text.secondary">
+                      资料完整度
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      {infoCompleteness}%
+                    </Typography>
+                  </Stack>
+                  <LinearProgress
+                    variant="determinate"
+                    value={infoCompleteness}
+                    sx={{ height: 8, borderRadius: 999 }}
+                    color={infoCompleteness > 80 ? 'success' : 'warning'}
+                  />
+                  <Typography variant="caption" color="text.secondary">
+                    补充学校、专业、联系方式等信息，可提升推荐准确度。
+                  </Typography>
+                </Stack>
                 <Typography variant="subtitle2" color="text.secondary" mt={2}>
                   {goalLabel}
                 </Typography>

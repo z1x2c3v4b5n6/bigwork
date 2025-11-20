@@ -28,6 +28,8 @@ export interface PublishBrochurePayload {
   summary?: string;
   link?: string;
   publishedAt?: string;
+  featured?: boolean;
+  status?: 'published' | 'offline';
 }
 
 export interface PublishBrochureResponse {

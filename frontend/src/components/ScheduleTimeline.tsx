@@ -25,6 +25,7 @@ type TimelineEntry = {
   focus?: string;
   location?: string;
   tags?: string[];
+  status?: '未开始' | '进行中' | '已完成';
 };
 
 const timelineIconMap: Partial<Record<string, JSX.Element>> = {
@@ -79,6 +80,14 @@ const ScheduleTimeline = ({ items, variant = 'card' }: ScheduleTimelineProps) =>
                 </Typography>
                 <Stack direction="row" spacing={1} alignItems="center">
                   <Chip label={item.type} size="small" color="primary" variant="outlined" />
+                  {item.status ? (
+                    <Chip
+                      label={item.status}
+                      size="small"
+                      color={item.status === '已完成' ? 'success' : item.status === '进行中' ? 'warning' : 'default'}
+                      variant={item.status === '未开始' ? 'outlined' : 'filled'}
+                    />
+                  ) : null}
                   <Typography variant="body2" color="text.secondary">
                     {dayjs(item.start).format('HH:mm')} - {dayjs(item.end).format('HH:mm')}
                   </Typography>
