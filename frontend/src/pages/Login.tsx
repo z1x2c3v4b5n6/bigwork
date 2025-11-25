@@ -1,4 +1,5 @@
 import LockOpenIcon from '@mui/icons-material/LockOpen';
+import PhoneIphoneIcon from '@mui/icons-material/PhoneIphone';
 import {
   Alert,
   Box,
@@ -6,9 +7,12 @@ import {
   Chip,
   Divider,
   Grid,
+  InputAdornment,
   Paper,
   Stack,
   TextField,
+  ToggleButton,
+  ToggleButtonGroup,
   Typography,
 } from '@mui/material';
 import { FormEvent, useEffect, useState } from 'react';
@@ -93,13 +97,13 @@ const Login = () => {
       sx={{
         minHeight: '100vh',
         px: { xs: 2, md: 6 },
-        py: { xs: 6, md: 10 },
+        py: { xs: 5, md: 8 },
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         position: 'relative',
         overflow: 'hidden',
-        bgcolor: 'background.default',
+        bgcolor: '#f3f6f2',
       }}
     >
       <Box
@@ -107,221 +111,319 @@ const Login = () => {
           position: 'absolute',
           inset: 0,
           background:
-            'radial-gradient(circle at 10% 20%, rgba(70, 140, 255, 0.1), transparent 30%), radial-gradient(circle at 80% 0%, rgba(118, 190, 255, 0.12), transparent 25%), linear-gradient(135deg, rgba(255,255,255,0.6), rgba(245,248,255,0.7))',
-          filter: 'blur(0px)',
+            'radial-gradient(circle at 10% 20%, rgba(58, 147, 100, 0.14), transparent 30%), radial-gradient(circle at 80% 0%, rgba(72, 139, 93, 0.12), transparent 24%), linear-gradient(135deg, rgba(239,245,239,0.9), rgba(226,237,228,0.95))',
           zIndex: 0,
         }}
       />
 
       <Paper
-        elevation={3}
+        elevation={6}
         sx={{
           width: '100%',
-          maxWidth: 1100,
+          maxWidth: 1180,
           borderRadius: 4,
-          p: { xs: 3, md: 5 },
+          overflow: 'hidden',
           position: 'relative',
           zIndex: 1,
-          backdropFilter: 'blur(10px)',
           border: '1px solid',
           borderColor: 'divider',
-          boxShadow: '0 20px 60px rgba(15, 23, 42, 0.15)',
+          boxShadow: '0 28px 80px rgba(30, 60, 43, 0.16)',
         }}
       >
-        <Grid container spacing={4} alignItems="stretch">
-          <Grid item xs={12} md={5}>
-            <Stack
-              spacing={3}
-              sx={{
-                height: '100%',
-                borderRadius: 3,
-                background:
-                  'linear-gradient(180deg, rgba(33, 150, 243, 0.12) 0%, rgba(21, 101, 192, 0.08) 100%)',
-                p: { xs: 3, md: 4 },
-                border: '1px solid',
-                borderColor: 'primary.light',
-              }}
-            >
-              <Chip label="Web 端专业体验" color="primary" variant="filled" sx={{ width: 'fit-content' }} />
-              <Stack spacing={1}>
-                <Typography variant="h4" fontWeight={800} lineHeight={1.2}>
-                  考研学习平台
-                  <Box component="span" color="primary.main"> · 登录</Box>
+        <Grid container>
+          <Grid
+            item
+            xs={12}
+            md={6}
+            sx={{
+              p: { xs: 3, md: 5 },
+              bgcolor: 'white',
+            }}
+          >
+            <Stack spacing={3} height="100%">
+              <Stack spacing={0.5} alignItems="flex-start">
+                <Chip label="安全登录" color="success" variant="filled" sx={{ borderRadius: 1 }} />
+                <Typography variant="h4" fontWeight={800} color="success.dark">
+                  登录
                 </Typography>
-                <Typography variant="body1" color="text.secondary">
-                  统一的账号体系覆盖学生、教研管理员与院校官方。安全的数据存储、桌面级的排版与留白，带来更像 Web 端的专业体验。
+                <Typography variant="body2" color="text.secondary">
+                  Sign in
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  没有账号？<Button component={RouterLink} to="/register" size="small">创建一个</Button>
                 </Typography>
               </Stack>
-              <Divider light />
-              <Stack spacing={2}>
-                {[`刷题与课程资源随时更新`, `院校动态与公告实时同步`, `后台管理支持审核与数据面板`].map(
-                  (text) => (
-                    <Stack
-                      key={text}
-                      direction="row"
-                      spacing={1.5}
-                      alignItems="center"
-                      sx={{
-                        p: 1.5,
-                        borderRadius: 2,
-                        bgcolor: 'background.paper',
-                        border: '1px solid',
-                        borderColor: 'divider',
-                        boxShadow: '0 10px 30px rgba(0,0,0,0.04)',
-                      }}
-                    >
-                      <Box
-                        sx={{
-                          width: 36,
-                          height: 36,
-                          borderRadius: '12px',
-                          bgcolor: 'primary.light',
-                          display: 'grid',
-                          placeItems: 'center',
-                          color: 'primary.main',
-                          fontWeight: 700,
-                        }}
-                      >
-                        •
-                      </Box>
-                      <Typography variant="body1" fontWeight={600} color="text.primary">
-                        {text}
-                      </Typography>
-                    </Stack>
-                  ),
-                )}
-              </Stack>
-            </Stack>
-          </Grid>
 
-          <Grid item xs={12} md={7}>
-            <Stack spacing={3} sx={{ height: '100%' }}>
-              <Stack spacing={1} alignItems="flex-start">
+              <Box
+                sx={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  border: '1px solid',
+                  borderColor: 'divider',
+                  borderRadius: 2,
+                  p: 1.5,
+                  bgcolor: '#f9fbf8',
+                }}
+              >
+                <Stack spacing={0.5}>
+                  <Typography variant="subtitle2" color="text.primary" fontWeight={700}>
+                    输入数据库已有账号密码
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    系统不会自动生成账号或修改表结构，所有身份信息均由后端数据库维护。
+                  </Typography>
+                </Stack>
                 <Box
                   sx={{
-                    width: 54,
-                    height: 54,
+                    width: 44,
+                    height: 44,
                     borderRadius: 2,
-                    bgcolor: 'primary.light',
-                    color: 'primary.main',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
+                    bgcolor: 'success.light',
+                    color: 'success.dark',
+                    display: 'grid',
+                    placeItems: 'center',
                   }}
                 >
                   <LockOpenIcon />
                 </Box>
-                <Typography variant="h5" fontWeight={700}>
-                  输入数据库已有账号密码
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  系统不会自动生成账号或修改表结构，所有身份信息均由后端数据库维护。
-                </Typography>
-              </Stack>
+              </Box>
 
               {error ? <Alert severity="error">{error}</Alert> : null}
 
-              <Box
-                sx={{
-                  border: '1px dashed',
-                  borderColor: 'divider',
-                  borderRadius: 2,
-                  p: 2.5,
-                  bgcolor: 'background.paper',
-                }}
-              >
-                <Stack spacing={1.5}>
-                  <Typography variant="subtitle2" color="text.secondary" fontWeight={700}>
-                    体验账号一键填充
-                  </Typography>
-                  <Box
+              <Stack spacing={1.5}>
+                <ToggleButtonGroup
+                  exclusive
+                  value="username"
+                  aria-label="登录方式"
+                  fullWidth
+                  onChange={() => undefined}
+                >
+                  <ToggleButton
+                    value="username"
                     sx={{
-                      display: 'grid',
-                      gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, minmax(0, 1fr))' },
-                      gap: 1.5,
+                      '&.Mui-selected': {
+                        bgcolor: '#e8f3ec',
+                        color: 'success.dark',
+                      },
                     }}
                   >
-                    {demoAccounts.map((account) => (
-                      <Stack
-                        key={account.key}
-                        spacing={0.5}
+                    手机/用户名登录
+                  </ToggleButton>
+                  <ToggleButton value="email" disabled>
+                    邮箱登录
+                  </ToggleButton>
+                </ToggleButtonGroup>
+
+                <Box
+                  component="form"
+                  onSubmit={handleSubmit}
+                  noValidate
+                  sx={{
+                    borderRadius: 2,
+                    p: { xs: 2, md: 2.5 },
+                    border: '1px solid',
+                    borderColor: 'divider',
+                    bgcolor: 'white',
+                    boxShadow: '0 20px 40px rgba(0,0,0,0.04)',
+                  }}
+                >
+                  <Stack spacing={2.5}>
+                    <TextField
+                      label="用户名 / 手机号"
+                      value={username}
+                      onChange={(event) => setUsername(event.target.value)}
+                      required
+                      autoFocus
+                      autoComplete="username"
+                      fullWidth
+                      InputProps={{
+                        startAdornment: (
+                          <InputAdornment position="start">
+                            <PhoneIphoneIcon color="success" />
+                          </InputAdornment>
+                        ),
+                        sx: { borderRadius: 2.5 },
+                      }}
+                    />
+                    <TextField
+                      label="密码"
+                      type="password"
+                      value={password}
+                      onChange={(event) => setPassword(event.target.value)}
+                      required
+                      autoComplete="current-password"
+                      fullWidth
+                      InputProps={{
+                        sx: { borderRadius: 2.5 },
+                      }}
+                    />
+                    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} alignItems="center">
+                      <Button
+                        type="submit"
+                        variant="contained"
+                        color="success"
+                        size="large"
+                        disabled={loading}
+                        fullWidth
                         sx={{
-                          borderRadius: 1.5,
-                          border: '1px solid',
-                          borderColor: 'divider',
-                          p: 1.5,
-                          bgcolor: 'background.default',
-                          transition: 'border-color 0.2s, box-shadow 0.2s',
-                          '&:hover': {
-                            borderColor: 'primary.main',
-                            boxShadow: '0 10px 30px rgba(0,0,0,0.06)',
-                          },
+                          borderRadius: 2,
+                          boxShadow: '0 12px 24px rgba(60,128,89,0.25)',
                         }}
                       >
-                        <Typography variant="body1" fontWeight={700}>
-                          {account.label}
-                        </Typography>
-                        <Typography variant="body2" color="text.secondary">
-                          用户名 <strong>{account.username}</strong> · 密码 <strong>{account.password}</strong>
-                        </Typography>
-                        <Typography variant="body2" color="text.secondary" sx={{ minHeight: 40 }}>
-                          {account.description}
-                        </Typography>
-                        <Button
-                          variant="outlined"
-                          size="small"
-                          onClick={() => handleUseAccount(account)}
-                          disabled={loading}
-                          sx={{ alignSelf: 'flex-start', mt: 0.5 }}
-                        >
-                          一键填充
-                        </Button>
-                      </Stack>
-                    ))}
-                  </Box>
-                </Stack>
-              </Box>
-
-              <Box
-                component="form"
-                onSubmit={handleSubmit}
-                noValidate
-                sx={{
-                  border: '1px solid',
-                  borderColor: 'divider',
-                  borderRadius: 2,
-                  p: { xs: 2.5, md: 3 },
-                  boxShadow: '0 10px 30px rgba(0,0,0,0.04)',
-                }}
-              >
-                <Stack spacing={2}>
-                  <TextField
-                    label="用户名"
-                    value={username}
-                    onChange={(event) => setUsername(event.target.value)}
-                    required
-                    autoFocus
-                    autoComplete="username"
-                    fullWidth
-                  />
-                  <TextField
-                    label="密码"
-                    type="password"
-                    value={password}
-                    onChange={(event) => setPassword(event.target.value)}
-                    required
-                    autoComplete="current-password"
-                    fullWidth
-                  />
-                  <Button type="submit" variant="contained" size="large" disabled={loading}>
-                    {loading ? '正在登录…' : '登录'}
-                  </Button>
-                  <Button component={RouterLink} to="/register" disabled={loading}>
-                    没有账号？立即注册
-                  </Button>
-                </Stack>
-              </Box>
+                        {loading ? '正在登录…' : '登录'}
+                      </Button>
+                      <Button
+                        component={RouterLink}
+                        to="/"
+                        variant="outlined"
+                        color="success"
+                        fullWidth
+                        sx={{ borderRadius: 2 }}
+                        disabled={loading}
+                      >
+                        返回首页
+                      </Button>
+                    </Stack>
+                    <Divider flexItem>
+                      <Typography variant="caption" color="text.secondary">
+                        体验账号
+                      </Typography>
+                    </Divider>
+                    <Box
+                      sx={{
+                        borderRadius: 2,
+                        border: '1px dashed',
+                        borderColor: 'success.light',
+                        bgcolor: '#f7fbf6',
+                        p: 2,
+                      }}
+                    >
+                      <Typography variant="subtitle2" color="success.dark" fontWeight={700} sx={{ mb: 1 }}>
+                        体验账号一键填充
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+                        点击下方卡片即可填充对应的用户名与密码。
+                      </Typography>
+                      <Box
+                        sx={{
+                          display: 'grid',
+                          gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, minmax(0, 1fr))' },
+                          gap: 1.25,
+                        }}
+                      >
+                        {demoAccounts.map((account) => (
+                          <Stack
+                            key={account.key}
+                            spacing={0.75}
+                            sx={{
+                              p: 1.5,
+                              borderRadius: 2,
+                              bgcolor: 'white',
+                              border: '1px solid',
+                              borderColor: 'divider',
+                              boxShadow: '0 16px 40px rgba(0,0,0,0.06)',
+                              transition: 'all 0.2s ease',
+                              '&:hover': {
+                                borderColor: 'success.main',
+                                boxShadow: '0 18px 44px rgba(64,122,90,0.16)',
+                                transform: 'translateY(-2px)',
+                              },
+                            }}
+                          >
+                            <Typography variant="subtitle1" fontWeight={700} color="text.primary">
+                              {account.label}
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary">
+                              用户名 <strong>{account.username}</strong> · 密码 <strong>{account.password}</strong>
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary" sx={{ minHeight: 40 }}>
+                              {account.description}
+                            </Typography>
+                            <Button
+                              variant="outlined"
+                              size="small"
+                              color="success"
+                              onClick={() => handleUseAccount(account)}
+                              disabled={loading}
+                              sx={{ alignSelf: 'flex-start', borderRadius: 1.5 }}
+                            >
+                              一键填充
+                            </Button>
+                          </Stack>
+                        ))}
+                      </Box>
+                    </Box>
+                  </Stack>
+                </Box>
+              </Stack>
             </Stack>
+          </Grid>
+
+          <Grid
+            item
+            xs={12}
+            md={6}
+            sx={{
+              position: 'relative',
+              background:
+                'linear-gradient(120deg, rgba(31, 86, 57, 0.92), rgba(50, 118, 83, 0.88)), url(https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1400&q=80) center/cover no-repeat',
+              color: '#f4fbf6',
+              p: { xs: 3, md: 5 },
+              display: 'flex',
+              alignItems: 'center',
+            }}
+          >
+            <Stack spacing={2.5} sx={{ zIndex: 1 }}>
+              <Typography variant="h4" fontWeight={800} lineHeight={1.2}>
+                更贴近 Web 端的考研学习平台
+              </Typography>
+              <Typography variant="body1" sx={{ maxWidth: 440 }} color="rgba(244,251,246,0.9)">
+                统一账号支持学生、教研管理员、院校官方。搭配后台管理、课程资源与院校动态，让每次登录都快速进入需要的工作区。
+              </Typography>
+              <Stack spacing={1.5}>
+                {['刷题与课程资源同步', '院校公告与学生关注', '后台审核与数据面板'].map((text) => (
+                  <Stack
+                    key={text}
+                    direction="row"
+                    spacing={1.5}
+                    alignItems="center"
+                    sx={{
+                      p: 1.5,
+                      borderRadius: 2,
+                      bgcolor: 'rgba(255,255,255,0.08)',
+                      border: '1px solid rgba(255,255,255,0.14)',
+                    }}
+                  >
+                    <Box
+                      sx={{
+                        width: 32,
+                        height: 32,
+                        borderRadius: '10px',
+                        bgcolor: 'rgba(255,255,255,0.18)',
+                        display: 'grid',
+                        placeItems: 'center',
+                        fontWeight: 700,
+                        color: '#e7f5ea',
+                      }}
+                    >
+                      •
+                    </Box>
+                    <Typography variant="body1" fontWeight={600} color="#f4fbf6">
+                      {text}
+                    </Typography>
+                  </Stack>
+                ))}
+              </Stack>
+            </Stack>
+            <Box
+              sx={{
+                position: 'absolute',
+                inset: 0,
+                bgcolor: 'linear-gradient(160deg, rgba(0,0,0,0.08), rgba(0,0,0,0.35))',
+                zIndex: 0,
+              }}
+            />
           </Grid>
         </Grid>
       </Paper>
