@@ -24,38 +24,6 @@ interface LocationState {
   };
 }
 
-interface DemoAccount {
-  key: string;
-  label: string;
-  username: string;
-  password: string;
-  description: string;
-}
-
-const demoAccounts: DemoAccount[] = [
-  {
-    key: 'student',
-    label: '普通学生体验账号',
-    username: 'student',
-    password: 'study2025',
-    description: '进入学习首页、刷题、课程和日程等全部学生功能。',
-  },
-  {
-    key: 'admin',
-    label: '教研管理员体验账号',
-    username: 'admin',
-    password: 'admin123',
-    description: '可访问后台管理面板，体验课程、题库与论坛审核流程。',
-  },
-  {
-    key: 'institution',
-    label: '院校官方体验账号',
-    username: 'institution',
-    password: 'admit2024',
-    description: '发布院校招生简章、查看关注考生并推送最新动态。',
-  },
-];
-
 const Login = () => {
   const { login, loading, user } = useAuth();
   const navigate = useNavigate();
@@ -66,12 +34,6 @@ const Login = () => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
-
-  const handleUseAccount = (account: DemoAccount) => {
-    setUsername(account.username);
-    setPassword(account.password);
-    setError(null);
-  };
 
   useEffect(() => {
     if (user) {
@@ -145,209 +107,39 @@ const Login = () => {
             </Typography>
           </Stack>
 
-          <Box
-            sx={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              border: '1px solid',
-              borderColor: 'divider',
-              borderRadius: 2,
-              p: 1.5,
-              bgcolor: '#f9fbf8',
-            }}
-          >
-            <Stack spacing={0.5}>
-              <Typography variant="subtitle2" color="text.primary" fontWeight={700}>
-                账号已在数据库中，请直接登录
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                支持学生、教研管理员、院校官方统一入口，无需额外注册或切换模式。
-              </Typography>
-            </Stack>
-            <Box
-              sx={{
-                width: 44,
-                height: 44,
-                borderRadius: 2,
-                bgcolor: 'success.light',
-                color: 'success.dark',
-                display: 'grid',
-                placeItems: 'center',
-              }}
-            >
-              <LockOpenIcon />
-            </Box>
-          </Box>
-
           {error ? <Alert severity="error">{error}</Alert> : null}
 
-          <Stack spacing={1.5}>
-            <ToggleButtonGroup
-              exclusive
-              value="username"
-              aria-label="登录方式"
-              fullWidth
-              onChange={() => undefined}
-            >
-              <ToggleButton
-                value="username"
-                sx={{
-                  '&.Mui-selected': {
-                    bgcolor: '#e8f3ec',
-                    color: 'success.dark',
-                  },
-                }}
+          <Box component="form" onSubmit={handleSubmit} noValidate>
+            <Stack spacing={2}>
+              <TextField
+                label="用户名"
+                value={username}
+                onChange={(event) => setUsername(event.target.value)}
+                required
+                autoFocus
+                autoComplete="username"
+              />
+              <TextField
+                label="密码"
+                type="password"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                required
+                autoComplete="current-password"
+              />
+              <Button
+                type="submit"
+                variant="contained"
+                size="large"
+                disabled={loading}
               >
-                手机/用户名登录
-              </ToggleButton>
-              <ToggleButton value="email" disabled>
-                邮箱登录
-              </ToggleButton>
-            </ToggleButtonGroup>
-
-            <Box
-              component="form"
-              onSubmit={handleSubmit}
-              noValidate
-              sx={{
-                borderRadius: 2,
-                p: { xs: 2, md: 2.5 },
-                border: '1px solid',
-                borderColor: 'divider',
-                bgcolor: 'white',
-                boxShadow: '0 20px 40px rgba(0,0,0,0.04)',
-              }}
-            >
-              <Stack spacing={2.5}>
-                <TextField
-                  label="用户名 / 手机号"
-                  value={username}
-                  onChange={(event) => setUsername(event.target.value)}
-                  required
-                  autoFocus
-                  autoComplete="username"
-                  fullWidth
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <PhoneIphoneIcon color="success" />
-                      </InputAdornment>
-                    ),
-                    sx: { borderRadius: 2.5 },
-                  }}
-                />
-                <TextField
-                  label="密码"
-                  type="password"
-                  value={password}
-                  onChange={(event) => setPassword(event.target.value)}
-                  required
-                  autoComplete="current-password"
-                  fullWidth
-                  InputProps={{
-                    sx: { borderRadius: 2.5 },
-                  }}
-                />
-                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} alignItems="center">
-                  <Button
-                    type="submit"
-                    variant="contained"
-                    color="success"
-                    size="large"
-                    disabled={loading}
-                    fullWidth
-                    sx={{
-                      borderRadius: 2,
-                      boxShadow: '0 12px 24px rgba(60,128,89,0.25)',
-                    }}
-                  >
-                    {loading ? '正在登录…' : '登录'}
-                  </Button>
-                  <Button
-                    component={RouterLink}
-                    to="/"
-                    variant="outlined"
-                    color="success"
-                    fullWidth
-                    sx={{ borderRadius: 2 }}
-                    disabled={loading}
-                  >
-                    返回首页
-                  </Button>
-                </Stack>
-                <Divider flexItem>
-                  <Typography variant="caption" color="text.secondary">
-                    体验账号
-                  </Typography>
-                </Divider>
-                <Box
-                  sx={{
-                    borderRadius: 2,
-                    border: '1px dashed',
-                    borderColor: 'success.light',
-                    bgcolor: '#f7fbf6',
-                    p: 2,
-                  }}
-                >
-                  <Typography variant="subtitle2" color="success.dark" fontWeight={700} sx={{ mb: 1 }}>
-                    体验账号一键填充
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-                    点击下方卡片即可填充对应的用户名与密码。
-                  </Typography>
-                  <Box
-                    sx={{
-                      display: 'grid',
-                      gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, minmax(0, 1fr))' },
-                      gap: 1.25,
-                    }}
-                  >
-                    {demoAccounts.map((account) => (
-                      <Stack
-                        key={account.key}
-                        spacing={0.75}
-                        sx={{
-                          p: 1.5,
-                          borderRadius: 2,
-                          bgcolor: 'white',
-                          border: '1px solid',
-                          borderColor: 'divider',
-                          boxShadow: '0 16px 40px rgba(0,0,0,0.06)',
-                          transition: 'all 0.2s ease',
-                          '&:hover': {
-                            borderColor: 'success.main',
-                            boxShadow: '0 18px 44px rgba(64,122,90,0.16)',
-                            transform: 'translateY(-2px)',
-                          },
-                        }}
-                      >
-                        <Typography variant="subtitle1" fontWeight={700} color="text.primary">
-                          {account.label}
-                        </Typography>
-                        <Typography variant="body2" color="text.secondary">
-                          用户名 <strong>{account.username}</strong> · 密码 <strong>{account.password}</strong>
-                        </Typography>
-                        <Typography variant="body2" color="text.secondary" sx={{ minHeight: 40 }}>
-                          {account.description}
-                        </Typography>
-                        <Button
-                          variant="outlined"
-                          size="small"
-                          color="success"
-                          onClick={() => handleUseAccount(account)}
-                          disabled={loading}
-                          sx={{ alignSelf: 'flex-start', borderRadius: 1.5 }}
-                        >
-                          一键填充
-                        </Button>
-                      </Stack>
-                    ))}
-                  </Box>
-                </Box>
-              </Stack>
-            </Box>
-          </Stack>
+                {loading ? '正在登录…' : '登录'}
+              </Button>
+              <Button component={RouterLink} to="/register" disabled={loading}>
+                没有账号？立即注册
+              </Button>
+            </Stack>
+          </Box>
         </Stack>
       </Paper>
     </Box>
