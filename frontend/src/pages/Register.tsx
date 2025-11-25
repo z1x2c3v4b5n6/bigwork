@@ -152,20 +152,108 @@ const Register = () => {
   };
 
   return (
-    <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
+    <Box
+      sx={{
+        minHeight: '100vh',
+        position: 'relative',
+        overflow: 'hidden',
+        bgcolor: 'linear-gradient(135deg, #f0f5ff 0%, #f9fcff 40%, #f5f7fb 100%)',
+        '&::before': {
+          content: '""',
+          position: 'absolute',
+          inset: -120,
+          background:
+            'radial-gradient(circle at 20% 20%, rgba(57, 130, 255, 0.12), transparent 40%),' +
+            'radial-gradient(circle at 80% 30%, rgba(0, 200, 180, 0.12), transparent 38%),' +
+            'radial-gradient(circle at 40% 80%, rgba(255, 163, 102, 0.12), transparent 36%)',
+          zIndex: 0,
+        },
+        '&::after': {
+          content: '""',
+          position: 'absolute',
+          width: 520,
+          height: 520,
+          borderRadius: '50%',
+          background:
+            'linear-gradient(145deg, rgba(57, 130, 255, 0.08), rgba(0, 200, 180, 0.06))',
+          filter: 'blur(60px)',
+          top: { xs: -180, sm: -140 },
+          right: { xs: -220, sm: -160 },
+          zIndex: 0,
+        },
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        p: { xs: 2, sm: 4 },
+      }}
+    >
+      <Box
+        aria-hidden
+        sx={{
+          position: 'absolute',
+          inset: 0,
+          pointerEvents: 'none',
+          zIndex: 0,
+        }}
+      >
+        <Box
+          sx={{
+            position: 'absolute',
+            inset: 0,
+            backgroundImage:
+              'linear-gradient(90deg, rgba(255,255,255,0.4) 1px, transparent 1px), ' +
+              'linear-gradient(0deg, rgba(255,255,255,0.4) 1px, transparent 1px)',
+            backgroundSize: '140px 140px',
+            mixBlendMode: 'soft-light',
+            opacity: 0.5,
+          }}
+        />
+        <Box
+          sx={{
+            position: 'absolute',
+            width: 240,
+            height: 240,
+            borderRadius: '32%',
+            left: { xs: -90, sm: -60 },
+            bottom: { xs: -70, sm: -50 },
+            background: 'linear-gradient(145deg, rgba(57,130,255,0.18), rgba(99,194,255,0.1))',
+            filter: 'blur(48px)',
+            opacity: 0.9,
+            transform: 'rotate(-8deg)',
+          }}
+        />
+        <Box
+          sx={{
+            position: 'absolute',
+            width: 180,
+            height: 180,
+            borderRadius: '50%',
+            right: { xs: -60, sm: -20 },
+            bottom: { xs: 120, sm: 140 },
+            background: 'radial-gradient(circle, rgba(0,200,180,0.2), transparent 60%)',
+            filter: 'blur(26px)',
+            opacity: 0.8,
+          }}
+        />
+      </Box>
+
       <Paper
         elevation={0}
         sx={{
           width: '100%',
           maxWidth: 520,
-          p: 4,
-          borderRadius: 3,
+          p: { xs: 3, sm: 4 },
+          borderRadius: 4,
           border: '1px solid',
           borderColor: 'divider',
+          bgcolor: '#ffffff',
+          boxShadow: '0 18px 48px rgba(0,0,0,0.06)',
+          position: 'relative',
+          zIndex: 1,
         }}
       >
         <Stack spacing={3}>
-          <Stack spacing={1} alignItems="center">
+          <Stack spacing={1} alignItems="center" textAlign="center">
             <Box
               sx={{
                 width: 56,
@@ -183,7 +271,7 @@ const Register = () => {
             <Typography variant="h5" fontWeight={700}>
               注册新账号
             </Typography>
-            <Typography variant="body2" color="text.secondary" textAlign="center">
+            <Typography variant="body2" color="text.secondary">
               请填写真实的个人信息。账号数据将直接写入数据库，平台不会自动创建或更改任何表结构。
             </Typography>
           </Stack>
