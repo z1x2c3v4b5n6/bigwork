@@ -1,11 +1,17 @@
 import LockOpenIcon from '@mui/icons-material/LockOpen';
+import PhoneIphoneIcon from '@mui/icons-material/PhoneIphone';
 import {
   Alert,
   Box,
   Button,
+  Chip,
+  Divider,
+  InputAdornment,
   Paper,
   Stack,
   TextField,
+  ToggleButton,
+  ToggleButtonGroup,
   Typography,
 } from '@mui/material';
 import { FormEvent, useEffect, useState } from 'react';
@@ -48,39 +54,56 @@ const Login = () => {
   };
 
   return (
-    <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
+    <Box
+      sx={{
+        minHeight: '100vh',
+        px: { xs: 2, md: 6 },
+        py: { xs: 5, md: 8 },
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        position: 'relative',
+        overflow: 'hidden',
+        bgcolor: '#f5f7f4',
+      }}
+    >
+      <Box
+        sx={{
+          position: 'absolute',
+          inset: 0,
+          background:
+            'radial-gradient(circle at 10% 20%, rgba(58, 147, 100, 0.14), transparent 30%), radial-gradient(circle at 80% 0%, rgba(72, 139, 93, 0.12), transparent 24%), linear-gradient(135deg, rgba(239,245,239,0.9), rgba(226,237,228,0.95))',
+          zIndex: 0,
+        }}
+      />
+
       <Paper
-        elevation={0}
+        elevation={6}
         sx={{
           width: '100%',
-          maxWidth: 420,
-          p: 4,
-          borderRadius: 3,
+          maxWidth: 840,
+          borderRadius: 4,
+          overflow: 'hidden',
+          position: 'relative',
+          zIndex: 1,
           border: '1px solid',
           borderColor: 'divider',
+          boxShadow: '0 28px 80px rgba(30, 60, 43, 0.16)',
+          p: { xs: 3, md: 5 },
+          bgcolor: 'white',
         }}
       >
-        <Stack spacing={3}>
-          <Stack spacing={1} alignItems="center">
-            <Box
-              sx={{
-                width: 56,
-                height: 56,
-                borderRadius: '50%',
-                bgcolor: 'primary.light',
-                color: 'primary.main',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <LockOpenIcon />
-            </Box>
-            <Typography variant="h5" fontWeight={700}>
-              欢迎登录考研学习平台
+        <Stack spacing={3} height="100%">
+          <Stack spacing={0.5} alignItems="flex-start">
+            <Chip label="安全登录" color="success" variant="filled" sx={{ borderRadius: 1 }} />
+            <Typography variant="h4" fontWeight={800} color="success.dark">
+              更贴近 Web 端的考研学习平台
             </Typography>
-            <Typography variant="body2" color="text.secondary" textAlign="center">
-              请输入数据库中已存在的账号密码。所有身份信息均由后端数据库维护，我们不会自动创建或修改表结构。
+            <Typography variant="body2" color="text.secondary">
+              统一账号支持学生、教研管理员、院校官方。搭配后台管理、课程资源与院校动态，让每次登录都快速进入需要的工作区。
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              没有账号？<Button component={RouterLink} to="/register" size="small">创建一个</Button>
             </Typography>
           </Stack>
 
