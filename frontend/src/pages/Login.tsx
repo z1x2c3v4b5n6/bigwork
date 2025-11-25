@@ -114,6 +114,56 @@ const Login = () => {
         p: { xs: 2, sm: 4 },
       }}
     >
+      <Box
+        aria-hidden
+        sx={{
+          position: 'absolute',
+          inset: 0,
+          pointerEvents: 'none',
+          zIndex: 0,
+        }}
+      >
+        <Box
+          sx={{
+            position: 'absolute',
+            inset: 0,
+            backgroundImage:
+              'linear-gradient(90deg, rgba(255,255,255,0.4) 1px, transparent 1px), ' +
+              'linear-gradient(0deg, rgba(255,255,255,0.4) 1px, transparent 1px)',
+            backgroundSize: '140px 140px',
+            mixBlendMode: 'soft-light',
+            opacity: 0.5,
+          }}
+        />
+        <Box
+          sx={{
+            position: 'absolute',
+            width: 240,
+            height: 240,
+            borderRadius: '32%',
+            left: { xs: -90, sm: -60 },
+            bottom: { xs: -70, sm: -50 },
+            background: 'linear-gradient(145deg, rgba(57,130,255,0.18), rgba(99,194,255,0.1))',
+            filter: 'blur(48px)',
+            opacity: 0.9,
+            transform: 'rotate(-8deg)',
+          }}
+        />
+        <Box
+          sx={{
+            position: 'absolute',
+            width: 180,
+            height: 180,
+            borderRadius: '50%',
+            right: { xs: -60, sm: -20 },
+            bottom: { xs: 120, sm: 140 },
+            background: 'radial-gradient(circle, rgba(0,200,180,0.2), transparent 60%)',
+            filter: 'blur(26px)',
+            opacity: 0.8,
+          }}
+        />
+      </Box>
+
       <Paper
         elevation={6}
         sx={{
