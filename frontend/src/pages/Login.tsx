@@ -3,6 +3,7 @@ import {
   Alert,
   Box,
   Button,
+  Divider,
   Paper,
   Stack,
   TextField,
@@ -18,38 +19,6 @@ interface LocationState {
   };
 }
 
-interface DemoAccount {
-  key: string;
-  label: string;
-  username: string;
-  password: string;
-  description: string;
-}
-
-const demoAccounts: DemoAccount[] = [
-  {
-    key: 'student',
-    label: '普通学生体验账号',
-    username: 'student',
-    password: 'study2025',
-    description: '进入学习首页、刷题、课程和日程等全部学生功能。',
-  },
-  {
-    key: 'admin',
-    label: '教研管理员体验账号',
-    username: 'admin',
-    password: 'admin123',
-    description: '可访问后台管理面板，体验课程、题库与论坛审核流程。',
-  },
-  {
-    key: 'institution',
-    label: '院校官方体验账号',
-    username: 'institution',
-    password: 'admit2024',
-    description: '发布院校招生简章、查看关注考生并推送最新动态。',
-  },
-];
-
 const Login = () => {
   const { login, loading, user } = useAuth();
   const navigate = useNavigate();
@@ -61,11 +30,26 @@ const Login = () => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
 
-  const handleUseAccount = (account: DemoAccount) => {
-    setUsername(account.username);
-    setPassword(account.password);
-    setError(null);
-  };
+  const quickAccounts = [
+    {
+      title: '考研学习平台考生账号',
+      description: '刷题、学习进度与课程资源同步。',
+      username: 'student',
+      password: 'study2025',
+    },
+    {
+      title: '考研教研管理员账号',
+      description: '课程、题库与学员管理。',
+      username: 'admin',
+      password: 'admin123',
+    },
+    {
+      title: '院校官方账号',
+      description: '发布院校公告与复试动态。',
+      username: 'institution',
+      password: 'admit2024',
+    },
+  ];
 
   useEffect(() => {
     if (user) {
@@ -85,25 +69,42 @@ const Login = () => {
     }
   };
 
+  const handleFill = (fillUsername: string, fillPassword: string) => {
+    setUsername(fillUsername);
+    setPassword(fillPassword);
+    setError(null);
+  };
+
   return (
-    <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
+    <Box
+      sx={{
+        minHeight: '100vh',
+        bgcolor: '#f5f7fb',
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        p: { xs: 2, sm: 4 },
+      }}
+    >
       <Paper
         elevation={0}
         sx={{
           width: '100%',
-          maxWidth: 420,
-          p: 4,
-          borderRadius: 3,
+          maxWidth: 520,
+          p: { xs: 3, sm: 4 },
+          borderRadius: 4,
           border: '1px solid',
           borderColor: 'divider',
+          bgcolor: '#ffffff',
+          boxShadow: '0 18px 48px rgba(0,0,0,0.06)',
         }}
       >
-        <Stack spacing={3}>
-          <Stack spacing={1} alignItems="center">
+        <Stack spacing={3.5}>
+          <Stack spacing={1.5} alignItems="center" textAlign="center">
             <Box
               sx={{
-                width: 56,
-                height: 56,
+                width: 64,
+                height: 64,
                 borderRadius: '50%',
                 bgcolor: 'primary.light',
                 color: 'primary.main',
@@ -112,69 +113,75 @@ const Login = () => {
                 justifyContent: 'center',
               }}
             >
-              <LockOpenIcon />
+              <LockOpenIcon fontSize="medium" />
             </Box>
-            <Typography variant="h5" fontWeight={700}>
-              欢迎登录考研学习平台
-            </Typography>
-            <Typography variant="body2" color="text.secondary" textAlign="center">
-              请输入数据库中已存在的账号密码。所有身份信息均由后端数据库维护，我们不会自动创建或修改表结构。
-            </Typography>
+            <Stack spacing={0.5}>
+              <Typography variant="h5" fontWeight={700}>
+                欢迎登录考研学习平台
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                更贴近 Web 端的考研学习平台，统一账号支持学生、教研管理员、院校官方。
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                账号在数据库中保持唯一，请勿随意删除。
+              </Typography>
+            </Stack>
+          </Stack>
+
+          <Stack spacing={1.5}>
+            {quickAccounts.map((item) => (
+              <Paper
+                key={item.username}
+                variant="outlined"
+                sx={{
+                  p: 2.25,
+                  borderRadius: 3,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 2,
+                  borderColor: 'divider',
+                }}
+              >
+                <Box sx={{ flex: 1 }}>
+                  <Typography variant="subtitle1" fontWeight={700}>
+                    {item.title}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                    {item.description}
+                  </Typography>
+                  <Stack direction="row" spacing={2} sx={{ mt: 1.25 }}>
+                    <Stack spacing={0.25}>
+                      <Typography variant="caption" color="text.secondary">
+                        用户名
+                      </Typography>
+                      <Typography variant="body2" fontWeight={600}>
+                        {item.username}
+                      </Typography>
+                    </Stack>
+                    <Divider flexItem orientation="vertical" />
+                    <Stack spacing={0.25}>
+                      <Typography variant="caption" color="text.secondary">
+                        密码
+                      </Typography>
+                      <Typography variant="body2" fontWeight={600}>
+                        ••••••
+                      </Typography>
+                    </Stack>
+                  </Stack>
+                </Box>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  onClick={() => handleFill(item.username, item.password)}
+                  sx={{ minWidth: 96, borderRadius: 2 }}
+                >
+                  填入
+                </Button>
+              </Paper>
+            ))}
           </Stack>
 
           {error ? <Alert severity="error">{error}</Alert> : null}
-
-          <Box
-            sx={{
-              border: '1px dashed',
-              borderColor: 'divider',
-              borderRadius: 2,
-              p: 2,
-              bgcolor: 'background.default',
-            }}
-          >
-            <Stack spacing={1.5}>
-              <Typography variant="subtitle2" color="text.secondary" fontWeight={600}>
-                一键填充体验账号
-              </Typography>
-              {demoAccounts.map((account) => (
-                <Stack
-                  key={account.key}
-                  direction={{ xs: 'column', sm: 'row' }}
-                  spacing={1}
-                  alignItems={{ xs: 'flex-start', sm: 'center' }}
-                  justifyContent="space-between"
-                  sx={{
-                    borderRadius: 1.5,
-                    border: '1px solid',
-                    borderColor: 'divider',
-                    p: 1.5,
-                    bgcolor: 'background.paper',
-                  }}
-                >
-                  <Box>
-                    <Typography variant="body1" fontWeight={600}>
-                      {account.label}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-                      用户名 <strong>{account.username}</strong> · 密码 <strong>{account.password}</strong>
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      {account.description}
-                    </Typography>
-                  </Box>
-                  <Button
-                    variant="outlined"
-                    size="small"
-                    onClick={() => handleUseAccount(account)}
-                    disabled={loading}
-                  >
-                    一键填充
-                  </Button>
-                </Stack>
-              ))}
-            </Stack>
-          </Box>
 
           <Box component="form" onSubmit={handleSubmit} noValidate>
             <Stack spacing={2}>
@@ -199,10 +206,16 @@ const Login = () => {
                 variant="contained"
                 size="large"
                 disabled={loading}
+                sx={{ borderRadius: 2, py: 1.4 }}
               >
                 {loading ? '正在登录…' : '登录'}
               </Button>
-              <Button component={RouterLink} to="/register" disabled={loading}>
+              <Button
+                component={RouterLink}
+                to="/register"
+                disabled={loading}
+                sx={{ borderRadius: 2 }}
+              >
                 没有账号？立即注册
               </Button>
             </Stack>
