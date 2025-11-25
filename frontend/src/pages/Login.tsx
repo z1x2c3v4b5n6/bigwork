@@ -82,7 +82,32 @@ const Login = () => {
     <Box
       sx={{
         minHeight: '100vh',
-        bgcolor: '#f5f7fb',
+        position: 'relative',
+        overflow: 'hidden',
+        bgcolor: 'linear-gradient(135deg, #f0f5ff 0%, #f9fcff 40%, #f5f7fb 100%)',
+        '&::before': {
+          content: '""',
+          position: 'absolute',
+          inset: -120,
+          background:
+            'radial-gradient(circle at 20% 20%, rgba(57, 130, 255, 0.12), transparent 40%),' +
+            'radial-gradient(circle at 80% 30%, rgba(0, 200, 180, 0.12), transparent 38%),' +
+            'radial-gradient(circle at 40% 80%, rgba(255, 163, 102, 0.12), transparent 36%)',
+          zIndex: 0,
+        },
+        '&::after': {
+          content: '""',
+          position: 'absolute',
+          width: 520,
+          height: 520,
+          borderRadius: '50%',
+          background:
+            'linear-gradient(145deg, rgba(57, 130, 255, 0.08), rgba(0, 200, 180, 0.06))',
+          filter: 'blur(60px)',
+          top: { xs: -180, sm: -140 },
+          right: { xs: -220, sm: -160 },
+          zIndex: 0,
+        },
         display: 'flex',
         justifyContent: 'center',
         alignItems: 'center',
@@ -100,6 +125,8 @@ const Login = () => {
           borderColor: 'divider',
           bgcolor: '#ffffff',
           boxShadow: '0 18px 48px rgba(0,0,0,0.06)',
+          position: 'relative',
+          zIndex: 1,
         }}
       >
         <Stack spacing={3.5}>
