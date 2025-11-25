@@ -18,38 +18,6 @@ interface LocationState {
   };
 }
 
-interface DemoAccount {
-  key: string;
-  label: string;
-  username: string;
-  password: string;
-  description: string;
-}
-
-const demoAccounts: DemoAccount[] = [
-  {
-    key: 'student',
-    label: '普通学生体验账号',
-    username: 'student',
-    password: 'study2025',
-    description: '进入学习首页、刷题、课程和日程等全部学生功能。',
-  },
-  {
-    key: 'admin',
-    label: '教研管理员体验账号',
-    username: 'admin',
-    password: 'admin123',
-    description: '可访问后台管理面板，体验课程、题库与论坛审核流程。',
-  },
-  {
-    key: 'institution',
-    label: '院校官方体验账号',
-    username: 'institution',
-    password: 'admit2024',
-    description: '发布院校招生简章、查看关注考生并推送最新动态。',
-  },
-];
-
 const Login = () => {
   const { login, loading, user } = useAuth();
   const navigate = useNavigate();
@@ -60,12 +28,6 @@ const Login = () => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
-
-  const handleUseAccount = (account: DemoAccount) => {
-    setUsername(account.username);
-    setPassword(account.password);
-    setError(null);
-  };
 
   useEffect(() => {
     if (user) {
@@ -123,58 +85,6 @@ const Login = () => {
           </Stack>
 
           {error ? <Alert severity="error">{error}</Alert> : null}
-
-          <Box
-            sx={{
-              border: '1px dashed',
-              borderColor: 'divider',
-              borderRadius: 2,
-              p: 2,
-              bgcolor: 'background.default',
-            }}
-          >
-            <Stack spacing={1.5}>
-              <Typography variant="subtitle2" color="text.secondary" fontWeight={600}>
-                一键填充体验账号
-              </Typography>
-              {demoAccounts.map((account) => (
-                <Stack
-                  key={account.key}
-                  direction={{ xs: 'column', sm: 'row' }}
-                  spacing={1}
-                  alignItems={{ xs: 'flex-start', sm: 'center' }}
-                  justifyContent="space-between"
-                  sx={{
-                    borderRadius: 1.5,
-                    border: '1px solid',
-                    borderColor: 'divider',
-                    p: 1.5,
-                    bgcolor: 'background.paper',
-                  }}
-                >
-                  <Box>
-                    <Typography variant="body1" fontWeight={600}>
-                      {account.label}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-                      用户名 <strong>{account.username}</strong> · 密码 <strong>{account.password}</strong>
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      {account.description}
-                    </Typography>
-                  </Box>
-                  <Button
-                    variant="outlined"
-                    size="small"
-                    onClick={() => handleUseAccount(account)}
-                    disabled={loading}
-                  >
-                    一键填充
-                  </Button>
-                </Stack>
-              ))}
-            </Stack>
-          </Box>
 
           <Box component="form" onSubmit={handleSubmit} noValidate>
             <Stack spacing={2}>
