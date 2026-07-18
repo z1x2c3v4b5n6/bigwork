@@ -36,7 +36,7 @@ public class AdminController {
     }
 
     @GetMapping("/settings")
-    public ResponseEntity<Map<String, String>> getSettings(HttpSession session) {
+    public ResponseEntity<Map<String, Object>> getSettings(HttpSession session) {
         currentAdmin(session);
         return ResponseEntity.ok(Map.of("settings", adminService.getSettings()));
     }

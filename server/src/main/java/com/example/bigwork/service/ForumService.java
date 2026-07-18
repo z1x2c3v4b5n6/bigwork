@@ -1,109 +1,17 @@
 package com.example.bigwork.service;
-
-import com.example.bigwork.dto.CreateForumPostRequest;
-import com.example.bigwork.dto.CreateForumTopicRequest;
-import com.example.bigwork.dto.ForumPostResponse;
-import com.example.bigwork.dto.ForumTopicResponse;
-import com.example.bigwork.exception.BusinessException;
-import com.example.bigwork.model.ForumPost;
-import com.example.bigwork.model.ForumTopic;
-import com.example.bigwork.repository.ForumPostRepository;
-import com.example.bigwork.repository.ForumTopicRepository;
-import com.example.bigwork.repository.UserRepository;
-import com.example.bigwork.support.DateTimeUtils;
-import com.example.bigwork.support.SessionUser;
-import org.springframework.http.HttpStatus;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
-import java.time.LocalDateTime;
-import java.util.List;
-
+import com.example.bigwork.dto.*;import com.example.bigwork.exception.BusinessException;import com.example.bigwork.model.*;import com.example.bigwork.repository.*;import com.example.bigwork.support.*;import org.springframework.http.HttpStatus;import org.springframework.stereotype.Service;import org.springframework.transaction.annotation.Transactional;import java.time.LocalDateTime;import java.util.*;
 @Service
-public class ForumService {
-
-    private final ForumTopicRepository forumTopicRepository;
-    private final ForumPostRepository forumPostRepository;
-    private final UserRepository userRepository;
-
-    public ForumService(ForumTopicRepository forumTopicRepository, ForumPostRepository forumPostRepository, UserRepository userRepository) {
-        this.forumTopicRepository = forumTopicRepository;
-        this.forumPostRepository = forumPostRepository;
-        this.userRepository = userRepository;
-    }
-
-    @Transactional(readOnly = true)
-    public List<ForumTopicResponse> listTopics() {
-        return forumTopicRepository.findAll().stream()
-                .map(topic -> new ForumTopicResponse(
-                        topic.getId(),
-                        topic.getTitle(),
-                        topic.getDescription(),
-                        resolveAuthorName(topic.getAuthorId()),
-                        DateTimeUtils.format(topic.getCreatedAt()),
-                        DateTimeUtils.format(topic.getUpdatedAt())
-                ))
-                .toList();
-    }
-
-    @Transactional
-    public Long createTopic(CreateForumTopicRequest request, SessionUser sessionUser) {
-        requireLogin(sessionUser);
-        ForumTopic topic = new ForumTopic();
-        topic.setTitle(request.title());
-        topic.setDescription(request.description());
-        topic.setAuthorId(sessionUser.getId());
-        LocalDateTime now = LocalDateTime.now();
-        topic.setCreatedAt(now);
-        topic.setUpdatedAt(now);
-        ForumTopic saved = forumTopicRepository.save(topic);
-        return saved.getId();
-    }
-
-    @Transactional(readOnly = true)
-    public List<ForumPostResponse> listPosts(Long topicId) {
-        return forumPostRepository.findByTopicIdOrderByCreatedAtAsc(topicId).stream()
-                .map(post -> new ForumPostResponse(
-                        post.getId(),
-                        post.getContent(),
-                        resolveAuthorName(post.getAuthorId()),
-                        DateTimeUtils.format(post.getCreatedAt()),
-                        DateTimeUtils.format(post.getUpdatedAt())
-                ))
-                .toList();
-    }
-
-    @Transactional
-    public Long createPost(Long topicId, CreateForumPostRequest request, SessionUser sessionUser) {
-        requireLogin(sessionUser);
-        ForumTopic topic = forumTopicRepository.findById(topicId)
-                .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "话题不存在"));
-        ForumPost post = new ForumPost();
-        post.setTopicId(topic.getId());
-        post.setAuthorId(sessionUser.getId());
-        post.setContent(request.content());
-        LocalDateTime now = LocalDateTime.now();
-        post.setCreatedAt(now);
-        post.setUpdatedAt(now);
-        ForumPost saved = forumPostRepository.save(post);
-
-        topic.setUpdatedAt(now);
-        forumTopicRepository.save(topic);
-        return saved.getId();
-    }
-
-    private void requireLogin(SessionUser sessionUser) {
-        if (sessionUser == null) {
-            throw new BusinessException(HttpStatus.UNAUTHORIZED, "请先登录");
-        }
-    }
-
-    private String resolveAuthorName(Long userId) {
-        if (userId == null) {
-            return "匿名用户";
-        }
-        return userRepository.findById(userId)
-                .map(user -> user.getDisplayName())
-                .orElse("用户已删除");
-    }
+public class ForumService{
+ private final ForumTopicRepository topics;private final ForumPostRepository posts;private final UserRepository users;private final ForumInteractionRepository interactions;
+ public ForumService(ForumTopicRepository t,ForumPostRepository p,UserRepository u,ForumInteractionRepository i){topics=t;posts=p;users=u;interactions=i;}
+ @Transactional(readOnly=true) public List<ForumTopicResponse> listTopics(SessionUser user,String keyword,String category,boolean favorites){
+  return topics.findAll().stream().filter(t->keyword==null||keyword.isBlank()||t.getTitle().toLowerCase().contains(keyword.toLowerCase())||(t.getDescription()!=null&&t.getDescription().toLowerCase().contains(keyword.toLowerCase())))
+   .filter(t->category==null||category.isBlank()||category.equals(t.getCategory())).map(t->response(t,user)).filter(t->!favorites||t.favorited()).sorted(Comparator.comparing(ForumTopicResponse::updatedAt).reversed()).toList();}
+ private ForumTopicResponse response(ForumTopic t,SessionUser user){List<ForumInteraction> rows=interactions.findByTopicId(t.getId());ForumInteraction mine=user==null?null:rows.stream().filter(x->x.getUserId().equals(user.getId())).findFirst().orElse(null);return new ForumTopicResponse(t.getId(),t.getTitle(),t.getDescription(),t.getCategory()==null?"备考交流":t.getCategory(),author(t.getAuthorId()),DateTimeUtils.format(t.getCreatedAt()),DateTimeUtils.format(t.getUpdatedAt()),rows.stream().filter(ForumInteraction::isLiked).count(),rows.stream().filter(ForumInteraction::isFavorited).count(),mine!=null&&mine.isLiked(),mine!=null&&mine.isFavorited(),user!=null&&(Objects.equals(t.getAuthorId(),user.getId())||"admin".equalsIgnoreCase(user.getRole())));}
+ @Transactional public Long createTopic(CreateForumTopicRequest r,SessionUser u){login(u);ForumTopic t=new ForumTopic();t.setTitle(r.title());t.setDescription(r.description());t.setCategory(r.category()==null||r.category().isBlank()?"备考交流":r.category());t.setAuthorId(u.getId());t.setCreatedAt(LocalDateTime.now());t.setUpdatedAt(LocalDateTime.now());return topics.save(t).getId();}
+ @Transactional(readOnly=true) public List<ForumPostResponse> listPosts(Long id){return posts.findByTopicIdOrderByCreatedAtAsc(id).stream().map(p->new ForumPostResponse(p.getId(),p.getContent(),author(p.getAuthorId()),DateTimeUtils.format(p.getCreatedAt()),DateTimeUtils.format(p.getUpdatedAt()))).toList();}
+ @Transactional public Long createPost(Long id,CreateForumPostRequest r,SessionUser u){login(u);ForumTopic t=topics.findById(id).orElseThrow(()->new BusinessException(HttpStatus.NOT_FOUND,"话题不存在"));ForumPost p=new ForumPost();p.setTopicId(id);p.setAuthorId(u.getId());p.setContent(r.content());p.setCreatedAt(LocalDateTime.now());p.setUpdatedAt(LocalDateTime.now());t.setUpdatedAt(LocalDateTime.now());topics.save(t);return posts.save(p).getId();}
+ @Transactional public Map<String,Boolean> toggle(Long id,String action,SessionUser u){login(u);topics.findById(id).orElseThrow(()->new BusinessException(HttpStatus.NOT_FOUND,"话题不存在"));ForumInteraction i=interactions.findByTopicIdAndUserId(id,u.getId()).orElseGet(ForumInteraction::new);i.setTopicId(id);i.setUserId(u.getId());if("like".equals(action))i.setLiked(!i.isLiked());else if("favorite".equals(action))i.setFavorited(!i.isFavorited());else throw new BusinessException(HttpStatus.BAD_REQUEST,"不支持的操作");interactions.save(i);return Map.of("liked",i.isLiked(),"favorited",i.isFavorited());}
+ @Transactional public void deleteTopic(Long id,SessionUser u){login(u);ForumTopic t=topics.findById(id).orElseThrow(()->new BusinessException(HttpStatus.NOT_FOUND,"话题不存在"));if(!Objects.equals(t.getAuthorId(),u.getId())&&!"admin".equalsIgnoreCase(u.getRole()))throw new BusinessException(HttpStatus.FORBIDDEN,"只能删除自己的话题");posts.deleteAll(posts.findByTopicIdOrderByCreatedAtAsc(id));interactions.deleteByTopicId(id);topics.delete(t);}
+ private void login(SessionUser u){if(u==null)throw new BusinessException(HttpStatus.UNAUTHORIZED,"请先登录");}private String author(Long id){return id==null?"匿名用户":users.findById(id).map(User::getDisplayName).orElse("用户已删除");}
 }

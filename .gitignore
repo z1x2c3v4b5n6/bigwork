@@ -1,9 +1,36 @@
+# Frontend
 node_modules/
 dist/
+
+# Environment
 .env
 .env.local
+.env.*
+
+# Java / Maven
+target/
+server/target/
+*.class
+*.log
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# H2 Database
+*.mv.db
+*.trace.db
+server/data/
+
+# Uploaded files
+server/uploads/
+
+# OS
 .DS_Store
+Thumbs.db
+
+# Lock files
 pnpm-lock.yaml
 yarn.lock
 package-lock.json
-server/target/

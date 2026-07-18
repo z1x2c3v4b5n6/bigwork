@@ -27,6 +27,12 @@ public class User {
     @Column(nullable = false, length = 20)
     private String role = "student";
 
+    @Column(name = "exam_score")
+    private Integer examScore;
+
+    @Column(name = "target_major", length = 120)
+    private String targetMajor;
+
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
@@ -80,6 +86,11 @@ public class User {
     public void setRole(String role) {
         this.role = role;
     }
+
+    public Integer getExamScore() { return examScore; }
+    public void setExamScore(Integer examScore) { this.examScore = examScore; }
+    public String getTargetMajor() { return targetMajor; }
+    public void setTargetMajor(String targetMajor) { this.targetMajor = targetMajor; }
 
     public LocalDateTime getCreatedAt() {
         return createdAt;

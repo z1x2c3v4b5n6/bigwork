@@ -1,7 +1,6 @@
 package com.example.bigwork.controller;
 
 import com.example.bigwork.dto.LoginRequest;
-import com.example.bigwork.dto.RegisterRequest;
 import com.example.bigwork.dto.UserResponse;
 import com.example.bigwork.service.AuthService;
 import com.example.bigwork.support.SessionUser;
@@ -35,14 +34,6 @@ public class AuthController {
     @PostMapping("/login")
     public ResponseEntity<Map<String, Object>> login(@Valid @RequestBody LoginRequest request, HttpSession session) {
         SessionUser user = authService.login(request);
-        session.setAttribute(SESSION_KEY, user);
-        UserResponse response = authService.toUserResponse(user);
-        return ResponseEntity.ok(Map.of("user", response));
-    }
-
-    @PostMapping("/register")
-    public ResponseEntity<Map<String, Object>> register(@Valid @RequestBody RegisterRequest request, HttpSession session) {
-        SessionUser user = authService.register(request);
         session.setAttribute(SESSION_KEY, user);
         UserResponse response = authService.toUserResponse(user);
         return ResponseEntity.ok(Map.of("user", response));

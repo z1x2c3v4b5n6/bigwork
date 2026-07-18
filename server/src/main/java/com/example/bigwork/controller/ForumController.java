@@ -31,8 +31,8 @@ public class ForumController {
     }
 
     @GetMapping("/topics")
-    public ResponseEntity<Map<String, List<ForumTopicResponse>>> listTopics() {
-        return ResponseEntity.ok(Map.of("topics", forumService.listTopics()));
+    public ResponseEntity<Map<String, List<ForumTopicResponse>>> listTopics(@RequestParam(required=false) String keyword,@RequestParam(required=false) String category,@RequestParam(defaultValue="false") boolean favorites,HttpSession session) {
+        return ResponseEntity.ok(Map.of("topics", forumService.listTopics(currentUser(session),keyword,category,favorites)));
     }
 
     @PostMapping("/topics")
@@ -60,4 +60,10 @@ public class ForumController {
         Long id = forumService.createPost(topicId, request, user);
         return ResponseEntity.status(201).body(Map.of("id", id));
     }
+
+    @PatchMapping("/topics/{topicId}/{action}")
+    public ResponseEntity<Map<String,Boolean>> toggle(@PathVariable Long topicId,@PathVariable String action,HttpSession session){return ResponseEntity.ok(forumService.toggle(topicId,action,currentUser(session)));}
+
+    @DeleteMapping("/topics/{topicId}")
+    public ResponseEntity<Void> delete(@PathVariable Long topicId,HttpSession session){forumService.deleteTopic(topicId,currentUser(session));return ResponseEntity.noContent().build();}
 }

@@ -18,6 +18,9 @@ public class ForumTopic {
     @Column(columnDefinition = "TEXT")
     private String description;
 
+    @Column(length = 40)
+    private String category;
+
     @Column(name = "author_id")
     private Long authorId;
 
@@ -50,6 +53,7 @@ public class ForumTopic {
     public void setDescription(String description) {
         this.description = description;
     }
+    public String getCategory(){return category;} public void setCategory(String value){category=value;}
 
     public Long getAuthorId() {
         return authorId;

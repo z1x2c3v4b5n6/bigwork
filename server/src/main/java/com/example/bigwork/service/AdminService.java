@@ -464,9 +464,11 @@ public class AdminService {
                         topic.getId(),
                         topic.getTitle(),
                         topic.getDescription(),
+                        topic.getCategory() == null ? "备考交流" : topic.getCategory(),
                         resolveAuthorName(topic.getAuthorId()),
                         DateTimeUtils.format(topic.getCreatedAt()),
-                        DateTimeUtils.format(topic.getUpdatedAt())
+                        DateTimeUtils.format(topic.getUpdatedAt()),
+                        0, 0, false, false, true
                 ))
                 .toList();
     }
